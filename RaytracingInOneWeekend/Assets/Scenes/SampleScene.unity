@@ -208,3 +208,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 1056194786}
+  ResolutionScaling: 0.5
+  SamplesPerPixel: 10

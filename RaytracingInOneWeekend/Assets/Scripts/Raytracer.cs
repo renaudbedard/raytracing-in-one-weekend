@@ -13,6 +13,9 @@ namespace RaytracerInOneWeekend
     public class Raytracer : MonoBehaviour
     {
         [SerializeField] UnityEngine.Camera targetCamera = null;
+        
+        [SerializeField] [Range(0.01f, 1)] float ResolutionScaling = 1;
+        [SerializeField] [Range(1, 1000)] int SamplesPerPixel = 100;
 
         CommandBuffer commandBuffer;
         Texture2D backBufferTexture;
@@ -20,22 +23,49 @@ namespace RaytracerInOneWeekend
         NativeArray<Sphere> spheres;
 
         JobHandle raytraceJobHandle;
+        
+        int Width => Mathf.RoundToInt(targetCamera.pixelWidth * ResolutionScaling);
+        int Height => Mathf.RoundToInt(targetCamera.pixelHeight * ResolutionScaling);
 
-        void Awake()
+        void OnValidate()
         {
-            int width = targetCamera.pixelWidth;
-            int height = targetCamera.pixelHeight;
+            if (Application.isPlaying)
+                RebuildBuffers();
+        }
 
-            backBufferTexture = new Texture2D(width, height, TextureFormat.RGBAHalf, false, false);
+        void RebuildBuffers()
+        {
+            if (backBufferTexture != null)
+                Destroy(backBufferTexture);
+                
+            backBufferTexture = new Texture2D(Width, Height, TextureFormat.RGBAHalf, false, true)
+            {
+                filterMode = FilterMode.Point,
+                hideFlags = HideFlags.HideAndDontSave
+            };
 
+            if (commandBuffer != null)
+            {
+                targetCamera.RemoveCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
+                commandBuffer.Release();
+            }
+            
             commandBuffer = new CommandBuffer { name = "Raytracer" };
             commandBuffer.Blit(backBufferTexture, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
             targetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
 
-            backBuffer = new NativeArray<half4>(width * height,
+            if (backBuffer.IsCreated)
+                backBuffer.Dispose();
+            
+            backBuffer = new NativeArray<half4>(Width * Height,
                 Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
+        }
 
+        void Awake()
+        {
+            RebuildBuffers();
+            
             spheres = new NativeArray<Sphere>(2, Allocator.Persistent)
             {
                 [0] = new Sphere(float3(0, 0, -1), 0.5f),
@@ -51,9 +81,7 @@ namespace RaytracerInOneWeekend
 
         void Update()
         {
-            int width = targetCamera.pixelWidth;
-            int height = targetCamera.pixelHeight;
-            float aspect = (float) width / height;
+            float aspect = (float) Width / Height;
 
             var raytracingCamera = new Camera(0, 
                 float3(-aspect, -1, -1), 
@@ -62,14 +90,14 @@ namespace RaytracerInOneWeekend
 
             var raytraceJob = new RaytraceJob
             {
-                Size = int2(width, height), 
+                Size = int2(Width, Height), 
                 Camera = raytracingCamera, 
                 Target = backBuffer,
                 Spheres = spheres,
-                Rng = new Random(1),
-                SampleCount = 100
+                Rng = new Random((uint) Time.frameCount),
+                SampleCount = SamplesPerPixel
             };
-            raytraceJobHandle = raytraceJob.Schedule(width * height, width);
+            raytraceJobHandle = raytraceJob.Schedule(Width * Height, Width);
         }
 
         void LateUpdate()
@@ -81,7 +109,7 @@ namespace RaytracerInOneWeekend
         }
     }
 
-    [BurstCompile]
+    [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
     struct RaytraceJob : IJobParallelFor
     {
         [ReadOnly] public int2 Size;
@@ -94,19 +122,22 @@ namespace RaytracerInOneWeekend
 
         float3 Color(Ray r)
         {
-            if (Spheres.Hit(r, 0, float.PositiveInfinity, out HitRecord rec))
-                return 0.5f * (rec.Normal + 1);
+            if (Spheres.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
+            {
+                float3 target = rec.Point + rec.Normal + Rng.InUnitSphere();
+                return 0.5f * Color(new Ray(rec.Point, target - rec.Point));
+            }
 
             float3 unitDirection = normalize(r.Direction);
             float t = 0.5f * (unitDirection.y + 1);
             return lerp(1, float3(0.5f, 0.7f, 1), t);
         }
-
+        
         public void Execute(int index)
         {
             int2 coordinates = int2(
-            index % Size.x, // column 
-            index / Size.x  // row
+                index % Size.x, // column 
+                index / Size.x  // row
             );
 
             float3 color = 0;
@@ -117,7 +148,7 @@ namespace RaytracerInOneWeekend
                 color += Color(r);
             }
             color /= SampleCount;
-
+            
             Target[index] = half4(half3(color), half(1));
         }
     }
@@ -194,7 +225,26 @@ namespace RaytracerInOneWeekend
         }
     }
 
-    static class HittableExtensions
+    struct Camera
+    {
+        public readonly float3 Origin;
+        public readonly float3 LowerLeftCorner;
+        public readonly float3 Horizontal;
+        public readonly float3 Vertical;
+
+        public Camera(float3 origin, float3 lowerLeftCorner, float3 horizontal, float3 vertical)
+        {
+            Origin = origin;
+            LowerLeftCorner = lowerLeftCorner;
+            Horizontal = horizontal;
+            Vertical = vertical;
+        }
+
+        public Ray GetRay(float2 normalizedCoordinates) => new Ray(Origin,
+                LowerLeftCorner + normalizedCoordinates.x * Horizontal + normalizedCoordinates.y * Vertical - Origin);
+    }
+    
+    static class Extensions
     {
         public static bool Hit(this NativeArray<Sphere> spheres, Ray r, float tMin, float tMax, out HitRecord rec)
         {
@@ -213,24 +263,15 @@ namespace RaytracerInOneWeekend
 
             return hitAnything;
         }
-    }
 
-    struct Camera
-    {
-        public readonly float3 Origin;
-        public readonly float3 LowerLeftCorner;
-        public readonly float3 Horizontal;
-        public readonly float3 Vertical;
-
-        public Camera(float3 origin, float3 lowerLeftCorner, float3 horizontal, float3 vertical)
+        public static float3 InUnitSphere(this Random rng)
         {
-            Origin = origin;
-            LowerLeftCorner = lowerLeftCorner;
-            Horizontal = horizontal;
-            Vertical = vertical;
+            float3 p;
+            do
+            {
+                p = 2 * rng.NextFloat3() - 1;
+            } while (lengthsq(p) >= 1);
+            return p;
         }
-
-        public Ray GetRay(float2 normalizedCoordinates) => new Ray(Origin,
-                LowerLeftCorner + normalizedCoordinates.x * Horizontal + normalizedCoordinates.y * Vertical - Origin);
     }
 }
