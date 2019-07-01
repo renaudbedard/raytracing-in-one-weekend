@@ -17,6 +17,7 @@
     <explicitExcludes>
       <Path>.idea</Path>
       <Path>Library</Path>
+      <Path>Media</Path>
       <Path>MemoryCaptures</Path>
       <Path>Temp</Path>
       <Path>obj</Path>
