@@ -127,39 +127,52 @@ namespace RaytracerInOneWeekend
 
         [WriteOnly] public NativeArray<half4> Target;
 
-        float3 Color(Ray r, int depth)
+        bool Color(Ray r, int depth, out float3 color)
         {
             if (Spheres.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
             {
                 if (depth < TraceDepth && rec.Material.Scatter(r, rec, Rng, out float3 attenuation, out Ray scattered))
-                    return attenuation * Color(scattered, depth + 1);
-                return 0;
+                {
+                    if (Color(scattered, depth + 1, out float3 scatteredColor))
+                    {
+                        color = attenuation * scatteredColor;
+                        return true;
+                    }
+                }
+                color = default;
+                return false;
             }
 
             float3 unitDirection = normalize(r.Direction);
             float t = 0.5f * (unitDirection.y + 1);
-            return lerp(1, float3(0.5f, 0.7f, 1), t);
+            color = lerp(1, float3(0.5f, 0.7f, 1), t);
+            return true;
         }
 
         public void Execute(int index)
         {
             int2 coordinates = int2(
                 index % Size.x, // column 
-                index / Size.x  // row
+                index / Size.x // row
             );
 
-            float3 color = 0;
+            float3 colorAcc = 0;
+            int realSampleCount = 0;
             for (int s = 0; s < SampleCount; s++)
             {
                 float2 normalizedCoordinates = (coordinates + Rng.NextFloat2()) / Size; // (u, v)
                 Ray r = Camera.GetRay(normalizedCoordinates);
-                color += Color(r, 0);
+                if (Color(r, 0, out float3 sampleColor))
+                {
+                    colorAcc += sampleColor;
+                    realSampleCount++;
+                }
             }
-            color /= SampleCount;
+            float3 finalColor = colorAcc / realSampleCount;
 
-            color = color.LinearToGamma();
+            finalColor = finalColor.LinearToGamma();
 
-            Target[index] = half4(half3(color), half(1));
+            Target[index] = half4(half3(finalColor), half(1));
         }
     }
 
@@ -275,8 +288,10 @@ namespace RaytracerInOneWeekend
 
         public static Material Lambertian(float3 albedo) => new Material(MaterialType.Lambertian, albedo);
         public static Material Metal(float3 albedo, float fuzz = 0) => new Material(MaterialType.Metal, albedo, fuzz);
-        public static Material Dielectric(float refractiveIndex) => new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
-        
+
+        public static Material Dielectric(float refractiveIndex) =>
+            new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
+
         [Pure]
         public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
         {
@@ -346,6 +361,7 @@ namespace RaytracerInOneWeekend
                 refracted = niOverNt * (normalizedV - n * dt) - n * sqrt(discriminant);
                 return true;
             }
+
             refracted = default;
             return false;
         }
