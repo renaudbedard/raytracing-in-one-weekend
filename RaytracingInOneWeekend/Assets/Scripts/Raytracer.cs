@@ -68,12 +68,13 @@ namespace RaytracerInOneWeekend
         {
             RebuildBuffers();
 
-            spheres = new NativeArray<Sphere>(4, Allocator.Persistent)
+            spheres = new NativeArray<Sphere>(5, Allocator.Persistent)
             {
-                [0] = new Sphere(float3(0, 0, -1), 0.5f, Material.Lambertian(float3(0.8f, 0.3f, 0.3f))),
+                [0] = new Sphere(float3(0, 0, -1), 0.5f, Material.Lambertian(float3(0.1f, 0.2f, 0.5f))),
                 [1] = new Sphere(float3(0, -100.5f, -1), 100, Material.Lambertian(float3(0.8f, 0.8f, 0.0f))),
                 [2] = new Sphere(float3(1, 0, -1), 0.5f, Material.Metal(float3(0.8f, 0.6f, 0.2f), 0.3f)),
-                [3] = new Sphere(float3(-1, 0, -1), 0.5f, Material.Metal(float3(0.8f, 0.8f, 0.8f), 1)),
+                [3] = new Sphere(float3(-1, 0, -1), 0.5f, Material.Dielectric(1.5f)),
+                [4] = new Sphere(float3(-1, 0, -1), -0.45f, Material.Dielectric(1.5f))
             };
         }
 
@@ -144,7 +145,7 @@ namespace RaytracerInOneWeekend
         {
             int2 coordinates = int2(
                 index % Size.x, // column 
-                index / Size.x // row
+                index / Size.x  // row
             );
 
             float3 color = 0;
@@ -154,7 +155,6 @@ namespace RaytracerInOneWeekend
                 Ray r = Camera.GetRay(normalizedCoordinates);
                 color += Color(r, 0);
             }
-
             color /= SampleCount;
 
             color = color.LinearToGamma();
@@ -263,45 +263,106 @@ namespace RaytracerInOneWeekend
         public readonly MaterialType Type;
         public readonly float3 Albedo;
         public readonly float Fuzz;
+        public readonly float RefractiveIndex;
 
-        private Material(MaterialType type, float3 albedo, float fuzz = 0)
+        Material(MaterialType type, float3 albedo = default, float fuzz = default, float refractiveIndex = default)
         {
             Type = type;
             Albedo = albedo;
             Fuzz = saturate(fuzz);
+            RefractiveIndex = refractiveIndex;
         }
 
         public static Material Lambertian(float3 albedo) => new Material(MaterialType.Lambertian, albedo);
-        public static Material Metal(float3 albedo, float fuzz) => new Material(MaterialType.Metal, albedo, fuzz);
-
+        public static Material Metal(float3 albedo, float fuzz = 0) => new Material(MaterialType.Metal, albedo, fuzz);
+        public static Material Dielectric(float refractiveIndex) => new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
+        
         [Pure]
         public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
         {
             switch (Type)
             {
                 case MaterialType.Lambertian:
+                {
                     float3 target = rec.Point + rec.Normal + rng.InUnitSphere();
                     scattered = new Ray(rec.Point, target - rec.Point);
                     attenuation = Albedo;
                     return true;
+                }
 
                 case MaterialType.Metal:
+                {
                     float3 reflected = reflect(normalize(r.Direction), rec.Normal);
                     scattered = new Ray(rec.Point, reflected + Fuzz * rng.InUnitSphere());
                     attenuation = Albedo;
                     return dot(scattered.Direction, rec.Normal) > 0;
+                }
+
+                case MaterialType.Dielectric:
+                {
+                    float3 reflected = reflect(r.Direction, rec.Normal);
+                    attenuation = 1;
+                    float niOverNt;
+                    float3 outwardNormal;
+                    float cosine;
+
+                    if (dot(r.Direction, rec.Normal) > 0)
+                    {
+                        outwardNormal = -rec.Normal;
+                        niOverNt = RefractiveIndex;
+                        cosine = RefractiveIndex * dot(r.Direction, rec.Normal) / length(r.Direction);
+                    }
+                    else
+                    {
+                        outwardNormal = rec.Normal;
+                        niOverNt = 1 / RefractiveIndex;
+                        cosine = -dot(r.Direction, rec.Normal) / length(r.Direction);
+                    }
+
+                    if (Refract(r.Direction, outwardNormal, niOverNt, out float3 refracted))
+                    {
+                        float reflectProb = Schlick(cosine, RefractiveIndex);
+                        scattered = new Ray(rec.Point, rng.NextFloat() < reflectProb ? reflected : refracted);
+                    }
+                    else
+                        scattered = new Ray(rec.Point, reflected);
+
+                    return true;
+                }
             }
 
             attenuation = default;
             scattered = default;
             return false;
         }
+
+        static bool Refract(float3 v, float3 n, float niOverNt, out float3 refracted)
+        {
+            float3 normalizedV = normalize(v);
+            float dt = dot(normalizedV, n);
+            float discriminant = 1 - niOverNt * niOverNt * (1 - dt * dt);
+            if (discriminant > 0)
+            {
+                refracted = niOverNt * (normalizedV - n * dt) - n * sqrt(discriminant);
+                return true;
+            }
+            refracted = default;
+            return false;
+        }
+
+        static float Schlick(float cosine, float refractiveIndex)
+        {
+            float r0 = (1 - refractiveIndex) / (1 + refractiveIndex);
+            r0 *= r0;
+            return r0 + (1 - r0) * pow((1 - cosine), 5);
+        }
     }
 
     public enum MaterialType
     {
         Lambertian,
-        Metal
+        Metal,
+        Dielectric
     }
 
     static class Extensions

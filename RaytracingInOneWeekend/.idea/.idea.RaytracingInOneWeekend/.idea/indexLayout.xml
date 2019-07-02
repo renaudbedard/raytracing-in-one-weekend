@@ -4,11 +4,9 @@
     <attachedFolders />
     <explicitIncludes>
       <Path>Library/PackageCache/com.unity.burst@1.1.0-preview.3</Path>
-      <Path>Library/PackageCache/com.unity.editorcoroutines@0.0.2-preview.1</Path>
       <Path>Library/PackageCache/com.unity.ext.nunit@1.0.0</Path>
       <Path>Library/PackageCache/com.unity.ide.rider@1.0.8</Path>
       <Path>Library/PackageCache/com.unity.mathematics@1.1.0-preview.1</Path>
-      <Path>Library/PackageCache/com.unity.memoryprofiler@0.1.0-preview.6</Path>
       <Path>Library/PackageCache/com.unity.test-framework@1.0.16</Path>
       <Path>Library/PackageCache/com.unity.textmeshpro@2.0.1</Path>
       <Path>Packages</Path>
@@ -16,6 +14,7 @@
     </explicitIncludes>
     <explicitExcludes>
       <Path>.idea</Path>
+      <Path>Builds</Path>
       <Path>Library</Path>
       <Path>Media</Path>
       <Path>MemoryCaptures</Path>
