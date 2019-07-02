@@ -341,7 +341,7 @@ namespace RaytracerInOneWeekend
                     }
                     else
                         scattered = new Ray(rec.Point, reflected);
-
+                    
                     return true;
                 }
             }
@@ -391,7 +391,7 @@ namespace RaytracerInOneWeekend
             for (var i = 0; i < spheres.Length; i++)
             {
                 Sphere sphere = spheres[i];
-                if (sphere.Hit(r, tMin, tMax, out HitRecord thisRec) && thisRec.Distance < rec.Distance)
+                if (sphere.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
                 {
                     hitAnything = true;
                     rec = thisRec;
