@@ -28,6 +28,9 @@ ExportedObj/
 */.idea/**/workspace.xml
 */.idea/**/contentModel.xml
 
+# Mac
+.DS_Store
+
 # Unity3D generated meta files
 *.pidb.meta
 *.pdb.meta
