@@ -1,16 +1,20 @@
+using System;
 using JetBrains.Annotations;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-    public enum MaterialType : byte
+    enum MaterialType : byte
     {
+        None,
         Lambertian,
         Metal,
         Dielectric
     }
-    
+
     struct Material
     {
         public readonly MaterialType Type;
@@ -37,7 +41,7 @@ namespace RaytracerInOneWeekend
             {
                 case MaterialType.Lambertian:
                 {
-                    float3 target = rec.Point + rec.Normal + rng.InUnitSphere();
+                    float3 target = rec.Point + rec.Normal + rng.UnitVector();
                     scattered = new Ray(rec.Point, target - rec.Point);
                     attenuation = Albedo;
                     return true;
