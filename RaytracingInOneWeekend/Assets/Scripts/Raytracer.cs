@@ -6,7 +6,6 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
-using float3 = Unity.Mathematics.float3;
 using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
@@ -15,9 +14,9 @@ namespace RaytracerInOneWeekend
     {
         [SerializeField] UnityEngine.Camera targetCamera = null;
 
-        [SerializeField] [Range(0.01f, 1)] float ResolutionScaling = 1;
-        [SerializeField] [Range(1, 1000)] int SamplesPerPixel = 100;
-        [SerializeField] [Range(1, 100)] int TraceDepth = 50;
+        [SerializeField] [Range(0.01f, 1)] float resolutionScaling = 1;
+        [SerializeField] [Range(1, 1000)] int samplesPerPixel = 100;
+        [SerializeField] [Range(1, 100)] int traceDepth = 50;
 
         CommandBuffer commandBuffer;
         Texture2D backBufferTexture;
@@ -26,8 +25,8 @@ namespace RaytracerInOneWeekend
 
         JobHandle raytraceJobHandle;
 
-        int Width => Mathf.RoundToInt(targetCamera.pixelWidth * ResolutionScaling);
-        int Height => Mathf.RoundToInt(targetCamera.pixelHeight * ResolutionScaling);
+        int Width => Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
+        int Height => Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
 
         void OnValidate()
         {
@@ -100,8 +99,8 @@ namespace RaytracerInOneWeekend
                 Target = backBuffer,
                 Spheres = spheres,
                 Rng = new Random((uint) Time.frameCount),
-                SampleCount = SamplesPerPixel,
-                TraceDepth = TraceDepth
+                SampleCount = samplesPerPixel,
+                TraceDepth = traceDepth
             };
             raytraceJobHandle = raytraceJob.Schedule(Width * Height, Width);
         }
@@ -288,9 +287,7 @@ namespace RaytracerInOneWeekend
 
         public static Material Lambertian(float3 albedo) => new Material(MaterialType.Lambertian, albedo);
         public static Material Metal(float3 albedo, float fuzz = 0) => new Material(MaterialType.Metal, albedo, fuzz);
-
-        public static Material Dielectric(float refractiveIndex) =>
-            new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
+        public static Material Dielectric(float refractiveIndex) => new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
 
         [Pure]
         public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
@@ -374,7 +371,7 @@ namespace RaytracerInOneWeekend
         }
     }
 
-    public enum MaterialType
+    public enum MaterialType : byte
     {
         Lambertian,
         Metal,
