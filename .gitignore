@@ -23,7 +23,10 @@ ExportedObj/
 *.svd
 *.pdb
 *.opendb
-workspace.xml
+
+# Rider
+*/.idea/**/workspace.xml
+*/.idea/**/contentModel.xml
 
 # Unity3D generated meta files
 *.pidb.meta
