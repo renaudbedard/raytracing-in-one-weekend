@@ -1,4 +1,5 @@
-﻿using Unity.Collections;
+﻿using System.Linq;
+using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
@@ -10,16 +11,20 @@ namespace RaytracerInOneWeekend
 {
     public class Raytracer : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] UnityEngine.Camera targetCamera = null;
 
+        [Header("Settings")]
         [SerializeField] [Range(0.01f, 2)] float resolutionScaling = 1;
         [SerializeField] [Range(1, 1000)] int samplesPerPixel = 100;
         [SerializeField] [Range(1, 100)] int traceDepth = 50;
 
+        [Header("World")] [SerializeField] SphereData[] spheres = null;
+        
         CommandBuffer commandBuffer;
         Texture2D backBufferTexture;
         NativeArray<half4> backBuffer;
-        NativeArray<Sphere> spheres;
+        NativeArray<Sphere> sphereBuffer;
 
         JobHandle raytraceJobHandle;
 
@@ -29,9 +34,24 @@ namespace RaytracerInOneWeekend
         void OnValidate()
         {
             if (Application.isPlaying)
+            {
                 RebuildBuffers();
+                RebuildWorld();
+            }
         }
-
+        
+        void Awake()
+        {
+            RebuildBuffers();
+            RebuildWorld();
+        }
+        
+        void OnDestroy()
+        {
+            if (backBuffer.IsCreated) backBuffer.Dispose();
+            if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
+        }
+        
         void RebuildBuffers()
         {
             if (backBufferTexture != null)
@@ -61,28 +81,36 @@ namespace RaytracerInOneWeekend
                 NativeArrayOptions.UninitializedMemory);
         }
 
-        void Awake()
+        void RebuildWorld()
         {
-            RebuildBuffers();
+            if (sphereBuffer.IsCreated)
+                sphereBuffer.Dispose();
 
-            spheres = new NativeArray<Sphere>(5, Allocator.Persistent)
+            sphereBuffer = new NativeArray<Sphere>(spheres.Count(x => x.Enabled), Allocator.Persistent);
+
+            int i = 0;
+            foreach (var sphere in spheres)
             {
-                [0] = new Sphere(float3(0, 0, -1), 0.5f, Material.Lambertian(float3(0.1f, 0.2f, 0.5f))),
-                [1] = new Sphere(float3(0, -100.5f, -1), 100, Material.Lambertian(float3(0.8f, 0.8f, 0.0f))),
-                [2] = new Sphere(float3(1, 0, -1), 0.5f, Material.Metal(float3(0.8f, 0.6f, 0.2f), 0.3f)),
-                [3] = new Sphere(float3(-1, 0, -1), 0.5f, Material.Dielectric(1.5f)),
-                [4] = new Sphere(float3(-1, 0, -1), -0.45f, Material.Dielectric(1.5f))
-            };
-        }
-
-        void OnDestroy()
-        {
-            if (backBuffer.IsCreated) backBuffer.Dispose();
-            if (spheres.IsCreated) spheres.Dispose();
+                if (!sphere.Enabled)
+                    continue;
+                
+                var materialData = sphere.Material;
+                sphereBuffer[i++] = new Sphere(sphere.Center, sphere.Radius,
+                    new Material(materialData.Type, materialData.Albedo.ToFloat3(), materialData.Fuzz,
+                        materialData.RefractiveIndex));
+            }
         }
 
         void Update()
         {
+#if UNITY_EDITOR
+            if (spheres.Any(x => x.Material.Dirty))
+            {
+                foreach (var sphere in spheres) sphere.Material.Dirty = false;
+                RebuildWorld();
+            }
+#endif
+            
             float aspect = (float) Width / Height;
 
             var raytracingCamera = new Camera(0,
@@ -95,7 +123,7 @@ namespace RaytracerInOneWeekend
                 Size = int2(Width, Height),
                 Camera = raytracingCamera,
                 Target = backBuffer,
-                Spheres = spheres,
+                Spheres = sphereBuffer,
                 Rng = new Random((uint) Time.frameCount),
                 SampleCount = samplesPerPixel,
                 TraceDepth = traceDepth

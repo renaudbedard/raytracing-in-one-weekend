@@ -1,6 +1,8 @@
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
@@ -35,11 +37,25 @@ namespace RaytracerInOneWeekend
 
             return p;
         }
+        
+        public static float3 UnitVector(this Random rng)
+        {
+            float z = rng.NextFloat(-1, 1);
+            float a = rng.NextFloat(2 * PI);
+            float r = sqrt(1.0f - z * z);
+            sincos(a, out float y, out float x);
+            return float3(x * r, y * r, z);
+        }
 
         public static float3 LinearToGamma(this float3 value)
         {
             value = max(value, 0);
             return max(1.055f * pow(value, 0.416666667f) - 0.055f, 0);
+        }
+
+        public static float3 ToFloat3(this Color c)
+        {
+            return float3(c.r, c.g, c.b);
         }
     }
 }

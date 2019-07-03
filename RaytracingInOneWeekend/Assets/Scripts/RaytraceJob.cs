@@ -59,9 +59,15 @@ namespace RaytracerInOneWeekend
                     realSampleCount++;
                 }
             }
-            float3 finalColor = colorAcc / realSampleCount;
 
-            finalColor = finalColor.LinearToGamma();
+            float3 finalColor;
+            if (realSampleCount == 0)
+                finalColor = float3(1, 0, 1);
+            else
+            {
+                finalColor = colorAcc / realSampleCount;
+                finalColor = finalColor.LinearToGamma();
+            }
 
             Target[index] = half4(half3(finalColor), half(1));
         }

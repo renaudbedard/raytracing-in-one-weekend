@@ -1,7 +1,5 @@
-using System;
 using JetBrains.Annotations;
 using Unity.Mathematics;
-using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -22,7 +20,7 @@ namespace RaytracerInOneWeekend
         public readonly float Fuzz;
         public readonly float RefractiveIndex;
 
-        Material(MaterialType type, float3 albedo = default, float fuzz = default, float refractiveIndex = default)
+        public Material(MaterialType type, float3 albedo = default, float fuzz = default, float refractiveIndex = default)
         {
             Type = type;
             Albedo = albedo;
