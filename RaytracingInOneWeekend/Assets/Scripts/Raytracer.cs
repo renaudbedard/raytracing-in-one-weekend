@@ -12,7 +12,7 @@ namespace RaytracerInOneWeekend
     {
         [SerializeField] UnityEngine.Camera targetCamera = null;
 
-        [SerializeField] [Range(0.01f, 1)] float resolutionScaling = 1;
+        [SerializeField] [Range(0.01f, 2)] float resolutionScaling = 1;
         [SerializeField] [Range(1, 1000)] int samplesPerPixel = 100;
         [SerializeField] [Range(1, 100)] int traceDepth = 50;
 
@@ -39,7 +39,7 @@ namespace RaytracerInOneWeekend
 
             backBufferTexture = new Texture2D(Width, Height, TextureFormat.RGBAHalf, false, true)
             {
-                filterMode = FilterMode.Point,
+                filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point,
                 hideFlags = HideFlags.HideAndDontSave
             };
 
