@@ -36,7 +36,8 @@ namespace RaytracerInOneWeekend
         NativeArray<Primitive> primitiveBuffer;
         NativeArray<Sphere> sphereBuffer;
 
-        JobHandle? raytraceJobHandle;
+        JobHandle raytraceJobHandle;
+        RaytraceJob raytraceJob;
         bool commandBufferHooked;
 
         readonly Stopwatch jobTimer = new Stopwatch();
@@ -68,7 +69,6 @@ namespace RaytracerInOneWeekend
             {
                 // we COULD do more fine-grained dirty-checking here
                 worldNeedsRebuild = true;
-
                 Array.Clear(jobTimeAccumulator, 0, jobTimeAccumulator.Length);
             }
         }
@@ -76,8 +76,9 @@ namespace RaytracerInOneWeekend
 
         void OnDestroy()
         {
-            // if there is a running job, wait for completion so that we can dispose buffers
-            raytraceJobHandle?.Complete();
+            // if there is a running job, let it know it needs to cancel and wait for completion
+            raytraceJob.Canceled = true;
+            raytraceJobHandle.Complete();
 
             if (backBuffer.IsCreated) backBuffer.Dispose();
             if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
@@ -86,28 +87,6 @@ namespace RaytracerInOneWeekend
 
         void Update()
         {
-            if (raytraceJobHandle.HasValue)
-            {
-                // don't actively wait for it, just poll completion status
-                if (raytraceJobHandle.Value.IsCompleted)
-                {
-                    // though we do need to call Complete to regain ownership of buffers
-                    raytraceJobHandle.Value.Complete();
-
-                    lastJobDuration = (float) jobTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
-                    jobTimeAccumulator[nextJobTimeIndex] = lastJobDuration;
-                    nextJobTimeIndex = (nextJobTimeIndex + 1) % jobTimeAccumulator.Length;
-                    averageJobDuration = jobTimeAccumulator.Where(x => !Mathf.Approximately(x, 0)).Average();
-
-                    SwapBuffers();
-                }
-                else
-                {
-                    // we already have a job in progress; early out
-                    return;
-                }
-            }
-
 #if UNITY_EDITOR
             // watch for material data changes (won't catch those from OnValidate)
             if (spheres.Any(x => x.Material.Dirty))
@@ -116,15 +95,37 @@ namespace RaytracerInOneWeekend
                 worldNeedsRebuild = true;
             }
 
-            // watch for local field changes
             if (worldNeedsRebuild)
             {
-                RebuildWorld();
-                worldNeedsRebuild = false;
+                if (raytraceJobHandle.IsCompleted)
+                {
+                    raytraceJobHandle.Complete();
+
+                    RebuildWorld();
+                    worldNeedsRebuild = false;
+                }
+                else
+                    raytraceJob.Canceled = true;
             }
 #endif
-            EnsureBuffersBuilt();
-            ScheduleJob();
+
+            // don't actively wait for it, just poll completion status
+            if (raytraceJobHandle.IsCompleted)
+            {
+                // though we do need to call Complete to regain ownership of buffers
+                raytraceJobHandle.Complete();
+
+                lastJobDuration = (float) jobTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
+                jobTimeAccumulator[nextJobTimeIndex] = lastJobDuration;
+                nextJobTimeIndex = (nextJobTimeIndex + 1) % jobTimeAccumulator.Length;
+                averageJobDuration = jobTimeAccumulator.Where(x => !Mathf.Approximately(x, 0)).Average();
+
+                SwapBuffers();
+
+                EnsureBuffersBuilt();
+
+                ScheduleJob();
+            }
         }
 
         void SwapBuffers()
@@ -148,7 +149,7 @@ namespace RaytracerInOneWeekend
                 float3(aspect * 2, 0, 0),
                 float3(0, 2, 0));
 
-            var raytraceJob = new RaytraceJob
+            raytraceJob = new RaytraceJob
             {
                 Size = int2(Width, Height),
                 Camera = raytracingCamera,

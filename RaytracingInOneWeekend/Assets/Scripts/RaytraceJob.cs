@@ -9,6 +9,8 @@ namespace RaytracerInOneWeekend
     [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
     struct RaytraceJob : IJobParallelFor
     {
+        public volatile bool Canceled;
+
         [ReadOnly] public int2 Size;
         [ReadOnly] public Camera Camera;
         [ReadOnly] public int SampleCount;
@@ -58,6 +60,10 @@ namespace RaytracerInOneWeekend
                     colorAcc += sampleColor;
                     realSampleCount++;
                 }
+
+                // check for job cancellation
+                if (Canceled)
+                    return;
             }
 
             float3 finalColor;
