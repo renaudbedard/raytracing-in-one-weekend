@@ -150,7 +150,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 1056194786}
-  resolutionScaling: 1
+  resolutionScaling: 0.1
   samplesPerPixel: 100
   traceDepth: 50
   spheres:
