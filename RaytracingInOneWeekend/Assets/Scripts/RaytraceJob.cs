@@ -66,7 +66,7 @@ namespace RaytracerInOneWeekend
             else
             {
                 finalColor = colorAcc / realSampleCount;
-                finalColor = finalColor.LinearToGamma();
+                finalColor = sqrt(finalColor);
             }
 
             Target[index] = half4(half3(finalColor), half(1));
