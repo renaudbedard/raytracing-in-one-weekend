@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -10,16 +11,17 @@ namespace RaytracerInOneWeekend
         Sphere
     }
 
-    unsafe struct Primitive : IPrimitive
+    struct Primitive : IPrimitive
     {
         public readonly PrimitiveType Type;
 
-        readonly Sphere* sphere;
+        [ReadOnly] readonly NativeSlice<Sphere> sphere;
 
-        // TODO: do we need a public accessor to the underlying one?
+        // TODO: do we need a public accessor to the underlying primitive?
 
-        public Primitive(Sphere* sphere)
+        public Primitive(NativeSlice<Sphere> sphere)
         {
+            Assert.IsTrue(sphere.Length == 1, "Primitive cannot be multi-valued");
             Type = PrimitiveType.Sphere;
             this.sphere = sphere;
         }
@@ -29,7 +31,7 @@ namespace RaytracerInOneWeekend
             switch (Type)
             {
                 case PrimitiveType.Sphere:
-                    return sphere->Hit(r, tMin, tMax, out rec);
+                    return sphere[0].Hit(r, tMin, tMax, out rec);
 
                 default:
                     rec = default;

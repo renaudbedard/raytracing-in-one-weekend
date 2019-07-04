@@ -11,10 +11,10 @@ namespace RaytracerInOneWeekend
     {
         [ReadOnly] public int2 Size;
         [ReadOnly] public Camera Camera;
-        [ReadOnly] public NativeArray<Primitive> Primitives;
         [ReadOnly] public int SampleCount;
         [ReadOnly] public int TraceDepth;
         [ReadOnly] public Random Rng;
+        [ReadOnly] public NativeArray<Primitive> Primitives;
 
         [WriteOnly] public NativeArray<half4> Target;
 

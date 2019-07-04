@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using Sirenix.OdinInspector;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
@@ -29,18 +28,20 @@ namespace RaytracerInOneWeekend
 
         [Title("Debug")]
         [ShowInInspector] [ReadOnly] float lastJobDuration;
+        [ShowInInspector] [ReadOnly] float averageJobDuration;
         [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly] Texture2D frontBuffer;
 
         CommandBuffer commandBuffer;
         NativeArray<half4> backBuffer;
         NativeArray<Primitive> primitiveBuffer;
-
         NativeArray<Sphere> sphereBuffer;
 
         JobHandle? raytraceJobHandle;
         bool commandBufferHooked;
 
         readonly Stopwatch jobTimer = new Stopwatch();
+        readonly float[] jobTimeAccumulator = new float[50];
+        int nextJobTimeIndex;
 
         int Width => Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
         int Height => Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
@@ -90,7 +91,12 @@ namespace RaytracerInOneWeekend
                 {
                     // though we do need to call Complete to regain ownership of buffers
                     raytraceJobHandle.Value.Complete();
+
                     lastJobDuration = (float) jobTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
+                    jobTimeAccumulator[nextJobTimeIndex] = lastJobDuration;
+                    nextJobTimeIndex = (nextJobTimeIndex + 1) % jobTimeAccumulator.Length;
+                    averageJobDuration = jobTimeAccumulator.Where(x => !Mathf.Approximately(x, 0)).Average();
+
                     SwapBuffers();
                 }
                 else
@@ -145,10 +151,10 @@ namespace RaytracerInOneWeekend
                 Size = int2(Width, Height),
                 Camera = raytracingCamera,
                 Target = backBuffer,
-                Primitives = primitiveBuffer,
                 Rng = new Random((uint) Time.frameCount + 1),
                 SampleCount = samplesPerPixel,
-                TraceDepth = traceDepth
+                TraceDepth = traceDepth,
+                Primitives = primitiveBuffer
             };
             raytraceJobHandle = raytraceJob.Schedule(Width * Height, Width);
 
@@ -192,7 +198,7 @@ namespace RaytracerInOneWeekend
             int primitiveCount = 0;
 
             activeSpheres.Clear();
-            foreach (var sphere in spheres)
+            foreach (SphereData sphere in spheres)
                 if (sphere.Enabled)
                     activeSpheres.Add(sphere);
 
@@ -228,11 +234,9 @@ namespace RaytracerInOneWeekend
                     new Material(materialData.Type, materialData.Albedo.ToFloat3(), materialData.Fuzz,
                         materialData.RefractiveIndex));
 
-                var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i);
-                unsafe
-                {
-                    primitiveBuffer[primitiveIndex++] = new Primitive((Sphere*) sphereSlice.GetUnsafeReadOnlyPtr());
-                }
+                var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
+
+                primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
             }
         }
     }
