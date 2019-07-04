@@ -11,7 +11,7 @@ namespace RaytracerInOneWeekend
     {
         [ReadOnly] public int2 Size;
         [ReadOnly] public Camera Camera;
-        [ReadOnly] public NativeArray<Sphere> Spheres;
+        [ReadOnly] public NativeArray<Primitive> Primitives;
         [ReadOnly] public int SampleCount;
         [ReadOnly] public int TraceDepth;
         [ReadOnly] public Random Rng;
@@ -20,7 +20,7 @@ namespace RaytracerInOneWeekend
 
         bool Color(Ray r, int depth, out float3 color)
         {
-            if (Spheres.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
+            if (Primitives.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
             {
                 if (depth < TraceDepth && rec.Material.Scatter(r, rec, Rng, out float3 attenuation, out Ray scattered))
                 {
@@ -43,7 +43,7 @@ namespace RaytracerInOneWeekend
         public void Execute(int index)
         {
             int2 coordinates = int2(
-                index % Size.x, // column 
+                index % Size.x, // column
                 index / Size.x // row
             );
 

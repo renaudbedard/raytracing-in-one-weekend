@@ -1,9 +1,70 @@
+using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-    struct Sphere
+    enum PrimitiveType
+    {
+        None,
+        Sphere
+    }
+
+    unsafe struct Primitive : IPrimitive
+    {
+        public readonly PrimitiveType Type;
+
+        readonly Sphere* sphere;
+
+        // TODO: do we need a public accessor to the underlying one?
+
+        public Primitive(Sphere* sphere)
+        {
+            Type = PrimitiveType.Sphere;
+            this.sphere = sphere;
+        }
+
+        public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
+        {
+            switch (Type)
+            {
+                case PrimitiveType.Sphere:
+                    return sphere->Hit(r, tMin, tMax, out rec);
+
+                default:
+                    rec = default;
+                    return false;
+            }
+        }
+    }
+
+    static class PrimitiveExtensions
+    {
+        public static bool Hit(this NativeArray<Primitive> primitives, Ray r, float tMin, float tMax, out HitRecord rec)
+        {
+            bool hitAnything = false;
+            rec = new HitRecord(tMax, 0, 0, default);
+
+            for (var i = 0; i < primitives.Length; i++)
+            {
+                Primitive sphere = primitives[i];
+                if (sphere.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
+                {
+                    hitAnything = true;
+                    rec = thisRec;
+                }
+            }
+
+            return hitAnything;
+        }
+    }
+
+    interface IPrimitive
+    {
+        bool Hit(Ray r, float tMin, float tMax, out HitRecord rec);
+    }
+
+    struct Sphere : IPrimitive
     {
         public readonly float3 Center;
         public readonly float Radius;

@@ -20,17 +20,13 @@ namespace RaytracerInOneWeekend
         public readonly float Fuzz;
         public readonly float RefractiveIndex;
 
-        public Material(MaterialType type, float3 albedo = default, float fuzz = default, float refractiveIndex = default)
+        public Material(MaterialType type, float3 albedo, float fuzz, float refractiveIndex)
         {
             Type = type;
             Albedo = albedo;
             Fuzz = saturate(fuzz);
             RefractiveIndex = refractiveIndex;
         }
-
-        public static Material Lambertian(float3 albedo) => new Material(MaterialType.Lambertian, albedo);
-        public static Material Metal(float3 albedo, float fuzz = 0) => new Material(MaterialType.Metal, albedo, fuzz);
-        public static Material Dielectric(float refractiveIndex) => new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
 
         [Pure]
         public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
@@ -81,14 +77,15 @@ namespace RaytracerInOneWeekend
                     }
                     else
                         scattered = new Ray(rec.Point, reflected);
-                    
+
                     return true;
                 }
-            }
 
-            attenuation = default;
-            scattered = default;
-            return false;
+                default:
+                    attenuation = default;
+                    scattered = default;
+                    return false;
+            }
         }
 
         static bool Refract(float3 v, float3 n, float niOverNt, out float3 refracted)

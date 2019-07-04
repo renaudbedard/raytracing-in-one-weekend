@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using Sirenix.OdinInspector;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
@@ -25,13 +26,15 @@ namespace RaytracerInOneWeekend
         [SerializeField] [Range(1, 100)] int traceDepth = 50;
 
         [Title("World")] [SerializeField] SphereData[] spheres = null;
-        
+
         [Title("Debug")]
         [ShowInInspector] [ReadOnly] float lastJobDuration;
         [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly] Texture2D frontBuffer;
 
         CommandBuffer commandBuffer;
         NativeArray<half4> backBuffer;
+        NativeArray<Primitive> primitiveBuffer;
+
         NativeArray<Sphere> sphereBuffer;
 
         JobHandle? raytraceJobHandle;
@@ -55,7 +58,7 @@ namespace RaytracerInOneWeekend
             RebuildWorld();
             ScheduleJob();
         }
-        
+
 #if UNITY_EDITOR
         bool worldNeedsRebuild;
         void OnValidate()
@@ -72,8 +75,9 @@ namespace RaytracerInOneWeekend
         {
             // if there is a running job, wait for completion so that we can dispose buffers
             raytraceJobHandle?.Complete();
-            
+
             if (backBuffer.IsCreated) backBuffer.Dispose();
+            if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
             if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
         }
 
@@ -95,7 +99,7 @@ namespace RaytracerInOneWeekend
                     return;
                 }
             }
-            
+
 #if UNITY_EDITOR
             // watch for material data changes (won't catch those from OnValidate)
             if (spheres.Any(x => x.Material.Dirty))
@@ -103,7 +107,7 @@ namespace RaytracerInOneWeekend
                 foreach (var sphere in spheres) sphere.Material.Dirty = false;
                 worldNeedsRebuild = true;
             }
-            
+
             // watch for local field changes
             if (worldNeedsRebuild)
             {
@@ -141,19 +145,19 @@ namespace RaytracerInOneWeekend
                 Size = int2(Width, Height),
                 Camera = raytracingCamera,
                 Target = backBuffer,
-                Spheres = sphereBuffer,
+                Primitives = primitiveBuffer,
                 Rng = new Random((uint) Time.frameCount + 1),
                 SampleCount = samplesPerPixel,
                 TraceDepth = traceDepth
             };
             raytraceJobHandle = raytraceJob.Schedule(Width * Height, Width);
-            
+
             // kick the job system
             JobHandle.ScheduleBatchedJobs();
-            
+
             jobTimer.Restart();
         }
-        
+
         void EnsureBuffersBuilt()
         {
             if (frontBuffer.width != Width || frontBuffer.height != Height)
@@ -185,19 +189,37 @@ namespace RaytracerInOneWeekend
         readonly List<SphereData> activeSpheres = new List<SphereData>();
         void RebuildWorld()
         {
+            int primitiveCount = 0;
+
             activeSpheres.Clear();
             foreach (var sphere in spheres)
                 if (sphere.Enabled)
                     activeSpheres.Add(sphere);
 
+            primitiveCount += activeSpheres.Count;
+
+            // other typed active primitives would be collected here
+
+            // rebuild primitive buffer
+            if (!primitiveBuffer.IsCreated || primitiveBuffer.Length != primitiveCount)
+            {
+                if (primitiveBuffer.IsCreated)
+                    primitiveBuffer.Dispose();
+
+                primitiveBuffer = new NativeArray<Primitive>(primitiveCount, Allocator.Persistent);
+            }
+
+            // rebuild individual typed primitive buffers
             if (!sphereBuffer.IsCreated || sphereBuffer.Length != activeSpheres.Count)
             {
                 if (sphereBuffer.IsCreated)
                     sphereBuffer.Dispose();
-                
+
                 sphereBuffer = new NativeArray<Sphere>(activeSpheres.Count, Allocator.Persistent);
             }
 
+            // collect primitives
+            int primitiveIndex = 0;
             for (var i = 0; i < activeSpheres.Count; i++)
             {
                 var sphereData = activeSpheres[i];
@@ -205,7 +227,13 @@ namespace RaytracerInOneWeekend
                 sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius,
                     new Material(materialData.Type, materialData.Albedo.ToFloat3(), materialData.Fuzz,
                         materialData.RefractiveIndex));
+
+                var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i);
+                unsafe
+                {
+                    primitiveBuffer[primitiveIndex++] = new Primitive((Sphere*) sphereSlice.GetUnsafeReadOnlyPtr());
+                }
             }
-        }        
+        }
     }
 }

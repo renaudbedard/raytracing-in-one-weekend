@@ -6,26 +6,8 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-    static class Extensions
+    static class MathExtensions
     {
-        public static bool Hit(this NativeArray<Sphere> spheres, Ray r, float tMin, float tMax, out HitRecord rec)
-        {
-            bool hitAnything = false;
-            rec = new HitRecord(tMax, 0, 0, default);
-
-            for (var i = 0; i < spheres.Length; i++)
-            {
-                Sphere sphere = spheres[i];
-                if (sphere.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
-                {
-                    hitAnything = true;
-                    rec = thisRec;
-                }
-            }
-
-            return hitAnything;
-        }
-
         public static float3 InUnitSphere(this Random rng)
         {
             // TODO: is this really as fast it gets?
@@ -37,7 +19,7 @@ namespace RaytracerInOneWeekend
 
             return p;
         }
-        
+
         public static float3 UnitVector(this Random rng)
         {
             float z = rng.NextFloat(-1, 1);
