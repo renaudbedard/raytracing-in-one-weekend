@@ -68,6 +68,8 @@ namespace RaytracerInOneWeekend
             {
                 // we COULD do more fine-grained dirty-checking here
                 worldNeedsRebuild = true;
+
+                Array.Clear(jobTimeAccumulator, 0, jobTimeAccumulator.Length);
             }
         }
 #endif
