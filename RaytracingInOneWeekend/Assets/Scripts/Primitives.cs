@@ -47,8 +47,8 @@ namespace RaytracerInOneWeekend
 
             for (var i = 0; i < primitives.Length; i++)
             {
-                Primitive sphere = primitives[i];
-                if (sphere.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
+                Primitive primitive = primitives[i];
+                if (primitive.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
                 {
                     hitAnything = true;
                     rec = thisRec;
