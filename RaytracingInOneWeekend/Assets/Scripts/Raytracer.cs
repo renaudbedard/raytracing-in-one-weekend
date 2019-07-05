@@ -16,18 +16,19 @@ namespace RaytracerInOneWeekend
 {
     public class Raytracer : MonoBehaviour
     {
-        [Title("References")] [SerializeField] UnityEngine.Camera targetCamera = null;
+        [Title("References")] 
+        [SerializeField] UnityEngine.Camera targetCamera = null;
 
-        [Title("Settings")] [SerializeField] [Range(0.01f, 2)]
-        float resolutionScaling = 1;
-
-        [SerializeField] [Range(1, 2000)] int samplesPerPixel = 100;
+        [Title("Settings")] 
+        [SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
+        [SerializeField] [Range(1, 2000)] int samplesPerPixel = 2000;
         [SerializeField] [Range(1, 100)] int samplesPerBatch = 10;
-        [SerializeField] [Range(1, 100)] int traceDepth = 50;
+        [SerializeField] [Range(1, 100)] int traceDepth = 20;
         [SerializeField] bool previewAfterBatch = true;
         [SerializeField] bool stopWhenCompleted = true;
 
-        [Title("World")] [SerializeField] SphereData[] spheres = null;
+        [Title("World")]
+        [SerializeField] SphereData[] spheres = null;
 
         [Title("Debug")] 
         [ShowInInspector] [ReadOnly] float lastTraceDuration;
@@ -45,6 +46,7 @@ namespace RaytracerInOneWeekend
         bool commandBufferHooked;
 
         readonly Stopwatch traceTimer = new Stopwatch();
+        readonly List<SphereData> activeSpheres = new List<SphereData>();
 
         int bufferWidth, bufferHeight;
 
@@ -270,8 +272,6 @@ namespace RaytracerInOneWeekend
             bufferWidth = width;
             bufferHeight = height;
         }
-
-        readonly List<SphereData> activeSpheres = new List<SphereData>();
 
         void RebuildWorld()
         {
