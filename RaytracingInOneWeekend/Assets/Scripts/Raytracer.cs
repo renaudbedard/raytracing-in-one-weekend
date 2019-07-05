@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using Sirenix.OdinInspector;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -10,7 +9,13 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
+
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
 using ReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
+#else
+using Title = UnityEngine.HeaderAttribute; 
+#endif
 
 namespace RaytracerInOneWeekend
 {
@@ -34,10 +39,27 @@ namespace RaytracerInOneWeekend
         [Title("World")]
         [SerializeField] SphereData[] spheres = null;
 
-        [Title("Debug")] 
-        [ShowInInspector] [ReadOnly] float lastTraceDuration;
-        [ShowInInspector] [ReadOnly] int accumulatedSamples;
-        [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly] Texture2D frontBuffer;
+        [Title("Debug")]
+#if ODIN_INSPECTOR        
+        [ShowInInspector] [ReadOnly] 
+#else
+        public
+#endif
+        float lastTraceDuration;
+        
+#if ODIN_INSPECTOR        
+        [ShowInInspector] [ReadOnly] 
+#else
+        public
+#endif        
+        int accumulatedSamples;
+        
+#if ODIN_INSPECTOR        
+        [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly]  
+#else
+        public
+#endif
+        Texture2D frontBuffer;
 
         CommandBuffer commandBuffer;
         NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
