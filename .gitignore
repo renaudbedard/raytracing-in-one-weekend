@@ -41,3 +41,6 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
+
+# Non-redistributable packages
+*/Assets/Plugins/Sirenix

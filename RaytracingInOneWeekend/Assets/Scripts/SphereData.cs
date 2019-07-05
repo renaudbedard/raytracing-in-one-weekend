@@ -1,6 +1,9 @@
 using System;
-using Sirenix.OdinInspector;
 using UnityEngine;
+
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#endif
 
 namespace RaytracerInOneWeekend
 {
@@ -10,7 +13,12 @@ namespace RaytracerInOneWeekend
         [SerializeField] bool enabled = true;
         [SerializeField] Vector3 center = Vector3.zero;
         [SerializeField] float radius = 1;
-        [SerializeField] [InlineEditor] MaterialData material = null;
+        
+        [SerializeField] 
+#if ODIN_INSPECTOR        
+        [InlineEditor] 
+#endif
+        MaterialData material = null;
         
         public bool Enabled => enabled;
         public Vector3 Center => center;
