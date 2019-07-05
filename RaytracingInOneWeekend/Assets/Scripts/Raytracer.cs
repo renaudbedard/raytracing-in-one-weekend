@@ -16,36 +16,37 @@ namespace RaytracerInOneWeekend
 {
     public class Raytracer : MonoBehaviour
     {
-        [Title("References")]
-        [SerializeField] UnityEngine.Camera targetCamera = null;
+        [Title("References")] [SerializeField] UnityEngine.Camera targetCamera = null;
 
-        [Title("Settings")]
-        [SerializeField] [Range(0.01f, 2)] float resolutionScaling = 1;
-        [SerializeField] [Range(1, 1000)] int samplesPerPixel = 100;
+        [Title("Settings")] [SerializeField] [Range(0.01f, 2)]
+        float resolutionScaling = 1;
+
+        [SerializeField] [Range(1, 2000)] int samplesPerPixel = 100;
+        [SerializeField] [Range(1, 100)] int samplesPerBatch = 10;
         [SerializeField] [Range(1, 100)] int traceDepth = 50;
+        [SerializeField] bool previewAfterBatch = true;
+        [SerializeField] bool stopWhenCompleted = true;
 
         [Title("World")] [SerializeField] SphereData[] spheres = null;
 
-        [Title("Debug")]
-        [ShowInInspector] [ReadOnly] float lastJobDuration;
-        [ShowInInspector] [ReadOnly] float averageJobDuration;
+        [Title("Debug")] 
+        [ShowInInspector] [ReadOnly] float lastTraceDuration;
+        [ShowInInspector] [ReadOnly] int accumulatedSamples;
         [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly] Texture2D frontBuffer;
 
         CommandBuffer commandBuffer;
+        NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
         NativeArray<half4> backBuffer;
         NativeArray<Primitive> primitiveBuffer;
         NativeArray<Sphere> sphereBuffer;
 
-        JobHandle raytraceJobHandle;
-        RaytraceJob raytraceJob;
+        JobHandle? accumulateJobHandle;
+        JobHandle? combineJobHandle;
         bool commandBufferHooked;
 
-        readonly Stopwatch jobTimer = new Stopwatch();
-        readonly float[] jobTimeAccumulator = new float[50];
-        int nextJobTimeIndex;
+        readonly Stopwatch traceTimer = new Stopwatch();
 
-        int Width => Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
-        int Height => Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
+        int bufferWidth, bufferHeight;
 
         void Awake()
         {
@@ -56,9 +57,9 @@ namespace RaytracerInOneWeekend
                 hideFlags = HideFlags.HideAndDontSave
             };
 
-            EnsureBuffersBuilt();
             RebuildWorld();
-            ScheduleJob();
+            EnsureBuffersBuilt();
+            ScheduleAccumulate();
         }
 
 #if UNITY_EDITOR
@@ -66,23 +67,21 @@ namespace RaytracerInOneWeekend
         void OnValidate()
         {
             if (Application.isPlaying)
-            {
-                // we COULD do more fine-grained dirty-checking here
                 worldNeedsRebuild = true;
-                Array.Clear(jobTimeAccumulator, 0, jobTimeAccumulator.Length);
-            }
         }
 #endif
 
         void OnDestroy()
         {
             // if there is a running job, let it know it needs to cancel and wait for completion
-            raytraceJob.Canceled = true;
-            raytraceJobHandle.Complete();
+            accumulateJobHandle?.Complete();
+            combineJobHandle?.Complete();
 
             if (backBuffer.IsCreated) backBuffer.Dispose();
             if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
             if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
+            if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
+            if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
         }
 
         void Update()
@@ -95,37 +94,86 @@ namespace RaytracerInOneWeekend
                 worldNeedsRebuild = true;
             }
 
-            if (worldNeedsRebuild)
+            if (worldNeedsRebuild && (accumulateJobHandle == null && combineJobHandle == null ||
+                                      (accumulateJobHandle?.IsCompleted ?? false) ||
+                                      (combineJobHandle?.IsCompleted ?? false)))
             {
-                if (raytraceJobHandle.IsCompleted)
-                {
-                    raytraceJobHandle.Complete();
+                accumulateJobHandle?.Complete();
+                combineJobHandle?.Complete();
+                accumulateJobHandle = combineJobHandle = null;
 
-                    RebuildWorld();
-                    worldNeedsRebuild = false;
-                }
-                else
-                    raytraceJob.Canceled = true;
+                RebuildWorld();
+                worldNeedsRebuild = false;
+
+                accumulatedSamples = 0;
+                if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
+                EnsureBuffersBuilt();
+                traceTimer.Restart();
+
+                ForceUpdateInspector();
+
+                ScheduleAccumulate();
             }
 #endif
 
-            // don't actively wait for it, just poll completion status
-            if (raytraceJobHandle.IsCompleted)
+            if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
             {
-                // though we do need to call Complete to regain ownership of buffers
-                raytraceJobHandle.Complete();
+                accumulateJobHandle.Value.Complete();
+                accumulateJobHandle = null;
+                
+                accumulatedSamples += samplesPerBatch;
+                
+                ForceUpdateInspector();
 
-                lastJobDuration = (float) jobTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
-                jobTimeAccumulator[nextJobTimeIndex] = lastJobDuration;
-                nextJobTimeIndex = (nextJobTimeIndex + 1) % jobTimeAccumulator.Length;
-                averageJobDuration = jobTimeAccumulator.Where(x => !Mathf.Approximately(x, 0)).Average();
+                if (accumulatedSamples >= samplesPerPixel || previewAfterBatch)
+                    ScheduleCombine();
+                else
+                {
+                    ExchangeBuffers(ref accumulationInputBuffer, ref accumulationOutputBuffer);
+                    ScheduleAccumulate();
+                }
+            }
+
+            if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
+            {
+                combineJobHandle.Value.Complete();
+                combineJobHandle = null;
+
+                bool traceCompleted = false;
+                if (accumulatedSamples >= samplesPerPixel)
+                {
+                    traceCompleted = true;
+                    lastTraceDuration = (float) traceTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
+                }
 
                 SwapBuffers();
 
-                EnsureBuffersBuilt();
+                ForceUpdateInspector();
 
-                ScheduleJob();
+                if (traceCompleted)
+                {
+                    if (stopWhenCompleted)
+                        return;
+                    
+                    accumulatedSamples = 0;
+                    
+                    accumulationInputBuffer.Dispose();
+                    EnsureBuffersBuilt();
+
+                    traceTimer.Restart();
+                }
+                else
+                    ExchangeBuffers(ref accumulationInputBuffer, ref accumulationOutputBuffer);
+
+                ScheduleAccumulate();
             }
+        }
+
+        void ForceUpdateInspector()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
         }
 
         void SwapBuffers()
@@ -140,36 +188,49 @@ namespace RaytracerInOneWeekend
             }
         }
 
-        void ScheduleJob()
+        void ScheduleAccumulate()
         {
-            float aspect = (float) Width / Height;
+            float aspect = (float) bufferWidth / bufferHeight;
 
             var raytracingCamera = new Camera(0,
                 float3(-aspect, -1, -1),
                 float3(aspect * 2, 0, 0),
                 float3(0, 2, 0));
-
-            raytraceJob = new RaytraceJob
+            
+            var job = new AccumulateJob
             {
-                Size = int2(Width, Height),
+                Size = int2(bufferWidth, bufferHeight),
                 Camera = raytracingCamera,
-                Target = backBuffer,
+                InputSamples = accumulationInputBuffer,
+                OutputSamples = accumulationOutputBuffer,
                 Rng = new Random((uint) Time.frameCount + 1),
-                SampleCount = samplesPerPixel,
+                SampleCount = Math.Min(samplesPerPixel, samplesPerBatch),
                 TraceDepth = traceDepth,
                 Primitives = primitiveBuffer
             };
-            raytraceJobHandle = raytraceJob.Schedule(Width * Height, Width);
+            accumulateJobHandle = job.Schedule(bufferWidth * bufferHeight, bufferWidth);
 
-            // kick the job system
             JobHandle.ScheduleBatchedJobs();
+        }
 
-            jobTimer.Restart();
+        void ScheduleCombine()
+        {
+            var job = new CombineJob
+            {
+                Input = accumulationOutputBuffer,
+                Output = backBuffer
+            };
+            combineJobHandle = job.Schedule(bufferWidth * bufferHeight, bufferWidth);
+
+            JobHandle.ScheduleBatchedJobs();
         }
 
         void EnsureBuffersBuilt()
         {
-            if (frontBuffer.width != Width || frontBuffer.height != Height)
+            int width = Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
+            int height = Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
+            
+            if (frontBuffer.width != width || frontBuffer.height != height)
             {
                 if (commandBufferHooked)
                 {
@@ -177,25 +238,41 @@ namespace RaytracerInOneWeekend
                     commandBufferHooked = false;
                 }
 
-                frontBuffer.Resize(Width, Height);
+                frontBuffer.Resize(width, height);
                 frontBuffer.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
 
                 commandBuffer.Clear();
                 commandBuffer.Blit(frontBuffer, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
             }
 
-            if (backBuffer.Length != Width * Height)
+            if (backBuffer.Length != width * height)
             {
-                if (backBuffer.IsCreated)
-                    backBuffer.Dispose();
-
-                backBuffer = new NativeArray<half4>(Width * Height,
+                if (backBuffer.IsCreated) backBuffer.Dispose();
+                backBuffer = new NativeArray<half4>(width * height,
                     Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
             }
+            
+            if (accumulationInputBuffer.Length != width * height)
+            {
+                if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
+                accumulationInputBuffer = new NativeArray<float4>(width * height, Allocator.Persistent);
+            }
+            
+            if (accumulationOutputBuffer.Length != width * height)
+            {
+                if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
+                accumulationOutputBuffer = new NativeArray<float4>(width * height,
+                    Allocator.Persistent,
+                    NativeArrayOptions.UninitializedMemory);
+            }
+
+            bufferWidth = width;
+            bufferHeight = height;
         }
 
         readonly List<SphereData> activeSpheres = new List<SphereData>();
+
         void RebuildWorld()
         {
             int primitiveCount = 0;
@@ -241,6 +318,13 @@ namespace RaytracerInOneWeekend
 
                 primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
             }
+        }
+
+        static void ExchangeBuffers(ref NativeArray<float4> lhs, ref NativeArray<float4> rhs)
+        {
+            var temp = lhs;
+            lhs = rhs;
+            rhs = temp;
         }
     }
 }

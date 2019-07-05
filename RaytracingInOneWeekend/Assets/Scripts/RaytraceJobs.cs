@@ -7,18 +7,17 @@ using static Unity.Mathematics.math;
 namespace RaytracerInOneWeekend
 {
     [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
-    struct RaytraceJob : IJobParallelFor
+    struct AccumulateJob : IJobParallelFor
     {
-        public volatile bool Canceled;
-
         [ReadOnly] public int2 Size;
         [ReadOnly] public Camera Camera;
         [ReadOnly] public int SampleCount;
         [ReadOnly] public int TraceDepth;
         [ReadOnly] public Random Rng;
         [ReadOnly] public NativeArray<Primitive> Primitives;
-
-        [WriteOnly] public NativeArray<half4> Target;
+        
+        [ReadOnly] public NativeArray<float4> InputSamples;
+        [WriteOnly] public NativeArray<float4> OutputSamples;
 
         bool Color(Ray r, int depth, out float3 color)
         {
@@ -49,8 +48,11 @@ namespace RaytracerInOneWeekend
                 index / Size.x // row
             );
 
-            float3 colorAcc = 0;
-            int realSampleCount = 0;
+            float4 lastValue = InputSamples[index];
+
+            float3 colorAcc = lastValue.xyz;
+            int sampleCount = (int) lastValue.w;
+            
             for (int s = 0; s < SampleCount; s++)
             {
                 float2 normalizedCoordinates = (coordinates + Rng.NextFloat2()) / Size; // (u, v)
@@ -58,24 +60,34 @@ namespace RaytracerInOneWeekend
                 if (Color(r, 0, out float3 sampleColor))
                 {
                     colorAcc += sampleColor;
-                    realSampleCount++;
+                    sampleCount++;
                 }
-
-                // check for job cancellation
-                if (Canceled)
-                    return;
             }
 
+            OutputSamples[index] = float4(colorAcc, sampleCount);
+        }
+    }
+    
+    [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+    struct CombineJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<float4> Input;
+        [WriteOnly] public NativeArray<half4> Output;
+
+        public void Execute(int index)
+        {
+            var realSampleCount = (int) Input[index].w;
+            
             float3 finalColor;
             if (realSampleCount == 0)
                 finalColor = float3(1, 0, 1);
             else
             {
-                finalColor = colorAcc / realSampleCount;
+                finalColor = Input[index].xyz / realSampleCount;
                 finalColor = sqrt(finalColor);
             }
 
-            Target[index] = half4(half3(finalColor), half(1));
+            Output[index] = half4(half3(finalColor), half(1));
         }
     }
 }
