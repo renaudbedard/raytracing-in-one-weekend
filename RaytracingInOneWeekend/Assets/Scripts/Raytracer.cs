@@ -16,17 +16,17 @@ using Random = Unity.Mathematics.Random;
 using Sirenix.OdinInspector;
 using ReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
 #else
-using Title = UnityEngine.HeaderAttribute; 
+using Title = UnityEngine.HeaderAttribute;
 #endif
 
 namespace RaytracerInOneWeekend
 {
     public class Raytracer : MonoBehaviour
     {
-        [Title("References")] 
+        [Title("References")]
         [SerializeField] UnityEngine.Camera targetCamera = null;
 
-        [Title("Settings")] 
+        [Title("Settings")]
         [SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
         [SerializeField] [Range(1, 2000)] int samplesPerPixel = 2000;
         [SerializeField] [Range(1, 100)] int samplesPerBatch = 10;
@@ -34,45 +34,45 @@ namespace RaytracerInOneWeekend
         [SerializeField] bool previewAfterBatch = true;
         [SerializeField] bool stopWhenCompleted = true;
 
-        [Title("Camera")] 
+        [Title("Camera")]
         [SerializeField] [Range(0, 180)] float fieldOfView = 90;
         [SerializeField] float3 cameraOrigin = new float3(13, 2, 3);
         [SerializeField] float3 cameraLookAt = new float3(0, 0, 0);
         [SerializeField] float cameraAperture = 0.1f;
         [SerializeField] float focalDistance = 10;
 
-        [Title("World")] 
+        [Title("World")]
         [SerializeField] bool randomScene = true;
-#if ODIN_INSPECTOR        
+#if ODIN_INSPECTOR
         [ShowIf(nameof(randomScene))]
 #endif
         [SerializeField] uint sceneSeed = 45573880;
-#if ODIN_INSPECTOR        
-        [HideIf(nameof(randomScene))] 
-#endif 
+#if ODIN_INSPECTOR
+        [HideIf(nameof(randomScene))]
+#endif
         [SerializeField] SphereData[] spheres = null;
 
         [Title("Debug")]
-#if ODIN_INSPECTOR        
-        [ShowInInspector] [ReadOnly] 
+#if ODIN_INSPECTOR
+        [ShowInInspector] [ReadOnly]
 #else
         public
 #endif
         float lastBatchDuration;
-#if ODIN_INSPECTOR        
-        [ShowInInspector] [ReadOnly] 
+#if ODIN_INSPECTOR
+        [ShowInInspector] [ReadOnly]
 #else
         public
 #endif
-        float lastTraceDuration;        
-#if ODIN_INSPECTOR        
-        [ShowInInspector] [ReadOnly] 
+        float lastTraceDuration;
+#if ODIN_INSPECTOR
+        [ShowInInspector] [ReadOnly]
 #else
         public
-#endif        
+#endif
         int accumulatedSamples;
-#if ODIN_INSPECTOR        
-        [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly]  
+#if ODIN_INSPECTOR
+        [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly]
 #else
         public
 #endif
@@ -89,7 +89,7 @@ namespace RaytracerInOneWeekend
                     $"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
         }
 #endif
-        
+
         CommandBuffer commandBuffer;
         NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
         NativeArray<half4> backBuffer;
@@ -99,7 +99,7 @@ namespace RaytracerInOneWeekend
         JobHandle? accumulateJobHandle;
         JobHandle? combineJobHandle;
         bool commandBufferHooked;
-        bool worldNeedsRebuild;        
+        bool worldNeedsRebuild;
 
         readonly Stopwatch batchTimer = new Stopwatch();
         readonly Stopwatch traceTimer = new Stopwatch();
@@ -135,7 +135,6 @@ namespace RaytracerInOneWeekend
             accumulateJobHandle?.Complete();
             combineJobHandle?.Complete();
 
-            if (backBuffer.IsCreated) backBuffer.Dispose();
             if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
             if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
             if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
@@ -152,15 +151,15 @@ namespace RaytracerInOneWeekend
                 worldNeedsRebuild = true;
             }
 #endif
-            
+
             int currentWidth = Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
             int currentHeight = Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
-            
+
             bool noActiveJob = accumulateJobHandle == null && combineJobHandle == null;
             bool jobCompleted = (accumulateJobHandle?.IsCompleted ?? false) ||
                                 (combineJobHandle?.IsCompleted ?? false);
             bool buffersNeedRebuild = currentWidth != bufferWidth || currentHeight != bufferHeight;
-            
+
             if ((noActiveJob || jobCompleted) && (worldNeedsRebuild || buffersNeedRebuild))
             {
                 accumulateJobHandle?.Complete();
@@ -169,7 +168,7 @@ namespace RaytracerInOneWeekend
 
                 if (worldNeedsRebuild)
                     RebuildWorld();
-                
+
                 EnsureBuffersBuilt();
 
                 ScheduleAccumulate(true);
@@ -179,11 +178,11 @@ namespace RaytracerInOneWeekend
             {
                 accumulateJobHandle.Value.Complete();
                 accumulateJobHandle = null;
-                
+
                 accumulatedSamples += samplesPerBatch;
                 lastBatchDuration = (float) batchTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
                 ForceUpdateInspector();
-                
+
                 if (accumulatedSamples >= samplesPerPixel || previewAfterBatch)
                     ScheduleCombine();
                 else
@@ -194,7 +193,7 @@ namespace RaytracerInOneWeekend
             {
                 combineJobHandle.Value.Complete();
                 combineJobHandle = null;
-                
+
                 bool traceCompleted = false;
                 if (accumulatedSamples >= samplesPerPixel)
                 {
@@ -219,7 +218,6 @@ namespace RaytracerInOneWeekend
 
         void SwapBuffers()
         {
-            frontBuffer.LoadRawTextureData(backBuffer);
             frontBuffer.Apply(false);
 
             if (!commandBufferHooked)
@@ -233,7 +231,7 @@ namespace RaytracerInOneWeekend
         {
             var raytracingCamera = new Camera(cameraOrigin, cameraLookAt, float3(0, 1, 0),
                 fieldOfView, (float) bufferWidth / bufferHeight, cameraAperture, focalDistance);
-            
+
             if (firstBatch)
             {
                 accumulationInputBuffer.Dispose();
@@ -248,7 +246,7 @@ namespace RaytracerInOneWeekend
                 ExchangeBuffers(ref accumulationInputBuffer, ref accumulationOutputBuffer);
 
             batchTimer.Restart();
-            
+
             var job = new AccumulateJob
             {
                 Size = int2(bufferWidth, bufferHeight),
@@ -281,7 +279,7 @@ namespace RaytracerInOneWeekend
         {
             int width = Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
             int height = Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
-            
+
             if (frontBuffer.width != width || frontBuffer.height != height)
             {
                 if (commandBufferHooked)
@@ -292,38 +290,29 @@ namespace RaytracerInOneWeekend
 
                 frontBuffer.Resize(width, height);
                 frontBuffer.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
+                backBuffer = frontBuffer.GetRawTextureData<half4>();
 
                 commandBuffer.Clear();
                 commandBuffer.Blit(frontBuffer, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
-                
+
                 Debug.Log($"Rebuilt front buffer (now {width} x {height})");
             }
 
-            if (backBuffer.Length != width * height)
-            {
-                if (backBuffer.IsCreated) backBuffer.Dispose();
-                backBuffer = new NativeArray<half4>(width * height,
-                    Allocator.Persistent,
-                    NativeArrayOptions.UninitializedMemory);
-                
-                Debug.Log($"Rebuilt back buffer (now {width} x {height})");
-            }
-            
             if (accumulationInputBuffer.Length != width * height)
             {
                 if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
                 accumulationInputBuffer = new NativeArray<float4>(width * height, Allocator.Persistent);
-                
+
                 Debug.Log($"Rebuilt accumulation input buffer (now {width} x {height})");
             }
-            
+
             if (accumulationOutputBuffer.Length != width * height)
             {
                 if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
                 accumulationOutputBuffer = new NativeArray<float4>(width * height,
                     Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
-                
+
                 Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
             }
 
@@ -339,7 +328,7 @@ namespace RaytracerInOneWeekend
                 worldNeedsRebuild = false;
                 return;
             }
-            
+
             int primitiveCount = 0;
 
             activeSpheres.Clear();
@@ -378,14 +367,14 @@ namespace RaytracerInOneWeekend
                 var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
                 primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
             }
-            
+
             worldNeedsRebuild = false;
         }
 
         void BuildRandomScene()
         {
             int n = 500;
-            
+
             if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
             sphereBuffer = new NativeArray<Sphere>(n, Allocator.Persistent)
             {
@@ -401,14 +390,14 @@ namespace RaytracerInOneWeekend
                 {
                     float materialProb = rng.NextFloat();
                     float3 center = float3(a + 0.9f * rng.NextFloat(), 0.2f, b + 0.9f * rng.NextFloat());
-                    
+
                     if (distance(center, float3(4, 0.2f, 0)) <= 0.9)
                         continue;
 
                     if (materialProb < 0.8)
                         sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, Material.Lambertian(rng.NextFloat3() * rng.NextFloat3()));
                     else if (materialProb < 0.95)
-                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, 
+                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f,
                             Material.Metal(rng.NextFloat3(0.5f, 1), rng.NextFloat(0, 0.5f)));
                     else
                         sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, Material.Dielectric(1.5f));
@@ -420,10 +409,10 @@ namespace RaytracerInOneWeekend
             sphereBuffer[sphereIndex++] = new Sphere(float3(4, 1, 0), 1, Material.Metal(float3(0.7f, 0.6f, 0.5f)));
 
             int sphereCount = sphereIndex;
-            
+
             if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
-            primitiveBuffer = new NativeArray<Primitive>(sphereCount, Allocator.Persistent);            
-            
+            primitiveBuffer = new NativeArray<Primitive>(sphereCount, Allocator.Persistent);
+
             int primitiveIndex = 0;
             for (var i = 0; i < sphereCount; i++)
             {
