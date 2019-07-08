@@ -19,6 +19,17 @@ namespace RaytracerInOneWeekend
             return p;
         }
 
+        public static float3 InUnitDisk(this Random rng)
+        {
+            float3 p;
+            do
+            {
+                p = 2 * float3(rng.NextFloat2(), 0) - float3(1, 1, 0);
+            } while (lengthsq(p) >= 1);
+
+            return p;
+        }
+
         public static float3 UnitVector(this Random rng)
         {
             float z = rng.NextFloat(-1, 1);

@@ -13,19 +13,19 @@ namespace RaytracerInOneWeekend
         [ReadOnly] public Camera Camera;
         [ReadOnly] public int SampleCount;
         [ReadOnly] public int TraceDepth;
-        [ReadOnly] public Random Rng;
+        [ReadOnly] public uint Seed;
         [ReadOnly] public NativeArray<Primitive> Primitives;
         
         [ReadOnly] public NativeArray<float4> InputSamples;
         [WriteOnly] public NativeArray<float4> OutputSamples;
 
-        bool Color(Ray r, int depth, out float3 color)
+        bool Color(Ray r, int depth, Random rng, out float3 color)
         {
             if (Primitives.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
             {
-                if (depth < TraceDepth && rec.Material.Scatter(r, rec, Rng, out float3 attenuation, out Ray scattered))
+                if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
                 {
-                    if (Color(scattered, depth + 1, out float3 scatteredColor))
+                    if (Color(scattered, depth + 1, rng, out float3 scatteredColor))
                     {
                         color = attenuation * scatteredColor;
                         return true;
@@ -53,11 +53,13 @@ namespace RaytracerInOneWeekend
             float3 colorAcc = lastValue.xyz;
             int sampleCount = (int) lastValue.w;
             
+            var rng = new Random(Seed + (uint) index * 0x7383ED49u);
+            
             for (int s = 0; s < SampleCount; s++)
             {
-                float2 normalizedCoordinates = (coordinates + Rng.NextFloat2()) / Size; // (u, v)
-                Ray r = Camera.GetRay(normalizedCoordinates);
-                if (Color(r, 0, out float3 sampleColor))
+                float2 normalizedCoordinates = (coordinates + rng.NextFloat2()) / Size; // (u, v)
+                Ray r = Camera.GetRay(normalizedCoordinates, rng);
+                if (Color(r, 0, rng, out float3 sampleColor))
                 {
                     colorAcc += sampleColor;
                     sampleCount++;

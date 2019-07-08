@@ -153,14 +153,19 @@ MonoBehaviour:
   resolutionScaling: 0.5
   samplesPerPixel: 2000
   samplesPerBatch: 10
-  traceDepth: 20
+  traceDepth: 35
   previewAfterBatch: 1
   stopWhenCompleted: 1
-  fieldOfView: 24
+  fieldOfView: 20
   cameraOrigin:
-    x: -2
-    y: 2
-    z: 1
+    x: 3
+    y: 3
+    z: 2
+  cameraLookAt:
+    x: 0
+    y: 0
+    z: -1
+  cameraAperture: 2
   spheres:
   - enabled: 1
     center: {x: 0, y: -100.5, z: -1.25}

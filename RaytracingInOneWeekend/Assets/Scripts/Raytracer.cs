@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Unity.Collections;
 using Unity.Jobs;
@@ -8,7 +9,6 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
-using Random = Unity.Mathematics.Random;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -34,7 +34,9 @@ namespace RaytracerInOneWeekend
 
         [Title("Camera")] 
         [SerializeField] [Range(0, 180)] float fieldOfView = 90;
-        [SerializeField] float3 cameraOrigin = new float3(-2, 2, 1);
+        [SerializeField] float3 cameraOrigin = new float3(3, 3, 2);
+        [SerializeField] float3 cameraLookAt = new float3(0, 0, -1);
+        [SerializeField] float cameraAperture = 2;
 
         [Title("World")]
         [SerializeField] SphereData[] spheres = null;
@@ -61,6 +63,18 @@ namespace RaytracerInOneWeekend
 #endif
         Texture2D frontBuffer;
 
+#if ODIN_INSPECTOR && UNITY_EDITOR
+        [Button(Name = "Save")]
+        [DisableInEditorMode]
+        void Save()
+        {
+            byte[] pngBytes = frontBuffer.EncodeToPNG();
+            File.WriteAllBytes(
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    $"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
+        }
+#endif
+        
         CommandBuffer commandBuffer;
         NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
         NativeArray<half4> backBuffer;
@@ -200,9 +214,10 @@ namespace RaytracerInOneWeekend
 
         void ScheduleAccumulate(bool firstBatch)
         {
-            var raytracingCamera = new Camera(
-                cameraOrigin, float3(0, 0, -1), float3(0, 1, 0), 
-                fieldOfView, (float) bufferWidth / bufferHeight);
+            float focalDistance = length(cameraOrigin - cameraLookAt);
+
+            var raytracingCamera = new Camera(cameraOrigin, cameraLookAt, float3(0, 1, 0),
+                fieldOfView, (float) bufferWidth / bufferHeight, cameraAperture, focalDistance);
 
             if (firstBatch)
             {
@@ -223,7 +238,7 @@ namespace RaytracerInOneWeekend
                 Camera = raytracingCamera,
                 InputSamples = accumulationInputBuffer,
                 OutputSamples = accumulationOutputBuffer,
-                Rng = new Random((uint) Time.frameCount + 1),
+                Seed = (uint) Time.frameCount + 1,
                 SampleCount = Math.Min(samplesPerPixel, samplesPerBatch),
                 TraceDepth = traceDepth,
                 Primitives = primitiveBuffer
