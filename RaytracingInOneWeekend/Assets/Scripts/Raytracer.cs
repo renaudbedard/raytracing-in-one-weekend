@@ -222,8 +222,6 @@ namespace RaytracerInOneWeekend
 
         void ScheduleAccumulate(bool firstBatch)
         {
-            float focalDistance = length(cameraOrigin - cameraLookAt);
-
             var raytracingCamera = new Camera(cameraOrigin, cameraLookAt, float3(0, 1, 0),
                 fieldOfView, (float) bufferWidth / bufferHeight, cameraAperture, focalDistance);
 
