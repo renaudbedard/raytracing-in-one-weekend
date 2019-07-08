@@ -9,6 +9,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -28,17 +29,26 @@ namespace RaytracerInOneWeekend
         [SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
         [SerializeField] [Range(1, 2000)] int samplesPerPixel = 2000;
         [SerializeField] [Range(1, 100)] int samplesPerBatch = 10;
-        [SerializeField] [Range(1, 100)] int traceDepth = 20;
+        [SerializeField] [Range(1, 100)] int traceDepth = 35;
         [SerializeField] bool previewAfterBatch = true;
         [SerializeField] bool stopWhenCompleted = true;
 
         [Title("Camera")] 
         [SerializeField] [Range(0, 180)] float fieldOfView = 90;
-        [SerializeField] float3 cameraOrigin = new float3(3, 3, 2);
-        [SerializeField] float3 cameraLookAt = new float3(0, 0, -1);
-        [SerializeField] float cameraAperture = 2;
+        [SerializeField] float3 cameraOrigin = new float3(13, 2, 3);
+        [SerializeField] float3 cameraLookAt = new float3(0, 0, 0);
+        [SerializeField] float cameraAperture = 0.1f;
+        [SerializeField] float focalDistance = 10;
 
-        [Title("World")]
+        [Title("World")] 
+        [SerializeField] bool randomScene = true;
+#if ODIN_INSPECTOR        
+        [ShowIf(nameof(randomScene))]
+#endif
+        [SerializeField] uint sceneSeed = 45573880;
+#if ODIN_INSPECTOR        
+        [HideIf(nameof(randomScene))] 
+#endif 
         [SerializeField] SphereData[] spheres = null;
 
         [Title("Debug")]
@@ -48,14 +58,12 @@ namespace RaytracerInOneWeekend
         public
 #endif
         float lastTraceDuration;
-        
 #if ODIN_INSPECTOR        
         [ShowInInspector] [ReadOnly] 
 #else
         public
 #endif        
         int accumulatedSamples;
-        
 #if ODIN_INSPECTOR        
         [ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly]  
 #else
@@ -130,7 +138,7 @@ namespace RaytracerInOneWeekend
         {
 #if UNITY_EDITOR
             // watch for material data changes (won't catch those from OnValidate)
-            if (spheres.Any(x => x.Material.Dirty))
+            if (!randomScene && spheres.Any(x => x.Material.Dirty))
             {
                 foreach (var sphere in spheres) sphere.Material.Dirty = false;
                 worldNeedsRebuild = true;
@@ -308,6 +316,13 @@ namespace RaytracerInOneWeekend
 
         void RebuildWorld()
         {
+            if (randomScene)
+            {
+                BuildRandomScene();
+                worldNeedsRebuild = false;
+                return;
+            }
+            
             int primitiveCount = 0;
 
             activeSpheres.Clear();
@@ -322,18 +337,14 @@ namespace RaytracerInOneWeekend
             // rebuild primitive buffer
             if (!primitiveBuffer.IsCreated || primitiveBuffer.Length != primitiveCount)
             {
-                if (primitiveBuffer.IsCreated)
-                    primitiveBuffer.Dispose();
-
+                if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
                 primitiveBuffer = new NativeArray<Primitive>(primitiveCount, Allocator.Persistent);
             }
 
             // rebuild individual typed primitive buffers
             if (!sphereBuffer.IsCreated || sphereBuffer.Length != activeSpheres.Count)
             {
-                if (sphereBuffer.IsCreated)
-                    sphereBuffer.Dispose();
-
+                if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
                 sphereBuffer = new NativeArray<Sphere>(activeSpheres.Count, Allocator.Persistent);
             }
 
@@ -348,11 +359,60 @@ namespace RaytracerInOneWeekend
                         materialData.RefractiveIndex));
 
                 var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
-
                 primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
             }
             
             worldNeedsRebuild = false;
+        }
+
+        void BuildRandomScene()
+        {
+            int n = 500;
+            
+            if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
+            sphereBuffer = new NativeArray<Sphere>(n, Allocator.Persistent)
+            {
+                [0] = new Sphere(new float3(0, -1000, 0), 1000, Material.Lambertian(0.5f))
+            };
+
+            var rng = new Random(sceneSeed);
+
+            int sphereIndex = 1;
+            for (int a = -11; a < 11; a++)
+            {
+                for (int b = -11; b < 11; b++)
+                {
+                    float materialProb = rng.NextFloat();
+                    float3 center = float3(a + 0.9f * rng.NextFloat(), 0.2f, b + 0.9f * rng.NextFloat());
+                    
+                    if (distance(center, float3(4, 0.2f, 0)) <= 0.9)
+                        continue;
+
+                    if (materialProb < 0.8)
+                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, Material.Lambertian(rng.NextFloat3() * rng.NextFloat3()));
+                    else if (materialProb < 0.95)
+                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, 
+                            Material.Metal(rng.NextFloat3(0.5f, 1), rng.NextFloat(0, 0.5f)));
+                    else
+                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, Material.Dielectric(1.5f));
+                }
+            }
+
+            sphereBuffer[sphereIndex++] = new Sphere(float3(0, 1, 0), 1, Material.Dielectric(1.5f));
+            sphereBuffer[sphereIndex++] = new Sphere(float3(-4, 1, 0), 1, Material.Lambertian(float3(0.4f, 0.2f, 0.1f)));
+            sphereBuffer[sphereIndex++] = new Sphere(float3(4, 1, 0), 1, Material.Metal(float3(0.7f, 0.6f, 0.5f)));
+
+            int sphereCount = sphereIndex;
+            
+            if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
+            primitiveBuffer = new NativeArray<Primitive>(sphereCount, Allocator.Persistent);            
+            
+            int primitiveIndex = 0;
+            for (var i = 0; i < sphereCount; i++)
+            {
+                var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
+                primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
+            }
         }
 
         static void ExchangeBuffers(ref NativeArray<float4> lhs, ref NativeArray<float4> rhs)
