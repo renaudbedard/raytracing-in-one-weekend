@@ -9,6 +9,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
+using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
 
 #if ODIN_INSPECTOR
@@ -57,7 +58,13 @@ namespace RaytracerInOneWeekend
 #else
         public
 #endif
-        float lastTraceDuration;
+        float lastBatchDuration;
+#if ODIN_INSPECTOR        
+        [ShowInInspector] [ReadOnly] 
+#else
+        public
+#endif
+        float lastTraceDuration;        
 #if ODIN_INSPECTOR        
         [ShowInInspector] [ReadOnly] 
 #else
@@ -94,6 +101,7 @@ namespace RaytracerInOneWeekend
         bool commandBufferHooked;
         bool worldNeedsRebuild;        
 
+        readonly Stopwatch batchTimer = new Stopwatch();
         readonly Stopwatch traceTimer = new Stopwatch();
         readonly List<SphereData> activeSpheres = new List<SphereData>();
 
@@ -173,8 +181,9 @@ namespace RaytracerInOneWeekend
                 accumulateJobHandle = null;
                 
                 accumulatedSamples += samplesPerBatch;
+                lastBatchDuration = (float) batchTimer.ElapsedTicks / TimeSpan.TicksPerMillisecond;
                 ForceUpdateInspector();
-
+                
                 if (accumulatedSamples >= samplesPerPixel || previewAfterBatch)
                     ScheduleCombine();
                 else
@@ -185,7 +194,7 @@ namespace RaytracerInOneWeekend
             {
                 combineJobHandle.Value.Complete();
                 combineJobHandle = null;
-
+                
                 bool traceCompleted = false;
                 if (accumulatedSamples >= samplesPerPixel)
                 {
@@ -224,7 +233,7 @@ namespace RaytracerInOneWeekend
         {
             var raytracingCamera = new Camera(cameraOrigin, cameraLookAt, float3(0, 1, 0),
                 fieldOfView, (float) bufferWidth / bufferHeight, cameraAperture, focalDistance);
-
+            
             if (firstBatch)
             {
                 accumulationInputBuffer.Dispose();
@@ -237,6 +246,8 @@ namespace RaytracerInOneWeekend
             }
             else
                 ExchangeBuffers(ref accumulationInputBuffer, ref accumulationOutputBuffer);
+
+            batchTimer.Restart();
             
             var job = new AccumulateJob
             {
@@ -284,6 +295,8 @@ namespace RaytracerInOneWeekend
 
                 commandBuffer.Clear();
                 commandBuffer.Blit(frontBuffer, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
+                
+                Debug.Log($"Rebuilt front buffer (now {width} x {height})");
             }
 
             if (backBuffer.Length != width * height)
@@ -292,12 +305,16 @@ namespace RaytracerInOneWeekend
                 backBuffer = new NativeArray<half4>(width * height,
                     Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
+                
+                Debug.Log($"Rebuilt back buffer (now {width} x {height})");
             }
             
             if (accumulationInputBuffer.Length != width * height)
             {
                 if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
                 accumulationInputBuffer = new NativeArray<float4>(width * height, Allocator.Persistent);
+                
+                Debug.Log($"Rebuilt accumulation input buffer (now {width} x {height})");
             }
             
             if (accumulationOutputBuffer.Length != width * height)
@@ -306,6 +323,8 @@ namespace RaytracerInOneWeekend
                 accumulationOutputBuffer = new NativeArray<float4>(width * height,
                     Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
+                
+                Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
             }
 
             bufferWidth = width;

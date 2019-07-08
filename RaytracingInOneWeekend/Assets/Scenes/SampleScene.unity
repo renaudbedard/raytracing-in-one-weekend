@@ -158,14 +158,17 @@ MonoBehaviour:
   stopWhenCompleted: 1
   fieldOfView: 20
   cameraOrigin:
-    x: 3
-    y: 3
-    z: 2
+    x: 13
+    y: 2
+    z: 3
   cameraLookAt:
     x: 0
     y: 0
-    z: -1
-  cameraAperture: 2
+    z: 0
+  cameraAperture: 0.1
+  focalDistance: 10
+  randomScene: 1
+  sceneSeed: 45573880
   spheres:
   - enabled: 1
     center: {x: 0, y: -100.5, z: -1.25}
