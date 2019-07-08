@@ -76,14 +76,14 @@ namespace RaytracerInOneWeekend
 #else
         public
 #endif
-        Texture2D frontBuffer;
+        Texture2D frontBufferTexture;
 
 #if ODIN_INSPECTOR && UNITY_EDITOR
         [Button(Name = "Save")]
         [DisableInEditorMode]
         void Save()
         {
-            byte[] pngBytes = frontBuffer.EncodeToPNG();
+            byte[] pngBytes = frontBufferTexture.EncodeToPNG();
             File.WriteAllBytes(
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                     $"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
@@ -92,7 +92,7 @@ namespace RaytracerInOneWeekend
 
         CommandBuffer commandBuffer;
         NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
-        NativeArray<half4> backBuffer;
+        NativeArray<half4> frontBuffer;
         NativeArray<Primitive> primitiveBuffer;
         NativeArray<Sphere> sphereBuffer;
 
@@ -111,7 +111,7 @@ namespace RaytracerInOneWeekend
         {
             commandBuffer = new CommandBuffer { name = "Raytracer" };
 
-            frontBuffer = new Texture2D(0, 0, TextureFormat.RGBAHalf, false)
+            frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBAHalf, false)
             {
                 hideFlags = HideFlags.HideAndDontSave
             };
@@ -218,7 +218,7 @@ namespace RaytracerInOneWeekend
 
         void SwapBuffers()
         {
-            frontBuffer.Apply(false);
+            frontBufferTexture.Apply(false);
 
             if (!commandBufferHooked)
             {
@@ -268,7 +268,7 @@ namespace RaytracerInOneWeekend
             var job = new CombineJob
             {
                 Input = accumulationOutputBuffer,
-                Output = backBuffer
+                Output = frontBuffer
             };
             combineJobHandle = job.Schedule(bufferWidth * bufferHeight, bufferWidth);
 
@@ -280,7 +280,7 @@ namespace RaytracerInOneWeekend
             int width = Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
             int height = Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
 
-            if (frontBuffer.width != width || frontBuffer.height != height)
+            if (frontBufferTexture.width != width || frontBufferTexture.height != height)
             {
                 if (commandBufferHooked)
                 {
@@ -288,12 +288,12 @@ namespace RaytracerInOneWeekend
                     commandBufferHooked = false;
                 }
 
-                frontBuffer.Resize(width, height);
-                frontBuffer.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
-                backBuffer = frontBuffer.GetRawTextureData<half4>();
+                frontBufferTexture.Resize(width, height);
+                frontBufferTexture.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
+                frontBuffer = frontBufferTexture.GetRawTextureData<half4>();
 
                 commandBuffer.Clear();
-                commandBuffer.Blit(frontBuffer, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
+                commandBuffer.Blit(frontBufferTexture, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
 
                 Debug.Log($"Rebuilt front buffer (now {width} x {height})");
             }
