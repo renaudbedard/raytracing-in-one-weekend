@@ -150,9 +150,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 1056194786}
-  resolutionScaling: 0.1
+  resolutionScaling: 0.25
   samplesPerPixel: 2000
-  samplesPerBatch: 2
+  samplesPerBatch: 1
   traceDepth: 35
   previewAfterBatch: 1
   stopWhenCompleted: 1
@@ -180,10 +180,6 @@ MonoBehaviour:
     center: {x: -1, y: 0, z: -1.25}
     radius: -0.45
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
-  lastBatchDuration: 0
-  lastTraceDuration: 0
-  accumulatedSamples: 0
-  frontBufferTexture: {fileID: 0}
 --- !u!4 &565612137
 Transform:
   m_ObjectHideFlags: 0
@@ -267,7 +263,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1056194785}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 13, y: 2, z: 3}
+  m_LocalPosition: {x: 13, y: 2, z: -3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -285,5 +281,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fec55e6d698e43f8b7ec5b42cc6a71db, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  raytracer: {fileID: 565612136}
   camera: {fileID: 1056194786}
+  raytracer: {fileID: 565612136}
