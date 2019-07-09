@@ -114,7 +114,10 @@ namespace RaytracerInOneWeekend
             {
                 hideFlags = HideFlags.HideAndDontSave
             };
+        }
 
+        void Start()
+        {
             RebuildWorld();
             EnsureBuffersBuilt();
             CleanCamera();

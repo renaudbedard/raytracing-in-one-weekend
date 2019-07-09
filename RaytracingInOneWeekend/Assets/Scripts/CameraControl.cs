@@ -55,7 +55,7 @@ namespace RaytracerInOneWeekend
                     mouseMovement /= Screen.dpi;
                     mouseMovement *= 5;
                     
-                    transform.Rotate(mouseMovement.y, -mouseMovement.x, 0, Space.Self);
+                    transform.Rotate(-mouseMovement.y, mouseMovement.x, 0, Space.Self);
 
                     ResetRoll();
                     
