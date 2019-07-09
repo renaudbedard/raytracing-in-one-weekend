@@ -1,16 +1,24 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#endif
+
 namespace RaytracerInOneWeekend
 {
     [RequireComponent(typeof(Camera))]
     class CameraControl : MonoBehaviour
     {
-        [SerializeField] Raytracer raytracer = null;
+#if ODIN_INSPECTOR
+        [ReadOnly]
+#endif
         [SerializeField] new UnityEngine.Camera camera = null;
+        [SerializeField] Raytracer raytracer = null;        
         
         Vector2 lastMousePosition;
         Vector3 orbitCenter;
+        float dragDistance;
 
         void Reset()
         {
@@ -46,6 +54,10 @@ namespace RaytracerInOneWeekend
             {
                 return;
             }
+
+            var scrollValue = mouse.scroll.ReadValue();
+            if (!Mathf.Approximately(scrollValue.y, 0))
+                transform.Translate(scrollValue.y / 360 * Vector3.forward, Space.Self);
             
             if (mouse.leftButton.isPressed)
             {
@@ -87,6 +99,32 @@ namespace RaytracerInOneWeekend
                     transform.RotateAround(orbitCenter, transform.up, mouseMovement.x);
 
                     ResetRoll();
+
+                    lastMousePosition = mousePosition;
+                }
+            }
+            else if (mouse.middleButton.isPressed)
+            {
+                if (mouse.middleButton.wasPressedThisFrame)
+                {
+                    dragDistance = 1;
+                    
+                    var origin = transform.localPosition;
+                    var forward = transform.forward;
+                    if (raytracer.Primitives.Hit(new Ray(origin, forward), 0, float.PositiveInfinity,
+                        out HitRecord hitRec))
+                    {
+                        dragDistance = hitRec.Distance;
+                    }          
+                }
+                
+                if (mousePosition != lastMousePosition)
+                {
+                    var mouseMovement = mousePosition - lastMousePosition;
+                    mouseMovement /= Screen.dpi * 15;
+                    mouseMovement *= dragDistance;
+                    
+                    transform.Translate(-mouseMovement.x, -mouseMovement.y, 0, Space.Self);
 
                     lastMousePosition = mousePosition;
                 }
