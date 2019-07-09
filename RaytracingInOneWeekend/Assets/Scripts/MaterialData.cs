@@ -32,7 +32,8 @@ namespace RaytracerInOneWeekend
 
         void OnValidate()
         {
-            Dirty = true;
+                if (Application.isPlaying) 
+                     Dirty = true;
         }
 #endif
     }

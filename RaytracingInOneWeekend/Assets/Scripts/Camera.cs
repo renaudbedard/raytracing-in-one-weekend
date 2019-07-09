@@ -13,7 +13,7 @@ namespace RaytracerInOneWeekend
             
         public readonly float LensRadius;
 
-        public Camera(float3 origin, float3 lookAt, float3 up, float verticalFov, float aspect, float aperture, float focalDistance)
+        public Camera(float3 origin, float3 lookAt, float3 up, float verticalFov, float aspect, float aperture, float focusDistance)
         {
             LensRadius = aperture / 2;
             
@@ -22,16 +22,16 @@ namespace RaytracerInOneWeekend
             float halfWidth = aspect * halfHeight;
 
             Forward = normalize(origin - lookAt);
-            Right = normalize(cross(up, Forward));
-            Up = cross(Forward, Right);
+            Right = normalize(cross(Forward, up));
+            Up = cross(Right, Forward);
 
             LowerLeftCorner = origin - 
-                              halfWidth * focalDistance * Right - 
-                              halfHeight * focalDistance * Up -
-                              focalDistance * Forward;
+                              halfWidth * focusDistance * Right - 
+                              halfHeight * focusDistance * Up -
+                              focusDistance * Forward;
             
-            Horizontal = 2 * halfWidth * focalDistance * Right;
-            Vertical = 2 * halfHeight * focalDistance * Up;
+            Horizontal = 2 * halfWidth * focusDistance * Right;
+            Vertical = 2 * halfHeight * focusDistance * Up;
             
             Origin = origin;
         }

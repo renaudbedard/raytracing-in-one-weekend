@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using Unity.Collections;
 using Unity.Jobs;
@@ -15,6 +14,7 @@ using Random = Unity.Mathematics.Random;
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 using ReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
+using System.IO;
 #else
 using Title = UnityEngine.HeaderAttribute;
 #endif
@@ -35,11 +35,7 @@ namespace RaytracerInOneWeekend
         [SerializeField] bool stopWhenCompleted = true;
 
         [Title("Camera")]
-        [SerializeField] [Range(0, 180)] float fieldOfView = 90;
-        [SerializeField] float3 cameraOrigin = new float3(13, 2, 3);
-        [SerializeField] float3 cameraLookAt = new float3(0, 0, 0);
         [SerializeField] float cameraAperture = 0.1f;
-        [SerializeField] float focalDistance = 10;
 
         [Title("World")]
         [SerializeField] bool randomScene = true;
@@ -100,6 +96,8 @@ namespace RaytracerInOneWeekend
         JobHandle? combineJobHandle;
         bool commandBufferHooked;
         bool worldNeedsRebuild;
+        float lastFieldOfView, lastFocusDistance;
+        bool initialized;
 
         readonly Stopwatch batchTimer = new Stopwatch();
         readonly Stopwatch traceTimer = new Stopwatch();
@@ -107,10 +105,11 @@ namespace RaytracerInOneWeekend
 
         int bufferWidth, bufferHeight;
 
+        internal NativeArray<Primitive> Primitives => primitiveBuffer;
+
         void Awake()
         {
             commandBuffer = new CommandBuffer { name = "Raytracer" };
-
             frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBAHalf, false)
             {
                 hideFlags = HideFlags.HideAndDontSave
@@ -118,6 +117,8 @@ namespace RaytracerInOneWeekend
 
             RebuildWorld();
             EnsureBuffersBuilt();
+            CleanCamera();
+            
             ScheduleAccumulate(true);
         }
 
@@ -155,22 +156,22 @@ namespace RaytracerInOneWeekend
             int currentWidth = Mathf.RoundToInt(targetCamera.pixelWidth * resolutionScaling);
             int currentHeight = Mathf.RoundToInt(targetCamera.pixelHeight * resolutionScaling);
 
-            bool noActiveJob = accumulateJobHandle == null && combineJobHandle == null;
-            bool jobCompleted = (accumulateJobHandle?.IsCompleted ?? false) ||
-                                (combineJobHandle?.IsCompleted ?? false);
             bool buffersNeedRebuild = currentWidth != bufferWidth || currentHeight != bufferHeight;
+            bool cameraDirty = targetCamera.transform.hasChanged ||
+                               !Mathf.Approximately(lastFieldOfView, targetCamera.fieldOfView);
+            bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty;
+            bool noActiveJob = !accumulateJobHandle.HasValue && !combineJobHandle.HasValue;
 
-            if ((noActiveJob || jobCompleted) && (worldNeedsRebuild || buffersNeedRebuild))
+            void RebuildDirtyComponents()
             {
-                accumulateJobHandle?.Complete();
-                combineJobHandle?.Complete();
-                accumulateJobHandle = combineJobHandle = null;
+                if (buffersNeedRebuild) EnsureBuffersBuilt();
+                if (worldNeedsRebuild) RebuildWorld();
+                if (cameraDirty) CleanCamera();
+            }
 
-                if (worldNeedsRebuild)
-                    RebuildWorld();
-
-                EnsureBuffersBuilt();
-
+            if (noActiveJob && traceNeedsReset)
+            {
+                RebuildDirtyComponents();
                 ScheduleAccumulate(true);
             }
 
@@ -186,7 +187,12 @@ namespace RaytracerInOneWeekend
                 if (accumulatedSamples >= samplesPerPixel || previewAfterBatch)
                     ScheduleCombine();
                 else
-                    ScheduleAccumulate(false);
+                {
+                    if (!previewAfterBatch)
+                        RebuildDirtyComponents();
+
+                    ScheduleAccumulate(traceNeedsReset && !previewAfterBatch);
+                }
             }
 
             if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
@@ -204,16 +210,24 @@ namespace RaytracerInOneWeekend
                 SwapBuffers();
                 ForceUpdateInspector();
 
+                RebuildDirtyComponents();
+
                 if (!(traceCompleted && stopWhenCompleted))
-                    ScheduleAccumulate(traceCompleted);
+                    ScheduleAccumulate(traceCompleted | traceNeedsReset);
             }
         }
-
+        
         void ForceUpdateInspector()
         {
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);
 #endif
+        }
+
+        void CleanCamera()
+        {
+            lastFieldOfView = targetCamera.fieldOfView;
+            targetCamera.transform.hasChanged = false;
         }
 
         void SwapBuffers()
@@ -229,8 +243,19 @@ namespace RaytracerInOneWeekend
 
         void ScheduleAccumulate(bool firstBatch)
         {
-            var raytracingCamera = new Camera(cameraOrigin, cameraLookAt, float3(0, 1, 0),
-                fieldOfView, (float) bufferWidth / bufferHeight, cameraAperture, focalDistance);
+            var cameraTransform = targetCamera.transform;
+            var origin = cameraTransform.localPosition;
+            var lookAt = origin + cameraTransform.forward;
+            var focusDistance = lastFocusDistance;
+            
+            if (primitiveBuffer.Hit(new Ray(origin, cameraTransform.forward), 0, float.PositiveInfinity,
+                out HitRecord hitRec))
+            {
+                lastFocusDistance = focusDistance = hitRec.Distance;
+            }
+
+            var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView, 
+                (float) bufferWidth / bufferHeight, cameraAperture, focusDistance);
 
             if (firstBatch)
             {
@@ -369,6 +394,8 @@ namespace RaytracerInOneWeekend
             }
 
             worldNeedsRebuild = false;
+            
+            Debug.Log("Rebuilt world");
         }
 
         void BuildRandomScene()
@@ -419,6 +446,8 @@ namespace RaytracerInOneWeekend
                 var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
                 primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
             }
+            
+            Debug.Log("Rebuild random scene");
         }
 
         static void ExchangeBuffers(ref NativeArray<float4> lhs, ref NativeArray<float4> rhs)
