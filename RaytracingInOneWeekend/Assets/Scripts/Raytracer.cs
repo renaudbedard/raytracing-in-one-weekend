@@ -7,6 +7,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
@@ -174,13 +175,7 @@ namespace RaytracerInOneWeekend
                 if (cameraDirty) CleanCamera();
             }
 
-            if (!TraceActive && traceNeedsReset)
-            {
-                RebuildDirtyComponents();
-                ScheduleAccumulate(true);
-            }
-
-            if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
+            void CompleteAccumulate()
             {
                 accumulateJobHandle.Value.Complete();
                 accumulateJobHandle = null;
@@ -191,21 +186,19 @@ namespace RaytracerInOneWeekend
                 accumulatedSamples += samplesPerBatch;
                 lastBatchDuration = (float) elapsedTime.TotalMilliseconds;
                 millionRaysPerSecond = rayCount / (float) elapsedTime.TotalSeconds / 1000000;
-                ForceUpdateInspector();
+            }
 
-                if (accumulatedSamples >= samplesPerPixel || previewAfterBatch)
-                    ScheduleCombine();
-                else
-                {
-                    if (!previewAfterBatch)
-                        RebuildDirtyComponents();
-
-                    ScheduleAccumulate(traceNeedsReset && !previewAfterBatch);
-                }
+            if (!TraceActive && traceNeedsReset)
+            {
+                RebuildDirtyComponents();
+                ScheduleAccumulate(true);
             }
 
             if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
             {
+                if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
+                    CompleteAccumulate();
+
                 combineJobHandle.Value.Complete();
                 combineJobHandle = null;
 
@@ -223,6 +216,15 @@ namespace RaytracerInOneWeekend
 
                 if (!(traceCompleted && stopWhenCompleted) || traceNeedsReset)
                     ScheduleAccumulate(traceCompleted | traceNeedsReset);
+            }
+
+            // only when preview is disabled
+            if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
+            {
+                CompleteAccumulate();
+                ForceUpdateInspector();
+                RebuildDirtyComponents();
+                ScheduleAccumulate(false);
             }
         }
 
@@ -291,7 +293,7 @@ namespace RaytracerInOneWeekend
             else
                 ExchangeBuffers(ref accumulationInputBuffer, ref accumulationOutputBuffer);
 
-            var job = new AccumulateJob
+            var accumulateJob = new AccumulateJob
             {
                 Size = int2(bufferWidth, bufferHeight),
                 Camera = raytracingCamera,
@@ -304,23 +306,16 @@ namespace RaytracerInOneWeekend
                 OutputRayCount = rayCountBuffer
             };
 
-            accumulateJobHandle = job.Schedule(bufferWidth * bufferHeight, 1);
+            accumulateJobHandle = accumulateJob.Schedule(bufferWidth * bufferHeight, 1);
+
+            if (accumulatedSamples + samplesPerBatch >= samplesPerPixel || previewAfterBatch)
+            {
+                var combineJob = new CombineJob { Input = accumulationOutputBuffer, Output = frontBuffer };
+                combineJobHandle = combineJob.Schedule(bufferWidth * bufferHeight, 128, accumulateJobHandle.Value);
+            }
 
             batchTimer.Restart();
             if (firstBatch) traceTimer.Restart();
-            JobHandle.ScheduleBatchedJobs();
-        }
-
-        void ScheduleCombine()
-        {
-            var job = new CombineJob
-            {
-                Input = accumulationOutputBuffer,
-                Output = frontBuffer
-            };
-
-            combineJobHandle = job.Schedule(bufferWidth * bufferHeight, 128);
-
             JobHandle.ScheduleBatchedJobs();
         }
 
