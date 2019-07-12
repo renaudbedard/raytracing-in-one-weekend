@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -21,9 +19,7 @@ namespace RaytracerInOneWeekend
 
         [WriteOnly] public NativeArray<float4> OutputSamples;
         [WriteOnly] public NativeArray<int> OutputRayCount;
-
-        // TODO: no idea if that helps with Burst
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        
         bool Color(Ray r, int depth, Random rng, out float3 color, ref int rayCount)
         {
             rayCount++;
