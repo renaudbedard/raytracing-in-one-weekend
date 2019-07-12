@@ -14,19 +14,31 @@ namespace RaytracerInOneWeekend
         [ReadOnly] public int SampleCount;
         [ReadOnly] public int TraceDepth;
         [ReadOnly] public uint Seed;
-        [ReadOnly] public NativeArray<Primitive> Primitives;
+
+#if SOA_SPHERES
+        [ReadOnly] public SoaSpheres World;
+        [ReadOnly] public SoaMaterials Materials;
+#else
+        [ReadOnly] public NativeArray<Primitive> World;
+#endif
+
         [ReadOnly] public NativeArray<float4> InputSamples;
 
         [WriteOnly] public NativeArray<float4> OutputSamples;
         [WriteOnly] public NativeArray<int> OutputRayCount;
-        
+
         bool Color(Ray r, int depth, Random rng, out float3 color, ref int rayCount)
         {
             rayCount++;
 
-            if (Primitives.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
+            if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
             {
-                if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+                if (depth < TraceDepth &&
+#if SOA_SPHERES
+                    Materials.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+#else
+                    rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+#endif
                 {
                     if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
                     {

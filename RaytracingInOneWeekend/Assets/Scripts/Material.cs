@@ -1,18 +1,19 @@
 using JetBrains.Annotations;
+using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-    enum MaterialType : byte
+#if SOA_SPHERES
+    struct SoaMaterials
     {
-        None,
-        Lambertian,
-        Metal,
-        Dielectric
+        public NativeArray<float3> Albedo;
+        public NativeArray<byte> MaterialType;
+        public NativeArray<float> Parameter; // Fuzz for Metal, RefractiveIndex for Dielectric, otherwise unused
     }
-
+#else
     struct Material
     {
         public readonly MaterialType Type;
@@ -27,29 +28,56 @@ namespace RaytracerInOneWeekend
             Fuzz = saturate(fuzz);
             RefractiveIndex = refractiveIndex;
         }
-        
+
         public static Material Lambertian(float3 albedo) => new Material(MaterialType.Lambertian, albedo);
         public static Material Metal(float3 albedo, float fuzz = 0) => new Material(MaterialType.Metal, albedo, fuzz);
         public static Material Dielectric(float refractiveIndex) => new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
+    }
+#endif
 
-        [Pure]
-        public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
+    enum MaterialType : byte
+    {
+        None,
+        Lambertian,
+        Metal,
+        Dielectric
+    }
+
+    static class MaterialExtensions
+    {
+#if SOA_SPHERES
+        public static bool Scatter(this SoaMaterials materials, Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
+#else
+        public static bool Scatter(this Material m, Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
+#endif
         {
-            switch (Type)
+#if SOA_SPHERES
+            var type = (MaterialType) materials.MaterialType[rec.MaterialIndex];
+            float3 albedo = materials.Albedo[rec.MaterialIndex];
+            float fuzz = materials.Parameter[rec.MaterialIndex];
+            float refractiveIndex = materials.Parameter[rec.MaterialIndex];
+#else
+            MaterialType type = m.MaterialType;
+            float3 albedo = m.Albedo;
+            float fuzz = m.Fuzz;
+            float refractiveIndex = m.RefractiveIndex;
+#endif
+
+            switch (type)
             {
                 case MaterialType.Lambertian:
                 {
                     float3 target = rec.Point + rec.Normal + rng.UnitVector();
                     scattered = new Ray(rec.Point, target - rec.Point);
-                    attenuation = Albedo;
+                    attenuation = albedo;
                     return true;
                 }
 
                 case MaterialType.Metal:
                 {
                     float3 reflected = reflect(normalize(r.Direction), rec.Normal);
-                    scattered = new Ray(rec.Point, reflected + Fuzz * rng.InUnitSphere());
-                    attenuation = Albedo;
+                    scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere());
+                    attenuation = albedo;
                     return dot(scattered.Direction, rec.Normal) > 0;
                 }
 
@@ -64,19 +92,19 @@ namespace RaytracerInOneWeekend
                     if (dot(r.Direction, rec.Normal) > 0)
                     {
                         outwardNormal = -rec.Normal;
-                        niOverNt = RefractiveIndex;
-                        cosine = RefractiveIndex * dot(r.Direction, rec.Normal) / length(r.Direction);
+                        niOverNt = refractiveIndex;
+                        cosine = refractiveIndex * dot(r.Direction, rec.Normal) / length(r.Direction);
                     }
                     else
                     {
                         outwardNormal = rec.Normal;
-                        niOverNt = 1 / RefractiveIndex;
+                        niOverNt = 1 / refractiveIndex;
                         cosine = -dot(r.Direction, rec.Normal) / length(r.Direction);
                     }
 
                     if (Refract(r.Direction, outwardNormal, niOverNt, out float3 refracted))
                     {
-                        float reflectProb = Schlick(cosine, RefractiveIndex);
+                        float reflectProb = Schlick(cosine, refractiveIndex);
                         scattered = new Ray(rec.Point, rng.NextFloat() < reflectProb ? reflected : refracted);
                     }
                     else

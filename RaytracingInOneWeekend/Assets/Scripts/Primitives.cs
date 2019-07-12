@@ -5,13 +5,23 @@ using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
+#if SOA_SPHERES
+    struct SoaSpheres
+    {
+        public NativeArray<float3> Center;
+        public NativeArray<float> Radius;
+        public NativeArray<byte> MaterialIndex;
+
+        public int Count => Center.Length;
+    }
+#else
     enum PrimitiveType
     {
         None,
         Sphere
     }
 
-    struct Primitive : IPrimitive
+    struct Primitive
     {
         public readonly PrimitiveType Type;
 
@@ -40,8 +50,42 @@ namespace RaytracerInOneWeekend
         }
     }
 
-    static class PrimitiveExtensions
+    struct Sphere
     {
+        public readonly float3 Center;
+        public readonly float Radius;
+        public readonly Material Material;
+
+        public Sphere(float3 center, float radius, Material material)
+        {
+            Center = center;
+            Radius = radius;
+            Material = material;
+        }
+    }
+#endif
+
+    static class WorldExtensions
+    {
+#if SOA_SPHERES
+        public static bool Hit(this SoaSpheres spheres, Ray r, float tMin, float tMax, out HitRecord rec)
+        {
+            bool hitAnything = false;
+            rec = new HitRecord(tMax, 0, 0, default);
+
+            for (var i = 0; i < spheres.Count; i++)
+            {
+                // TODO: 4-wide hit
+                if (spheres.Hit(i, r, tMin, rec.Distance, out HitRecord thisRec))
+                {
+                    hitAnything = true;
+                    rec = thisRec;
+                }
+            }
+
+            return hitAnything;
+        }
+#else
         public static bool Hit(this NativeArray<Primitive> primitives, Ray r, float tMin, float tMax, out HitRecord rec)
         {
             bool hitAnything = false;
@@ -59,32 +103,28 @@ namespace RaytracerInOneWeekend
 
             return hitAnything;
         }
-    }
+#endif
 
-    interface IPrimitive
-    {
-        bool Hit(Ray r, float tMin, float tMax, out HitRecord rec);
-    }
-
-    struct Sphere : IPrimitive
-    {
-        public readonly float3 Center;
-        public readonly float Radius;
-        public readonly Material Material;
-
-        public Sphere(float3 center, float radius, Material material)
+#if SOA_SPHERES
+        private static bool Hit(this SoaSpheres spheres, int sphereIndex, Ray r, float tMin, float tMax, out HitRecord rec)
+#else
+        public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out HitRecord rec)
+#endif
         {
-            Center = center;
-            Radius = radius;
-            Material = material;
-        }
+#if SOA_SPHERES
+            float3 center = spheres.Center[sphereIndex];
+            float radius = spheres.Radius[sphereIndex];
+            byte material = spheres.MaterialIndex[sphereIndex];
+#else
+            float3 center = s.Center;
+            float radius = s.Radius;
+            Material material = s.Material;
+#endif
 
-        public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
-        {
-            float3 oc = r.Origin - Center;
+            float3 oc = r.Origin - center;
             float a = dot(r.Direction, r.Direction);
             float b = dot(oc, r.Direction);
-            float c = dot(oc, oc) - Radius * Radius;
+            float c = dot(oc, oc) - radius * radius;
             float discriminant = b * b - a * c;
 
             if (discriminant > 0)
@@ -94,7 +134,7 @@ namespace RaytracerInOneWeekend
                 if (t < tMax && t > tMin)
                 {
                     float3 point = r.GetPoint(t);
-                    rec = new HitRecord(t, point, (point - Center) / Radius, Material);
+                    rec = new HitRecord(t, point, (point - center) / radius, material);
                     return true;
                 }
 
@@ -102,7 +142,7 @@ namespace RaytracerInOneWeekend
                 if (t < tMax && t > tMin)
                 {
                     float3 point = r.GetPoint(t);
-                    rec = new HitRecord(t, point, (point - Center) / Radius, Material);
+                    rec = new HitRecord(t, point, (point - center) / radius, material);
                     return true;
                 }
             }
