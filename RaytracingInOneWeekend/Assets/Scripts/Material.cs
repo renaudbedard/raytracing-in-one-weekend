@@ -57,7 +57,7 @@ namespace RaytracerInOneWeekend
             float fuzz = materials.Parameter[rec.MaterialIndex];
             float refractiveIndex = materials.Parameter[rec.MaterialIndex];
 #else
-            MaterialType type = m.MaterialType;
+            MaterialType type = m.Type;
             float3 albedo = m.Albedo;
             float fuzz = m.Fuzz;
             float refractiveIndex = m.RefractiveIndex;

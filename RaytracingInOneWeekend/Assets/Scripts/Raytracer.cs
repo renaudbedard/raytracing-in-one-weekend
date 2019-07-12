@@ -76,7 +76,7 @@ namespace RaytracerInOneWeekend
 #if ODIN_INSPECTOR
         [DisableIf(nameof(TraceActive))] [DisableInEditorMode] [Button]
         void TriggerTrace() => ScheduleAccumulate(true);
-        
+
         [EnableIf(nameof(TraceActive))] [DisableInEditorMode] [Button]
         void AbortTrace() => traceAborted = true;
 #endif
@@ -96,7 +96,7 @@ namespace RaytracerInOneWeekend
 
         JobHandle? accumulateJobHandle;
         JobHandle? combineJobHandle;
-        
+
         bool commandBufferHooked;
         bool worldNeedsRebuild;
         float lastFieldOfView;
@@ -181,7 +181,7 @@ namespace RaytracerInOneWeekend
             void CompleteAccumulate()
             {
                 TimeSpan elapsedTime = batchTimer.Elapsed;
-                
+
                 accumulateJobHandle.Value.Complete();
                 accumulateJobHandle = null;
 
@@ -197,12 +197,12 @@ namespace RaytracerInOneWeekend
                 RebuildDirtyComponents();
                 ScheduleAccumulate(true);
             }
-            
+
             if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
             {
                 if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
-                    CompleteAccumulate();                
-                
+                    CompleteAccumulate();
+
                 combineJobHandle.Value.Complete();
                 combineJobHandle = null;
 
@@ -229,10 +229,10 @@ namespace RaytracerInOneWeekend
                 CompleteAccumulate();
                 ForceUpdateInspector();
                 RebuildDirtyComponents();
-                
+
                 if (!traceAborted)
                     ScheduleAccumulate(false);
-                
+
                 traceAborted = false;
             }
         }
@@ -277,7 +277,7 @@ namespace RaytracerInOneWeekend
             Transform cameraTransform = targetCamera.transform;
             Vector3 origin = cameraTransform.localPosition;
             Vector3 lookAt = origin + cameraTransform.forward;
-            
+
             if (primitiveBuffer.Hit(new Ray(origin, cameraTransform.forward), 0, float.PositiveInfinity,
                 out HitRecord hitRec))
             {
@@ -310,12 +310,12 @@ namespace RaytracerInOneWeekend
                 Seed = (uint) Time.frameCount + 1,
                 SampleCount = Math.Min(samplesPerPixel, samplesPerBatch),
                 TraceDepth = traceDepth,
-                Primitives = primitiveBuffer,
+                World = primitiveBuffer,
                 OutputRayCount = rayCountBuffer
             };
-            
+
             accumulateJobHandle = accumulateJob.Schedule(bufferWidth * bufferHeight, 1);
-            
+
             if (accumulatedSamples + samplesPerBatch >= samplesPerPixel || previewAfterBatch)
             {
                 var combineJob = new CombineJob { Input = accumulationOutputBuffer, Output = frontBuffer };
