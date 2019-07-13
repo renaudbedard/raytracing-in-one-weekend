@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
@@ -6,13 +7,20 @@ using static Unity.Mathematics.math;
 namespace RaytracerInOneWeekend
 {
 #if SOA_SPHERES
-    struct SoaSpheres
+    struct SoaSpheres : IDisposable
     {
         public NativeArray<float3> Center;
         public NativeArray<float> Radius;
-        public NativeArray<byte> MaterialIndex;
+        public NativeArray<ushort> MaterialIndex;
 
         public int Count => Center.Length;
+
+        public void Dispose()
+        {
+            if (Center.IsCreated) Center.Dispose();
+            if (Radius.IsCreated) Radius.Dispose();
+            if (MaterialIndex.IsCreated) MaterialIndex.Dispose();
+        }
     }
 #else
     enum PrimitiveType
@@ -114,7 +122,7 @@ namespace RaytracerInOneWeekend
 #if SOA_SPHERES
             float3 center = spheres.Center[sphereIndex];
             float radius = spheres.Radius[sphereIndex];
-            byte material = spheres.MaterialIndex[sphereIndex];
+            ushort material = spheres.MaterialIndex[sphereIndex];
 #else
             float3 center = s.Center;
             float radius = s.Radius;

@@ -1,4 +1,4 @@
-using JetBrains.Annotations;
+using System;
 using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
@@ -7,11 +7,20 @@ using Random = Unity.Mathematics.Random;
 namespace RaytracerInOneWeekend
 {
 #if SOA_SPHERES
-    struct SoaMaterials
+    struct SoaMaterials : IDisposable
     {
         public NativeArray<float3> Albedo;
-        public NativeArray<byte> MaterialType;
+        public NativeArray<byte> Type;
         public NativeArray<float> Parameter; // Fuzz for Metal, RefractiveIndex for Dielectric, otherwise unused
+
+        public int Count => Albedo.Length; 
+        
+        public void Dispose()
+        {
+            if (Albedo.IsCreated) Albedo.Dispose();
+            if (Type.IsCreated) Type.Dispose();
+            if (Parameter.IsCreated) Parameter.Dispose();
+        }
     }
 #else
     struct Material
@@ -21,17 +30,13 @@ namespace RaytracerInOneWeekend
         public readonly float Fuzz;
         public readonly float RefractiveIndex;
 
-        public Material(MaterialType type, float3 albedo = default, float fuzz = 0, float refractiveIndex = 0)
+        public Material(MaterialType type, float3 albedo = default, float fuzz = 0, float refractiveIndex = 1)
         {
             Type = type;
             Albedo = albedo;
             Fuzz = saturate(fuzz);
             RefractiveIndex = refractiveIndex;
         }
-
-        public static Material Lambertian(float3 albedo) => new Material(MaterialType.Lambertian, albedo);
-        public static Material Metal(float3 albedo, float fuzz = 0) => new Material(MaterialType.Metal, albedo, fuzz);
-        public static Material Dielectric(float refractiveIndex) => new Material(MaterialType.Dielectric, refractiveIndex: refractiveIndex);
     }
 #endif
 
@@ -52,7 +57,7 @@ namespace RaytracerInOneWeekend
 #endif
         {
 #if SOA_SPHERES
-            var type = (MaterialType) materials.MaterialType[rec.MaterialIndex];
+            var type = (MaterialType) materials.Type[rec.MaterialIndex];
             float3 albedo = materials.Albedo[rec.MaterialIndex];
             float fuzz = materials.Parameter[rec.MaterialIndex];
             float refractiveIndex = materials.Parameter[rec.MaterialIndex];

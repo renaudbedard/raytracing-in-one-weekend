@@ -90,9 +90,19 @@ namespace RaytracerInOneWeekend
         CommandBuffer commandBuffer;
         NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
         NativeArray<half4> frontBuffer;
-        NativeArray<Primitive> primitiveBuffer;
         NativeArray<int> rayCountBuffer;
+        
+#if SOA_SPHERES
+        SoaSpheres sphereBuffer;
+        SoaMaterials materialBuffer;
+        
+        internal SoaSpheres World => sphereBuffer;        
+#else
+        NativeArray<Primitive> primitiveBuffer;        
         NativeArray<Sphere> sphereBuffer;
+
+        internal NativeArray<Primitive> World => primitiveBuffer;
+#endif
 
         JobHandle? accumulateJobHandle;
         JobHandle? combineJobHandle;
@@ -108,10 +118,10 @@ namespace RaytracerInOneWeekend
         readonly Stopwatch traceTimer = new Stopwatch();
 
         readonly List<SphereData> activeSpheres = new List<SphereData>();
+        readonly List<MaterialData> activeMaterials = new List<MaterialData>();
 
         int bufferWidth, bufferHeight;
 
-        internal NativeArray<Primitive> Primitives => primitiveBuffer;
         internal bool TraceActive => accumulateJobHandle.HasValue || combineJobHandle.HasValue;
 
         void Awake()
@@ -146,8 +156,13 @@ namespace RaytracerInOneWeekend
             accumulateJobHandle?.Complete();
             combineJobHandle?.Complete();
 
+#if SOA_SPHERES 
+            sphereBuffer.Dispose();
+            materialBuffer.Dispose();                  
+#else
             if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
             if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
+#endif
             if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
             if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
             if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
@@ -278,7 +293,7 @@ namespace RaytracerInOneWeekend
             Vector3 origin = cameraTransform.localPosition;
             Vector3 lookAt = origin + cameraTransform.forward;
 
-            if (primitiveBuffer.Hit(new Ray(origin, cameraTransform.forward), 0, float.PositiveInfinity,
+            if (World.Hit(new Ray(origin, cameraTransform.forward), 0, float.PositiveInfinity,
                 out HitRecord hitRec))
             {
                 focusDistance = hitRec.Distance;
@@ -310,8 +325,11 @@ namespace RaytracerInOneWeekend
                 Seed = (uint) Time.frameCount + 1,
                 SampleCount = Math.Min(samplesPerPixel, samplesPerBatch),
                 TraceDepth = traceDepth,
-                World = primitiveBuffer,
-                OutputRayCount = rayCountBuffer
+                World = World,
+                OutputRayCount = rayCountBuffer,
+#if SOA_SPHERES
+                Materials = materialBuffer
+#endif
             };
 
             accumulateJobHandle = accumulateJob.Schedule(bufferWidth * bufferHeight, 1);
@@ -367,20 +385,62 @@ namespace RaytracerInOneWeekend
         void RebuildWorld()
         {
             if (randomScene)
-            {
                 BuildRandomScene();
-                worldNeedsRebuild = false;
-                return;
+            else
+            {
+                activeSpheres.Clear();
+                foreach (SphereData sphere in spheres)
+                    if (sphere.Enabled)
+                        activeSpheres.Add(sphere);
             }
 
-            int primitiveCount = 0;
+            activeMaterials.Clear();
+            foreach (SphereData sphere in activeSpheres)
+                if (!activeMaterials.Contains(sphere.Material))
+                    activeMaterials.Add(sphere.Material);
+            
+#if SOA_SPHERES
+            int materialCount = activeMaterials.Count;
+            if (materialBuffer.Count != materialCount)
+            {
+                materialBuffer.Dispose();
+                materialBuffer.Albedo = new NativeArray<float3>(materialCount, Allocator.Persistent);
+                materialBuffer.Parameter = new NativeArray<float>(materialCount, Allocator.Persistent);
+                materialBuffer.Type = new NativeArray<byte>(materialCount, Allocator.Persistent);
+            }
 
-            activeSpheres.Clear();
-            foreach (SphereData sphere in spheres)
-                if (sphere.Enabled)
-                    activeSpheres.Add(sphere);
+            int sphereCount = activeSpheres.Count;
+            if (sphereBuffer.Count != sphereCount)
+            {
+                sphereBuffer.Dispose();
+                sphereBuffer.Center = new NativeArray<float3>(sphereCount, Allocator.Persistent);
+                sphereBuffer.Radius = new NativeArray<float>(sphereCount, Allocator.Persistent);
+                sphereBuffer.MaterialIndex = new NativeArray<ushort>(sphereCount, Allocator.Persistent);
+            }
 
-            primitiveCount += activeSpheres.Count;
+            ushort materialIndex = 0;
+            foreach (MaterialData material in activeMaterials)
+            {
+                materialBuffer.Type[materialIndex] = (byte) material.Type;
+                materialBuffer.Albedo[materialIndex] = float3(material.Albedo.r, material.Albedo.g, material.Albedo.b);
+                switch (material.Type)
+                {
+                    case MaterialType.Dielectric: materialBuffer.Parameter[materialIndex] = material.RefractiveIndex; break;
+                    case MaterialType.Metal: materialBuffer.Parameter[materialIndex] = material.Fuzz; break;
+                }
+                materialIndex++;
+            }
+
+            for (var i = 0; i < activeSpheres.Count; i++)
+            {
+                SphereData sphere = activeSpheres[i];
+
+                sphereBuffer.Center[i] = sphere.Center;
+                sphereBuffer.Radius[i] = sphere.Radius;
+                sphereBuffer.MaterialIndex[i] = (ushort) activeMaterials.IndexOf(sphere.Material);
+            }
+#else
+            int primitiveCount = activeSpheres.Count;
 
             // other typed active primitives would be collected here
 
@@ -411,25 +471,20 @@ namespace RaytracerInOneWeekend
                 var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
                 primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
             }
+#endif
 
             worldNeedsRebuild = false;
 
-            Debug.Log("Rebuilt world");
+            Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
         }
 
         void BuildRandomScene()
         {
-            int n = 500;
-
-            if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
-            sphereBuffer = new NativeArray<Sphere>(n, Allocator.Persistent)
-            {
-                [0] = new Sphere(new float3(0, -1000, 0), 1000, Material.Lambertian(0.5f))
-            };
+            activeSpheres.Clear();
+            activeSpheres.Add(new SphereData(new Vector3(0, -1000, 0), 1000, MaterialData.Lambertian(0.5f)));
 
             var rng = new Random(sceneSeed);
 
-            int sphereIndex = 1;
             for (int a = -11; a < 11; a++)
             {
                 for (int b = -11; b < 11; b++)
@@ -441,32 +496,18 @@ namespace RaytracerInOneWeekend
                         continue;
 
                     if (materialProb < 0.8)
-                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, Material.Lambertian(rng.NextFloat3() * rng.NextFloat3()));
+                        activeSpheres.Add(new SphereData(center, 0.2f, MaterialData.Lambertian(rng.NextFloat3() * rng.NextFloat3())));
                     else if (materialProb < 0.95)
-                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f,
-                            Material.Metal(rng.NextFloat3(0.5f, 1), rng.NextFloat(0, 0.5f)));
+                        activeSpheres.Add(new SphereData(center, 0.2f,
+                            MaterialData.Metal(rng.NextFloat3(0.5f, 1), rng.NextFloat(0, 0.5f))));
                     else
-                        sphereBuffer[sphereIndex++] = new Sphere(center, 0.2f, Material.Dielectric(1.5f));
+                        activeSpheres.Add(new SphereData(center, 0.2f, MaterialData.Dielectric(1.5f)));
                 }
             }
 
-            sphereBuffer[sphereIndex++] = new Sphere(float3(0, 1, 0), 1, Material.Dielectric(1.5f));
-            sphereBuffer[sphereIndex++] = new Sphere(float3(-4, 1, 0), 1, Material.Lambertian(float3(0.4f, 0.2f, 0.1f)));
-            sphereBuffer[sphereIndex++] = new Sphere(float3(4, 1, 0), 1, Material.Metal(float3(0.7f, 0.6f, 0.5f)));
-
-            int sphereCount = sphereIndex;
-
-            if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
-            primitiveBuffer = new NativeArray<Primitive>(sphereCount, Allocator.Persistent);
-
-            int primitiveIndex = 0;
-            for (var i = 0; i < sphereCount; i++)
-            {
-                var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
-                primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
-            }
-
-            Debug.Log("Rebuilt random scene");
+            activeSpheres.Add(new SphereData(float3(0, 1, 0), 1, MaterialData.Dielectric(1.5f)));
+            activeSpheres.Add(new SphereData(float3(-4, 1, 0), 1, MaterialData.Lambertian(float3(0.4f, 0.2f, 0.1f))));
+            activeSpheres.Add(new SphereData(float3(4, 1, 0), 1, MaterialData.Metal(float3(0.7f, 0.6f, 0.5f))));
         }
 
         static void ExchangeBuffers(ref NativeArray<float4> lhs, ref NativeArray<float4> rhs)

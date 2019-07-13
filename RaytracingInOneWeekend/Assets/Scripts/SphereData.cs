@@ -20,6 +20,13 @@ namespace RaytracerInOneWeekend
 #endif
         MaterialData material = null;
         
+        public SphereData(Vector3 center, float radius, MaterialData material)
+        {
+            this.center = center;
+            this.radius = radius;
+            this.material = material;
+        }        
+        
         public bool Enabled => enabled;
         public Vector3 Center => center;
         public float Radius => radius;

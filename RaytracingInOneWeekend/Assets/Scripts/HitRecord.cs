@@ -9,13 +9,13 @@ namespace RaytracerInOneWeekend
         public readonly float3 Normal;
 
 #if SOA_SPHERES
-		public readonly byte MaterialIndex;
+		public readonly ushort MaterialIndex;
 #else
 		public readonly Material Material;
 #endif
 
 #if SOA_SPHERES
-		public HitRecord(float distance, float3 point, float3 normal, byte materialIndex)
+		public HitRecord(float distance, float3 point, float3 normal, ushort materialIndex)
 #else
         public HitRecord(float distance, float3 point, float3 normal, Material material)
 #endif
