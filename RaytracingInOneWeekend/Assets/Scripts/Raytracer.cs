@@ -156,11 +156,11 @@ namespace RaytracerInOneWeekend
 
 #if SOA_SPHERES 
 			sphereBuffer.Dispose();
-			materialBuffer.Dispose();                  
 #else
 			if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
 			if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
 #endif
+			if (materialBuffer.IsCreated) materialBuffer.Dispose();
 			if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
 			if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
 			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
@@ -402,15 +402,13 @@ namespace RaytracerInOneWeekend
 				materialBuffer = new NativeArray<Material>(materialCount, Allocator.Persistent);
 			}
 			
-			ushort materialIndex = 0;
-			foreach (MaterialData material in activeMaterials)
+			for (var i = 0; i < activeMaterials.Count; i++)
 			{
-				materialBuffer[materialIndex] = new Material(material.Type,
-					float3(material.Albedo.r, material.Albedo.g, material.Albedo.b), 
+				MaterialData material = activeMaterials[i];
+				materialBuffer[i] = new Material(material.Type,
+					float3(material.Albedo.r, material.Albedo.g, material.Albedo.b),
 					material.Fuzz, material.RefractiveIndex);
-				
-				materialIndex++;
-			}			
+			}
 
 #if SOA_SPHERES
 			int sphereCount = activeSpheres.Count;
