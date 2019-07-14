@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
@@ -22,6 +23,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 		
+		[Pure]
 		public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
 		{
 			switch (Type)

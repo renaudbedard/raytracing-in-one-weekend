@@ -520,7 +520,7 @@ PlayerSettings:
   webGLThreadsSupport: 0
   webGLWasmStreaming: 0
   scriptingDefineSymbols:
-    1: SOA_SPHERES
+    1: SOA_SPHERES;HIT_FOUR_WIDE
   platformArchitecture: {}
   scriptingBackend: {}
   il2cppCompilerConfiguration: {}

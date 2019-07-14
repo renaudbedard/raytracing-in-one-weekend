@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
@@ -42,6 +43,13 @@ namespace RaytracerInOneWeekend
         public static float3 ToFloat3(this Color c)
         {
             return float3(c.r, c.g, c.b);
+        }
+
+        public static uint Sum(this NativeArray<uint> values)
+        {
+            uint total = 0;
+            foreach (uint value in values) total += value;
+            return total;
         }
     }
 }

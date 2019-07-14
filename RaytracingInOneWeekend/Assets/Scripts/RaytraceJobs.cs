@@ -9,32 +9,37 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct AccumulateJob : IJobParallelFor
 	{
-		[ReadOnly] public int2 Size;
+		[ReadOnly] public uint2 Size;
 		[ReadOnly] public Camera Camera;
-		[ReadOnly] public int SampleCount;
-		[ReadOnly] public int TraceDepth;
+		[ReadOnly] public uint SampleCount;
+		[ReadOnly] public uint TraceDepth;
 		[ReadOnly] public uint Seed;
-
 #if SOA_SPHERES
 		[ReadOnly] public SoaSpheres World;
 #else
 		[ReadOnly] public NativeArray<Primitive> World;
 #endif
+#if BUFFERED_MATERIALS
 		[ReadOnly] public NativeArray<Material> Materials;
-
+#endif
 		[ReadOnly] public NativeArray<float4> InputSamples;
 
 		[WriteOnly] public NativeArray<float4> OutputSamples;
-		[WriteOnly] public NativeArray<int> OutputRayCount;
+		[WriteOnly] public NativeArray<uint> OutputRayCount;
 
-		bool Color(Ray r, int depth, Random rng, out float3 color, ref int rayCount)
+		bool Color(Ray r, uint depth, Random rng, out float3 color, ref uint rayCount)
 		{
 			rayCount++;
 
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 			{
 				if (depth < TraceDepth &&
-				    Materials[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+#if BUFFERED_MATERIALS 
+				    Materials[rec.MaterialIndex]
+#else
+					rec.Material
+#endif
+					.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 				{
 					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
 					{
@@ -54,9 +59,9 @@ namespace RaytracerInOneWeekend
 
 		public void Execute(int index)
 		{
-			int2 coordinates = int2(
-				index % Size.x, // column
-				index / Size.x // row
+			uint2 coordinates = uint2(
+				(uint) (index % Size.x), // column
+				(uint) (index / Size.x)  // row
 			);
 
 			float4 lastValue = InputSamples[index];
@@ -65,7 +70,7 @@ namespace RaytracerInOneWeekend
 			int sampleCount = (int) lastValue.w;
 
 			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
-			int rayCount = 0;
+			uint rayCount = 0;
 
 			for (int s = 0; s < SampleCount; s++)
 			{
@@ -86,6 +91,8 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct CombineJob : IJobParallelFor
 	{
+		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
+
 		[ReadOnly] public NativeArray<float4> Input;
 		[WriteOnly] public NativeArray<half4> Output;
 
@@ -95,7 +102,7 @@ namespace RaytracerInOneWeekend
 
 			float3 finalColor;
 			if (realSampleCount == 0)
-				finalColor = float3(1, 0, 1);
+				finalColor = NoSamplesColor;
 			else
 			{
 				finalColor = Input[index].xyz / realSampleCount;
