@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -6,7 +7,79 @@ using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-#if SOA_SPHERES
+#if AOSOA_SPHERES
+	unsafe struct AosoaSpheres : IDisposable
+	{
+		public const int SimdLength = 4;
+
+		public readonly int Length;
+		
+		NativeArray<float> blockData;
+
+		public NativeArray<SphereBlock> Blocks;
+		public NativeArray<Material> Materials;
+		
+		public AosoaSpheres(int length)
+		{
+			Length = length;
+			
+			int blockCount = (int) ceil(length / (float) SimdLength);
+			blockData = new NativeArray<float>(blockCount * SphereBlock.Size, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			
+			Blocks = new NativeArray<SphereBlock>(blockCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			for (int i = 0; i < blockCount; i++)
+				Blocks[i] = new SphereBlock(blockData, i);
+
+			Materials = new NativeArray<Material>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
+			SphereBlock lastBlock = Blocks[blockCount - 1];
+			for (int i = length % SimdLength; i < SimdLength; i++)
+			{
+				lastBlock.CenterX[i] = lastBlock.CenterY[i] = lastBlock.CenterZ[i] = float.PositiveInfinity;
+				lastBlock.SquaredRadius[i] = 0;
+			}
+		}
+
+		public void SetCenter(int i, float3 center)
+		{
+			SphereBlock block = Blocks[i / SimdLength];
+			int offset = i % SimdLength;
+			block.CenterX[offset] = center.x;
+			block.CenterY[offset] = center.y;
+			block.CenterZ[offset] = center.z;
+		}
+		
+		public void SetRadius(int i, float radius)
+		{
+			SphereBlock block = Blocks[i / SimdLength];
+			block.SquaredRadius[i % SimdLength] = radius * radius;
+		}
+		
+		public void Dispose()
+		{
+			if (blockData.IsCreated) blockData.Dispose();
+			if (Blocks.IsCreated) Blocks.Dispose();
+			if (Materials.IsCreated) Materials.Dispose();
+		}
+	}
+
+	unsafe struct SphereBlock
+	{
+		const int MemberCount = 4;
+		
+		public const int Size = MemberCount * AosoaSpheres.SimdLength;
+		
+		public readonly float* CenterX, CenterY, CenterZ, SquaredRadius;
+
+		public SphereBlock(NativeArray<float> blockData, int blockIndex)
+		{
+			CenterX = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 0;
+			CenterY = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 1;
+			CenterZ = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 2;
+			SquaredRadius = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 3;
+		}
+	}
+#elif SOA_SPHERES
 	struct SoaSpheres : IDisposable
 	{
 		public NativeArray<float> CenterX, CenterY, CenterZ;
@@ -16,8 +89,28 @@ namespace RaytracerInOneWeekend
 #else
 		public NativeArray<Material> Material;
 #endif
-
 		public int Count => CenterX.Length;
+
+		public SoaSpheres(int length)
+		{
+			int dataLength = length;
+			length = (int) ceil(length / 4.0) * 4;
+			
+			CenterX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			SquaredRadius = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+#if BUFFERED_MATERIALS
+			MaterialIndex = new NativeArray<ushort>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+#else
+			Material = new NativeArray<Material>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+#endif
+			for (int i = dataLength; i < length; i++)
+			{
+				CenterX[i] = CenterY[i] = CenterZ[i] = float.PositiveInfinity;
+				SquaredRadius[i] = 0;
+			}
+		}
 
 		public void Dispose()
 		{
@@ -25,7 +118,7 @@ namespace RaytracerInOneWeekend
 			if (CenterY.IsCreated) CenterY.Dispose();
 			if (CenterZ.IsCreated) CenterZ.Dispose();
 			if (SquaredRadius.IsCreated) SquaredRadius.Dispose();
-#if BUFFERED_MATERIALS			
+#if BUFFERED_MATERIALS
 			if (MaterialIndex.IsCreated) MaterialIndex.Dispose();
 #else
 			if (Material.IsCreated) Material.Dispose();
@@ -98,14 +191,82 @@ namespace RaytracerInOneWeekend
 
 	static class WorldExtensions
 	{
-#if SOA_SPHERES
+#if AOSOA_SPHERES
+		public static unsafe bool Hit(this AosoaSpheres spheres, Ray r, float tMin, float tMax, out HitRecord rec)
+		{
+			rec = new HitRecord(tMax, 0, 0, default);
+
+			float4 a = dot(r.Direction, r.Direction);
+
+			int4 curId = int4(0, 1, 2, 3), hitId = -1;
+			float4 hitT = tMax;
+			bool4 mask;
+
+			for (int i = 0; i < spheres.Blocks.Length; i++)
+			{
+				SphereBlock block = spheres.Blocks[i];
+
+				float4 centerX = *(float4*) block.CenterX,
+					centerY = *(float4*) block.CenterY,
+					centerZ = *(float4*) block.CenterZ,
+					sqRadius = *(float4*) block.SquaredRadius;
+				
+				float4 ocX = r.Origin.x - centerX,
+					ocY = r.Origin.y - centerY,
+					ocZ = r.Origin.z - centerZ;
+
+				float4 b = ocX * r.Direction.x + ocY * r.Direction.y + ocZ * r.Direction.z;
+				float4 c = ocX * ocX + ocY * ocY + ocZ * ocZ - sqRadius;
+				float4 discriminant = b * b - a * c;
+
+				bool4 discriminantTest = discriminant > 0;
+
+				if (any(discriminantTest))
+				{
+					float4 sqrtDiscriminant = sqrt(discriminant);
+
+					float4 t0 = (-b - sqrtDiscriminant) / a;
+					float4 t1 = (-b + sqrtDiscriminant) / a;
+
+					float4 t = select(t1, t0, t0 > tMin);
+					mask = discriminantTest & t > tMin & t < hitT;
+
+					hitId = select(hitId, curId, mask);
+					hitT = select(hitT, t, mask);
+				}
+
+				curId += 4;
+			}
+
+			if (all(hitId == -1))
+				return false;
+
+			float minDistance = cmin(hitT);
+			mask = hitT == minDistance;
+			// TODO: I guess it's not impossible that more than one sphere have the same distance?
+			int closestId = dot(hitId, int4(mask));
+
+			int blockId = closestId / AosoaSpheres.SimdLength;
+			int blockOffset = closestId % AosoaSpheres.SimdLength;
+
+			float3 closestCenter = float3(spheres.Blocks[blockId].CenterX[blockOffset],
+				spheres.Blocks[blockId].CenterY[blockOffset],
+				spheres.Blocks[blockId].CenterZ[blockOffset]);
+			float closestRadius = sqrt(spheres.Blocks[blockId].SquaredRadius[blockOffset]);
+			Material closestMaterial = spheres.Materials[closestId];
+
+			float3 point = r.GetPoint(minDistance);
+			rec = new HitRecord(minDistance, point, (point - closestCenter) / closestRadius, closestMaterial);
+			return true;
+		}
+
+#elif SOA_SPHERES
 		public static unsafe bool Hit(this SoaSpheres spheres, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
 			rec = new HitRecord(tMax, 0, 0, default);
 
-#if HIT_FOUR_WIDE
 			float4 a = dot(r.Direction, r.Direction);
-			
+
 			float4* pCenterX = (float4*) spheres.CenterX.GetUnsafeReadOnlyPtr(),
 				pCenterY = (float4*) spheres.CenterY.GetUnsafeReadOnlyPtr(),
 				pCenterZ = (float4*) spheres.CenterZ.GetUnsafeReadOnlyPtr(),
@@ -114,7 +275,7 @@ namespace RaytracerInOneWeekend
 			int4 curId = int4(0, 1, 2, 3), hitId = -1;
 			float4 hitT = tMax;
 			bool4 mask;
-			
+
 			for (int i = 0; i < spheres.Count / 4; i++)
 			{
 				float4 centerX = *pCenterX,
@@ -135,7 +296,7 @@ namespace RaytracerInOneWeekend
 				if (any(discriminantTest))
 				{
 					float4 sqrtDiscriminant = sqrt(discriminant);
-					
+
 					float4 t0 = (-b - sqrtDiscriminant) / a;
 					float4 t1 = (-b + sqrtDiscriminant) / a;
 
@@ -145,7 +306,7 @@ namespace RaytracerInOneWeekend
 					hitId = select(hitId, curId, mask);
 					hitT = select(hitT, t, mask);
 				}
-				
+
 				pCenterX++;
 				pCenterY++;
 				pCenterZ++;
@@ -165,23 +326,13 @@ namespace RaytracerInOneWeekend
 				spheres.CenterY[closestId],
 				spheres.CenterZ[closestId]);
 			float closestRadius = sqrt(spheres.SquaredRadius[closestId]);
-			var closestMaterial = spheres.Material[closestId];
+			Material closestMaterial = spheres.Material[closestId];
 
 			float3 point = r.GetPoint(minDistance);
 			rec = new HitRecord(minDistance, point, (point - closestCenter) / closestRadius, closestMaterial);
 			return true;
-#else
-			bool hitAnything = false;
-			for (var i = 0; i < spheres.Count; i++)
-				if (spheres.Hit(i, r, tMin, rec.Distance, out HitRecord thisRec))
-				{
-					hitAnything = true;
-					rec = thisRec;
-				}
-
-			return hitAnything;
-#endif
 		}
+		
 #else
 		public static bool Hit(this NativeArray<Primitive> primitives, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
@@ -200,34 +351,15 @@ namespace RaytracerInOneWeekend
 
 			return hitAnything;
 		}
-#endif
 
-#if SOA_SPHERES
-		static bool Hit(this SoaSpheres spheres, int sphereIndex, Ray r, float tMin, float tMax, out HitRecord rec)
-#else
 		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out HitRecord rec)
-#endif
 		{
-#if SOA_SPHERES
-			float3 center = float3(
-				spheres.CenterX[sphereIndex], 
-				spheres.CenterY[sphereIndex],
-				spheres.CenterZ[sphereIndex]);
-			
-			float squaredRadius = spheres.SquaredRadius[sphereIndex];
-#if BUFFERED_MATERIALS
-			ushort material = spheres.MaterialIndex[sphereIndex];
-#else
-			Material material = spheres.Material[sphereIndex];
-#endif
-#else
 			float3 center = s.Center;
 			float squaredRadius = s.SquaredRadius;
 #if BUFFERED_MATERIALS
 			ushort material = s.MaterialIndex;
 #else
 			Material material = s.Material;
-#endif
 #endif
 			float3 oc = r.Origin - center;
 			float a = dot(r.Direction, r.Direction);
@@ -258,5 +390,6 @@ namespace RaytracerInOneWeekend
 			rec = default;
 			return false;
 		}
+#endif
 	}
 }

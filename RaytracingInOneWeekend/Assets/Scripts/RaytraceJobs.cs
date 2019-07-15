@@ -14,7 +14,9 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public uint TraceDepth;
 		[ReadOnly] public uint Seed;
-#if SOA_SPHERES
+#if AOSOA_SPHERES
+		[ReadOnly] public AosoaSpheres World;
+#elif SOA_SPHERES
 		[ReadOnly] public SoaSpheres World;
 #else
 		[ReadOnly] public NativeArray<Primitive> World;

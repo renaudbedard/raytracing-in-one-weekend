@@ -107,7 +107,10 @@ namespace RaytracerInOneWeekend
 		
 #if SOA_SPHERES
 		SoaSpheres sphereBuffer;
-		internal SoaSpheres World => sphereBuffer;        
+		internal SoaSpheres World => sphereBuffer;
+#elif AOSOA_SPHERES
+		AosoaSpheres sphereBuffer;
+		internal AosoaSpheres World => sphereBuffer;
 #else
 		NativeArray<Primitive> primitiveBuffer;        
 		NativeArray<Sphere> sphereBuffer;
@@ -166,7 +169,7 @@ namespace RaytracerInOneWeekend
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
 
-#if SOA_SPHERES 
+#if SOA_SPHERES || AOSOA_SPHERES 
 			sphereBuffer.Dispose();
 #else
 			if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
@@ -428,24 +431,31 @@ namespace RaytracerInOneWeekend
 					material.Fuzz, material.RefractiveIndex);
 			}
 #endif
-
-#if SOA_SPHERES
+			
+#if AOSOA_SPHERES
 			int sphereCount = activeSpheres.Count;
-#if HIT_FOUR_WIDE
-			sphereCount = (int) ceil(sphereCount / 4.0f) * 4;
-#endif
+			if (sphereBuffer.Length != sphereCount)
+			{
+				sphereBuffer.Dispose();
+				sphereBuffer = new AosoaSpheres(sphereCount);
+			}
+
+			for (int i = 0; i < activeSpheres.Count; i++)
+			{
+				SphereData sphere = activeSpheres[i];
+				sphereBuffer.SetCenter(i, sphere.Center);
+				sphereBuffer.SetRadius(i, sphere.Radius);
+				
+				MaterialData material = sphere.Material;
+				sphereBuffer.Materials[i] =
+					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);					
+			}
+#elif SOA_SPHERES
+			int sphereCount = activeSpheres.Count;
 			if (sphereBuffer.Count != sphereCount)
 			{
 				sphereBuffer.Dispose();
-				sphereBuffer.CenterX = new NativeArray<float>(sphereCount, Allocator.Persistent);
-				sphereBuffer.CenterY = new NativeArray<float>(sphereCount, Allocator.Persistent);
-				sphereBuffer.CenterZ = new NativeArray<float>(sphereCount, Allocator.Persistent);
-				sphereBuffer.SquaredRadius = new NativeArray<float>(sphereCount, Allocator.Persistent);
-#if BUFFERED_MATERIALS
-				sphereBuffer.MaterialIndex = new NativeArray<ushort>(sphereCount, Allocator.Persistent);
-#else
-				sphereBuffer.Material = new NativeArray<Material>(sphereCount, Allocator.Persistent);
-#endif
+				sphereBuffer = new SoaSpheres(sphereCount);
 			}
 
 			for (var i = 0; i < activeSpheres.Count; i++)
@@ -464,13 +474,6 @@ namespace RaytracerInOneWeekend
 					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);
 #endif
 			}
-#if HIT_FOUR_WIDE
-			for (var i = activeSpheres.Count; i < sphereCount; i++)
-			{
-				sphereBuffer.CenterX[i] = sphereBuffer.CenterY[i] = sphereBuffer.CenterZ[i] = float.PositiveInfinity;
-				sphereBuffer.SquaredRadius[i] = 0;
-			}
-#endif
 #else
 			int primitiveCount = activeSpheres.Count;
 
