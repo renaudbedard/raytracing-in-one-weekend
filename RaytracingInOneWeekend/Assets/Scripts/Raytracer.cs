@@ -57,7 +57,7 @@ namespace RaytracerInOneWeekend
 		public
 #endif
 		float millionRaysPerSecond;
-		
+
 		[UsedImplicitly]
 #if ODIN_INSPECTOR
 		[ShowInInspector] [ReadOnly]
@@ -65,7 +65,7 @@ namespace RaytracerInOneWeekend
 		public
 #endif
 		float lastBatchDuration;
-		
+
 		[UsedImplicitly]
 #if ODIN_INSPECTOR
 		[ShowInInspector] [ReadOnly]
@@ -73,7 +73,7 @@ namespace RaytracerInOneWeekend
 		public
 #endif
 		float lastTraceDuration;
-		
+
 		[UsedImplicitly]
 #if ODIN_INSPECTOR
 		[ShowInInspector] [ReadOnly]
@@ -81,7 +81,7 @@ namespace RaytracerInOneWeekend
 		public
 #endif
 		uint accumulatedSamples;
-		
+
 #if ODIN_INSPECTOR
 		[DisableIf(nameof(TraceActive))] [DisableInEditorMode] [Button]
 		void TriggerTrace() => ScheduleAccumulate(true);
@@ -100,11 +100,11 @@ namespace RaytracerInOneWeekend
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
 		NativeArray<half4> frontBuffer;
 		NativeArray<uint> rayCountBuffer;
-		
-#if BUFFERED_MATERIALS 
+
+#if BUFFERED_MATERIALS
 		NativeArray<Material> materialBuffer;
 #endif
-		
+
 #if SOA_SPHERES
 		SoaSpheres sphereBuffer;
 		internal SoaSpheres World => sphereBuffer;
@@ -112,7 +112,7 @@ namespace RaytracerInOneWeekend
 		AosoaSpheres sphereBuffer;
 		internal AosoaSpheres World => sphereBuffer;
 #else
-		NativeArray<Primitive> primitiveBuffer;        
+		NativeArray<Primitive> primitiveBuffer;
 		NativeArray<Sphere> sphereBuffer;
 		internal NativeArray<Primitive> World => primitiveBuffer;
 #endif
@@ -169,7 +169,7 @@ namespace RaytracerInOneWeekend
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
 
-#if SOA_SPHERES || AOSOA_SPHERES 
+#if SOA_SPHERES || AOSOA_SPHERES
 			sphereBuffer.Dispose();
 #else
 			if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
@@ -345,7 +345,7 @@ namespace RaytracerInOneWeekend
 				World = World,
 				OutputSamples = accumulationOutputBuffer,
 				OutputRayCount = rayCountBuffer,
-#if BUFFERED_MATERIALS				
+#if BUFFERED_MATERIALS
 				Materials = materialBuffer
 #endif
 			};
@@ -423,7 +423,7 @@ namespace RaytracerInOneWeekend
 				if (materialBuffer.IsCreated) materialBuffer.Dispose();
 				materialBuffer = new NativeArray<Material>(materialCount, Allocator.Persistent);
 			}
-			
+
 			for (var i = 0; i < activeMaterials.Count; i++)
 			{
 				MaterialData material = activeMaterials[i];
@@ -431,7 +431,7 @@ namespace RaytracerInOneWeekend
 					material.Fuzz, material.RefractiveIndex);
 			}
 #endif
-			
+
 #if AOSOA_SPHERES
 			int sphereCount = activeSpheres.Count;
 			if (sphereBuffer.Length != sphereCount)
@@ -443,12 +443,11 @@ namespace RaytracerInOneWeekend
 			for (int i = 0; i < activeSpheres.Count; i++)
 			{
 				SphereData sphere = activeSpheres[i];
-				sphereBuffer.SetCenter(i, sphere.Center);
-				sphereBuffer.SetRadius(i, sphere.Radius);
-				
+				sphereBuffer.SetElement(i, sphere.Center, sphere.Radius);
+
 				MaterialData material = sphere.Material;
 				sphereBuffer.Materials[i] =
-					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);					
+					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);
 			}
 #elif SOA_SPHERES
 			int sphereCount = activeSpheres.Count;
@@ -467,7 +466,7 @@ namespace RaytracerInOneWeekend
 				sphereBuffer.CenterY[i] = sphere.Center.y;
 				sphereBuffer.CenterZ[i] = sphere.Center.z;
 				sphereBuffer.SquaredRadius[i] = sphere.Radius * sphere.Radius;
-#if BUFFERED_MATERIALS				
+#if BUFFERED_MATERIALS
 				sphereBuffer.MaterialIndex[i] = (ushort) activeMaterials.IndexOf(sphere.Material);
 #else
 				sphereBuffer.Material[i] =
@@ -500,7 +499,7 @@ namespace RaytracerInOneWeekend
 				var sphereData = activeSpheres[i];
 				var material = sphereData.Material;
 				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius,
-#if BUFFERED_MATERIALS						
+#if BUFFERED_MATERIALS
 					(ushort) activeMaterials.IndexOf(material));
 #else
 					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex));

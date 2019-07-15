@@ -10,73 +10,55 @@ namespace RaytracerInOneWeekend
 #if AOSOA_SPHERES
 	unsafe struct AosoaSpheres : IDisposable
 	{
-		public const int SimdLength = 4;
+		static readonly int SimdLength = sizeof(float4) / sizeof(float);
+		static readonly int[] MemberOffsets =
+		{
+			0, // Center X
+			1, // Center Y
+			2, // Center Z
+			3  // SquaredRadius
+		};
+		static int MemberCount => MemberOffsets.Length;
 
 		public readonly int Length;
-		
-		NativeArray<float> blockData;
 
-		public NativeArray<SphereBlock> Blocks;
+		NativeArray<float4> dataBuffer;
+
+		public float4* DataPointer => (float4*) dataBuffer.GetUnsafePtr();
 		public NativeArray<Material> Materials;
-		
+
 		public AosoaSpheres(int length)
 		{
 			Length = length;
-			
+
 			int blockCount = (int) ceil(length / (float) SimdLength);
-			blockData = new NativeArray<float>(blockCount * SphereBlock.Size, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			
-			Blocks = new NativeArray<SphereBlock>(blockCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			for (int i = 0; i < blockCount; i++)
-				Blocks[i] = new SphereBlock(blockData, i);
+			dataBuffer = new NativeArray<float4>(blockCount * MemberCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
 			Materials = new NativeArray<Material>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
-			SphereBlock lastBlock = Blocks[blockCount - 1];
-			for (int i = length % SimdLength; i < SimdLength; i++)
-			{
-				lastBlock.CenterX[i] = lastBlock.CenterY[i] = lastBlock.CenterZ[i] = float.PositiveInfinity;
-				lastBlock.SquaredRadius[i] = 0;
-			}
+			float4* lastBlockPointer = DataPointer + (blockCount - 1) * MemberCount;
+			lastBlockPointer[MemberOffsets[0]] = float4(float.PositiveInfinity);
+			lastBlockPointer[MemberOffsets[1]] = float4(float.PositiveInfinity);
+			lastBlockPointer[MemberOffsets[2]] = float4(float.PositiveInfinity);
+			lastBlockPointer[MemberOffsets[3]] = float4(0);
 		}
 
-		public void SetCenter(int i, float3 center)
+		public void SetElement(int i, float3 center, float radius)
 		{
-			SphereBlock block = Blocks[i / SimdLength];
-			int offset = i % SimdLength;
-			block.CenterX[offset] = center.x;
-			block.CenterY[offset] = center.y;
-			block.CenterZ[offset] = center.z;
+			int blockIndex = i / SimdLength;
+			int lane = i % SimdLength;
+
+			float4* blockPointer = DataPointer + blockIndex * MemberCount;
+			blockPointer[MemberOffsets[0]][lane] = center.x;
+			blockPointer[MemberOffsets[1]][lane] = center.y;
+			blockPointer[MemberOffsets[2]][lane] = center.z;
+			blockPointer[MemberOffsets[3]][lane] = radius * radius;
 		}
-		
-		public void SetRadius(int i, float radius)
-		{
-			SphereBlock block = Blocks[i / SimdLength];
-			block.SquaredRadius[i % SimdLength] = radius * radius;
-		}
-		
+
 		public void Dispose()
 		{
-			if (blockData.IsCreated) blockData.Dispose();
-			if (Blocks.IsCreated) Blocks.Dispose();
+			if (dataBuffer.IsCreated) dataBuffer.Dispose();
 			if (Materials.IsCreated) Materials.Dispose();
-		}
-	}
-
-	unsafe struct SphereBlock
-	{
-		const int MemberCount = 4;
-		
-		public const int Size = MemberCount * AosoaSpheres.SimdLength;
-		
-		public readonly float* CenterX, CenterY, CenterZ, SquaredRadius;
-
-		public SphereBlock(NativeArray<float> blockData, int blockIndex)
-		{
-			CenterX = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 0;
-			CenterY = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 1;
-			CenterZ = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 2;
-			SquaredRadius = (float*) blockData.GetUnsafePtr() + blockIndex * Size + AosoaSpheres.SimdLength * 3;
 		}
 	}
 #elif SOA_SPHERES
@@ -95,7 +77,7 @@ namespace RaytracerInOneWeekend
 		{
 			int dataLength = length;
 			length = (int) ceil(length / 4.0) * 4;
-			
+
 			CenterX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			CenterY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			CenterZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
@@ -171,7 +153,7 @@ namespace RaytracerInOneWeekend
 		public readonly Material Material;
 #endif
 
-		public Sphere(float3 center, float radius, 
+		public Sphere(float3 center, float radius,
 #if BUFFERED_MATERIALS
 			ushort materialIndex)
 #else
@@ -180,7 +162,7 @@ namespace RaytracerInOneWeekend
 		{
 			Center = center;
 			SquaredRadius = radius * radius;
-#if BUFFERED_MATERIALS			
+#if BUFFERED_MATERIALS
 			MaterialIndex = materialIndex;
 #else
 			Material = material;
@@ -202,6 +184,7 @@ namespace RaytracerInOneWeekend
 			float4 hitT = tMax;
 			bool4 mask;
 
+			// TODO: use new AoSoA implementation
 			for (int i = 0; i < spheres.Blocks.Length; i++)
 			{
 				SphereBlock block = spheres.Blocks[i];
@@ -210,7 +193,7 @@ namespace RaytracerInOneWeekend
 					centerY = *(float4*) block.CenterY,
 					centerZ = *(float4*) block.CenterZ,
 					sqRadius = *(float4*) block.SquaredRadius;
-				
+
 				float4 ocX = r.Origin.x - centerX,
 					ocY = r.Origin.y - centerY,
 					ocZ = r.Origin.z - centerZ;
@@ -332,7 +315,7 @@ namespace RaytracerInOneWeekend
 			rec = new HitRecord(minDistance, point, (point - closestCenter) / closestRadius, closestMaterial);
 			return true;
 		}
-		
+
 #else
 		public static bool Hit(this NativeArray<Primitive> primitives, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
