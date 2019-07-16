@@ -160,7 +160,7 @@ namespace RaytracerInOneWeekend
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
 
-#if MANUAL_AOSOA || MANUAL_AOSOA || UNITY_SOA
+#if MANUAL_SOA || MANUAL_AOSOA || UNITY_SOA
 			sphereBuffer.Dispose();
 #else
 			if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
@@ -185,8 +185,8 @@ namespace RaytracerInOneWeekend
 			}
 #endif
 			uint2 currentSize = uint2(
-				(uint) round(targetCamera.pixelWidth * resolutionScaling),
-				(uint) round(targetCamera.pixelHeight * resolutionScaling));
+				(uint) ceil(targetCamera.pixelWidth * resolutionScaling),
+				(uint) ceil(targetCamera.pixelHeight * resolutionScaling));
 
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
 			bool cameraDirty = targetCamera.transform.hasChanged ||
@@ -341,7 +341,7 @@ namespace RaytracerInOneWeekend
 				OutputSamples = accumulationOutputBuffer,
 				OutputRayCount = rayCountBuffer,
 #if BUFFERED_MATERIALS || UNITY_SOA
-				Materials = materialBuffer
+				Material = materialBuffer
 #endif
 			};
 
@@ -360,8 +360,8 @@ namespace RaytracerInOneWeekend
 
 		void EnsureBuffersBuilt()
 		{
-			int width = (int) round(targetCamera.pixelWidth * resolutionScaling);
-			int height = (int) round(targetCamera.pixelHeight * resolutionScaling);
+			int width = (int) ceil(targetCamera.pixelWidth * resolutionScaling);
+			int height = (int) ceil(targetCamera.pixelHeight * resolutionScaling);
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height)
 			{
@@ -437,15 +437,12 @@ namespace RaytracerInOneWeekend
 
 			for (var i = 0; i < activeSpheres.Count; i++)
 			{
-				SphereData sphere = activeSpheres[i];
-				MaterialData material = sphere.Material;
+				SphereData sphereData = activeSpheres[i];
+				sphereBuffer.SetElement(i, sphereData.Center, sphereData.Radius);
 
-				sphereBuffer.CenterX[i] = sphere.Center.x;
-				sphereBuffer.CenterY[i] = sphere.Center.y;
-				sphereBuffer.CenterZ[i] = sphere.Center.z;
-				sphereBuffer.SquaredRadius[i] = sphere.Radius * sphere.Radius;
+				MaterialData material = sphereData.Material;
 #if BUFFERED_MATERIALS
-				sphereBuffer.MaterialIndex[i] = (ushort) activeMaterials.IndexOf(sphere.Material);
+				sphereBuffer.MaterialIndex[i] = activeMaterials.IndexOf(material);
 #else
 				sphereBuffer.Material[i] =
 					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);
@@ -462,12 +459,16 @@ namespace RaytracerInOneWeekend
 
 			for (int i = 0; i < activeSpheres.Count; i++)
 			{
-				SphereData sphere = activeSpheres[i];
-				sphereBuffer.SetElement(i, sphere.Center, sphere.Radius);
+				SphereData sphereData = activeSpheres[i];
+				sphereBuffer.SetElement(i, sphereData.Center, sphereData.Radius);
 
-				MaterialData material = sphere.Material;
-				sphereBuffer.Materials[i] =
+				MaterialData material = sphereData.Material;
+#if BUFFERED_MATERIALS
+				sphereBuffer.MaterialIndex[i] = activeMaterials.IndexOf(material);
+#else
+				sphereBuffer.Material[i] =
 					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);
+#endif
 			}
 
 #elif UNITY_SOA
@@ -513,7 +514,7 @@ namespace RaytracerInOneWeekend
 				var material = sphereData.Material;
 				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius,
 #if BUFFERED_MATERIALS
-					(ushort) activeMaterials.IndexOf(material));
+					activeMaterials.IndexOf(material));
 #else
 					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex));
 #endif

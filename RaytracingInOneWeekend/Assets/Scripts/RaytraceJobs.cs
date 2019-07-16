@@ -25,7 +25,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<Primitive> World;
 #endif
 #if BUFFERED_MATERIALS || UNITY_SOA
-		[ReadOnly] public NativeArray<Material> Materials;
+		[ReadOnly] public NativeArray<Material> Material;
 #endif
 		[ReadOnly] public NativeArray<float4> InputSamples;
 
@@ -39,7 +39,7 @@ namespace RaytracerInOneWeekend
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 			{
 #if BUFFERED_MATERIALS || UNITY_SOA
-				if (depth < TraceDepth && Materials[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+				if (depth < TraceDepth && Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #else
 				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #endif
