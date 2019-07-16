@@ -15,14 +15,14 @@ namespace RaytracerInOneWeekend
 		{
 			Type = type;
 			Albedo = albedo;
-			
+
 			switch (type)
 			{
 				case MaterialType.Metal: Parameter = saturate(fuzz); break;
 				case MaterialType.Dielectric: Parameter = refractiveIndex; break;
 			}
 		}
-		
+
 		[Pure]
 		public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
 		{

@@ -1,5 +1,6 @@
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.Experimental;
 using Unity.Jobs;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
@@ -14,14 +15,16 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public uint TraceDepth;
 		[ReadOnly] public uint Seed;
-#if AOSOA_SPHERES
+#if MANUAL_AOSOA
 		[ReadOnly] public AosoaSpheres World;
-#elif SOA_SPHERES
+#elif MANUAL_SOA
 		[ReadOnly] public SoaSpheres World;
+#elif UNITY_SOA
+		[ReadOnly] public NativeArrayFullSOA<Sphere> World;
 #else
 		[ReadOnly] public NativeArray<Primitive> World;
 #endif
-#if BUFFERED_MATERIALS
+#if BUFFERED_MATERIALS || UNITY_SOA
 		[ReadOnly] public NativeArray<Material> Materials;
 #endif
 		[ReadOnly] public NativeArray<float4> InputSamples;
@@ -35,13 +38,11 @@ namespace RaytracerInOneWeekend
 
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 			{
-				if (depth < TraceDepth &&
-#if BUFFERED_MATERIALS 
-				    Materials[rec.MaterialIndex]
+#if BUFFERED_MATERIALS || UNITY_SOA
+				if (depth < TraceDepth && Materials[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #else
-					rec.Material
+				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #endif
-					.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 				{
 					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
 					{
