@@ -129,6 +129,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 565612137}
+  - component: {fileID: 565612138}
   - component: {fileID: 565612136}
   m_Layer: 0
   m_Name: Raytracer
@@ -150,9 +151,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 1056194786}
-  resolutionScaling: 0.25
+  resolutionScaling: 0.5
   samplesPerPixel: 2000
-  samplesPerBatch: 1
+  samplesPerBatch: 20
   traceDepth: 35
   previewAfterBatch: 1
   stopWhenCompleted: 1
@@ -194,6 +195,20 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &565612138
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 565612135}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cb02af1b72547dc9b5d89c2b36356c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  dataLayout: 2
+  materialStorage: 1
 --- !u!1 &1056194785
 GameObject:
   m_ObjectHideFlags: 0
@@ -262,7 +277,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1056194785}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0.058169525, y: -0.62082916, z: 0.04627459, w: 0.78041404}
   m_LocalPosition: {x: 13, y: 2, z: -3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
