@@ -98,9 +98,15 @@ namespace RaytracerInOneWeekend
 				{
 					color = sphere.Material.Albedo
 				};
+				material.SetFloat("_Metallic", sphere.Material.Type == MaterialType.Metal ? 1 : 0);
+				material.SetFloat("_Glossiness",
+					sphere.Material.Type == MaterialType.Metal ? 1 - sphere.Material.Fuzz :
+					sphere.Material.Type == MaterialType.Dielectric ? 1 : 0);
+
+				previewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 				previewCommandBuffer.DrawMesh(meshFilter.sharedMesh,
 					Matrix4x4.TRS(sphere.Center, Quaternion.identity, sphere.Radius * 2 * Vector3.one), material, 0,
-					material.FindPass("DEFERRED"));
+					material.FindPass("FORWARD"));
 				previewMaterials.Add(material);
 			}
 		}
