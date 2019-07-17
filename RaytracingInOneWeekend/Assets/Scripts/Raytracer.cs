@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -40,6 +41,8 @@ namespace RaytracerInOneWeekend
 		[SerializeField] float cameraAperture = 0.1f;
 
 		[Title("World")]
+		[SerializeField] Color skyBottomColor = Color.white;
+		[SerializeField] Color skyTopColor = new Color(0.5f, 0.7f, 1);
 		[SerializeField] bool randomScene = true;
 #if ODIN_INSPECTOR
 		[ShowIf(nameof(randomScene))]
@@ -49,6 +52,34 @@ namespace RaytracerInOneWeekend
 		[HideIf(nameof(randomScene))]
 #endif
 		[SerializeField] SphereData[] spheres = null;
+
+		[Title("Debug")]
+		[UsedImplicitly]
+#if ODIN_INSPECTOR
+		[ShowInInspector]
+		[Sirenix.OdinInspector.ReadOnly]
+#else
+		public
+#endif
+		uint accumulatedSamples;
+
+		[UsedImplicitly]
+#if ODIN_INSPECTOR
+		[ShowInInspector]
+		[Sirenix.OdinInspector.ReadOnly]
+#else
+		public
+#endif
+		float millionRaysPerSecond, avgMRaysPerSecond, lastBatchDuration, lastTraceDuration;
+
+#if ODIN_INSPECTOR
+		[ShowInInspector]
+		[InlineEditor(InlineEditorModes.LargePreview)]
+		[Sirenix.OdinInspector.ReadOnly]
+#else
+		public
+#endif
+		Texture2D frontBufferTexture;
 
 		CommandBuffer commandBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
@@ -108,6 +139,8 @@ namespace RaytracerInOneWeekend
 
 		void Start()
 		{
+			targetCamera.RemoveAllCommandBuffers();
+
 			RebuildWorld();
 			EnsureBuffersBuilt();
 			CleanCamera();
@@ -137,14 +170,8 @@ namespace RaytracerInOneWeekend
 
 		void Update()
 		{
-#if UNITY_EDITOR
-			// watch for material data changes (won't catch those from OnValidate)
-			if (!randomScene && spheres.Any(x => x.Material.Dirty))
-			{
-				foreach (SphereData sphere in spheres) sphere.Material.Dirty = false;
-				worldNeedsRebuild = true;
-			}
-#endif
+			WatchForDirtyMaterials();
+
 			uint2 currentSize = uint2(
 				(uint) ceil(targetCamera.pixelWidth * resolutionScaling),
 				(uint) ceil(targetCamera.pixelHeight * resolutionScaling));
@@ -276,6 +303,8 @@ namespace RaytracerInOneWeekend
 			{
 				Size = bufferSize,
 				Camera = raytracingCamera,
+				SkyBottomColor = skyBottomColor.ToFloat3(),
+				SkyTopColor = skyTopColor.ToFloat3(),
 				InputSamples = accumulationInputBuffer,
 				Seed = (uint) Time.frameCount + 1,
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
@@ -339,15 +368,11 @@ namespace RaytracerInOneWeekend
 
 		void RebuildWorld()
 		{
-			if (randomScene)
-				BuildRandomScene();
-			else
-			{
-				activeSpheres.Clear();
-				foreach (SphereData sphere in spheres)
-					if (sphere.Enabled)
-						activeSpheres.Add(sphere);
-			}
+#if UNITY_EDITOR
+			foreach (SphereData sphere in spheres)
+				sphere.Material.Dirty = false;
+#endif
+			CollectActiveSpheres();
 
 			activeMaterials.Clear();
 			foreach (SphereData sphere in activeSpheres)
@@ -469,6 +494,19 @@ namespace RaytracerInOneWeekend
 			worldNeedsRebuild = false;
 
 			Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
+		}
+
+		void CollectActiveSpheres()
+		{
+			if (randomScene)
+				BuildRandomScene();
+			else
+			{
+				activeSpheres.Clear();
+				foreach (SphereData sphere in spheres)
+					if (sphere.Enabled)
+						activeSpheres.Add(sphere);
+			}
 		}
 
 		void BuildRandomScene()

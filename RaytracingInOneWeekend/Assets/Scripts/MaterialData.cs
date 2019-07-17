@@ -13,13 +13,13 @@ namespace RaytracerInOneWeekend
 	{
 		[SerializeField] MaterialType type = MaterialType.None;
 		[SerializeField] Color albedo = Color.white;
-		
-#if ODIN_INSPECTOR        
+
+#if ODIN_INSPECTOR
 		[ShowIf(nameof(Type), MaterialType.Metal)]
 #endif
 		[Range(0, 1)] [SerializeField] float fuzz = 0;
-		
-#if ODIN_INSPECTOR        
+
+#if ODIN_INSPECTOR
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 #endif
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
@@ -62,18 +62,17 @@ namespace RaytracerInOneWeekend
 
 		void OnValidate()
 		{
-			if (Application.isPlaying) 
-				Dirty = true;
+			Dirty = true;
 		}
 #endif
-		
+
 		public bool Equals(MaterialData other)
 		{
 			if (ReferenceEquals(null, other)) return false;
 			if (ReferenceEquals(this, other)) return true;
-			return base.Equals(other) && 
-				   type == other.type && 
-				   albedo.Equals(other.albedo) && 
+			return base.Equals(other) &&
+				   type == other.type &&
+				   albedo.Equals(other.albedo) &&
 				   fuzz.Equals(other.fuzz) &&
 				   refractiveIndex.Equals(other.refractiveIndex);
 		}

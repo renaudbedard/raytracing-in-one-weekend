@@ -14,6 +14,8 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public Camera Camera;
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public uint TraceDepth;
+		[ReadOnly] public float3 SkyBottomColor;
+		[ReadOnly] public float3 SkyTopColor;
 		[ReadOnly] public uint Seed;
 #if MANUAL_AOSOA
 		[ReadOnly] public AosoaSpheres World;
@@ -56,7 +58,7 @@ namespace RaytracerInOneWeekend
 
 			float3 unitDirection = normalize(r.Direction);
 			float t = 0.5f * (unitDirection.y + 1);
-			color = lerp(1, float3(0.5f, 0.7f, 1), t);
+			color = lerp(SkyBottomColor, SkyTopColor, t);
 			return true;
 		}
 
@@ -107,10 +109,7 @@ namespace RaytracerInOneWeekend
 			if (realSampleCount == 0)
 				finalColor = NoSamplesColor;
 			else
-			{
 				finalColor = Input[index].xyz / realSampleCount;
-				finalColor = sqrt(finalColor);
-			}
 
 			Output[index] = half4(half3(finalColor), half(1));
 		}
