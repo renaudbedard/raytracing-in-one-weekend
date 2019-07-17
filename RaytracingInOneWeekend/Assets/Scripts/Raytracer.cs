@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using JetBrains.Annotations;
 using Unity.Collections;
-using Unity.Collections.Experimental;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
@@ -15,15 +13,17 @@ using Random = Unity.Mathematics.Random;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
-using ReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
-using System.IO;
 #else
 using Title = UnityEngine.HeaderAttribute;
 #endif
 
+#if UNITY_SOA
+using Unity.Collections.Experimental;
+#endif
+
 namespace RaytracerInOneWeekend
 {
-	public class Raytracer : MonoBehaviour
+	partial class Raytracer : MonoBehaviour
 	{
 		[Title("References")]
 		[SerializeField] UnityEngine.Camera targetCamera = null;
@@ -49,37 +49,6 @@ namespace RaytracerInOneWeekend
 		[HideIf(nameof(randomScene))]
 #endif
 		[SerializeField] SphereData[] spheres = null;
-
-		[Title("Debug")]
-		[UsedImplicitly]
-#if ODIN_INSPECTOR
-		[ShowInInspector] [ReadOnly]
-#else
-		public
-#endif
-		uint accumulatedSamples;
-
-		[UsedImplicitly]
-#if ODIN_INSPECTOR
-		[ShowInInspector] [ReadOnly]
-#else
-		public
-#endif
-		float millionRaysPerSecond, avgMRaysPerSecond, lastBatchDuration, lastTraceDuration;
-
-#if ODIN_INSPECTOR
-		[DisableIf(nameof(TraceActive))] [DisableInEditorMode] [Button]
-		void TriggerTrace() => ScheduleAccumulate(true);
-
-		[EnableIf(nameof(TraceActive))] [DisableInEditorMode] [Button]
-		void AbortTrace() => traceAborted = true;
-#endif
-#if ODIN_INSPECTOR
-		[ShowInInspector] [InlineEditor(InlineEditorModes.LargePreview)] [ReadOnly]
-#else
-		public
-#endif
-		Texture2D frontBufferTexture;
 
 		CommandBuffer commandBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
@@ -145,14 +114,6 @@ namespace RaytracerInOneWeekend
 
 			ScheduleAccumulate(true);
 		}
-
-#if UNITY_EDITOR
-		void OnValidate()
-		{
-			if (Application.isPlaying)
-				worldNeedsRebuild = true;
-		}
-#endif
 
 		void OnDestroy()
 		{
@@ -261,24 +222,6 @@ namespace RaytracerInOneWeekend
 				traceAborted = false;
 			}
 		}
-
-		void ForceUpdateInspector()
-		{
-#if UNITY_EDITOR
-			UnityEditor.EditorUtility.SetDirty(this);
-#endif
-		}
-
-#if ODIN_INSPECTOR && UNITY_EDITOR
-		[Button] [DisableInEditorMode]
-		void SaveFrontBuffer()
-		{
-			byte[] pngBytes = frontBufferTexture.EncodeToPNG();
-			File.WriteAllBytes(
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
-		}
-#endif
 
 		void CleanCamera()
 		{
