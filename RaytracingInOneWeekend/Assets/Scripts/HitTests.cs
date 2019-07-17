@@ -1,8 +1,17 @@
-using Unity.Collections;
-using Unity.Collections.Experimental;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
+
+#if !MANUAL_AOSOA
+using Unity.Collections;
+#endif
+
+#if MANUAL_SOA || MANUAL_AOSOA
+using Unity.Collections.LowLevel.Unsafe;
+#endif
+
+#if UNITY_SOA
+using Unity.Collections.Experimental;
+#endif
 
 namespace RaytracerInOneWeekend
 {

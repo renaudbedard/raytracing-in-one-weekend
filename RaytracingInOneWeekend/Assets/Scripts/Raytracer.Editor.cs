@@ -82,7 +82,7 @@ namespace RaytracerInOneWeekend
 			skybox.material.SetColor("_Color2", skyTopColor);
 
 			if (previewObject == null)
-				previewObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+				previewObject = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Sphere);
 			previewObject.hideFlags = HideFlags.HideAndDontSave;
 			previewObject.SetActive(false);
 
