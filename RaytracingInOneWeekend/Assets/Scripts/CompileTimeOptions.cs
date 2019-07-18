@@ -42,22 +42,29 @@ namespace RaytracerInOneWeekend
 			if (Application.isPlaying || UnityEditor.EditorApplication.isCompiling)
 				return;
 
-			var definitions = new List<string>();
-#if ODIN_INSPECTOR
-			definitions.Add("ODIN_INSPECTOR");
-#endif
+			string currentDefines =
+				UnityEditor.PlayerSettings.GetScriptingDefineSymbolsForGroup(UnityEditor.BuildTargetGroup.Standalone);
+
+			var originalDefinitions = new HashSet<string>(currentDefines.Split(';'));
+			var newDefinitions = new HashSet<string>(originalDefinitions);
+
+			newDefinitions.Remove("MANUAL_SOA");
+			newDefinitions.Remove("MANUAL_AOSOA");
+			newDefinitions.Remove("UNITY_SOA");
+			newDefinitions.Remove("BUFFERED_MATERIALS");
+
 			switch (dataLayout)
 			{
 				case DataLayout.StructOfArrays:
-					definitions.Add("MANUAL_SOA");
+					newDefinitions.Add("MANUAL_SOA");
 					break;
 
 				case DataLayout.Interleaved:
-					definitions.Add("MANUAL_AOSOA");
+					newDefinitions.Add("MANUAL_AOSOA");
 					break;
 
 				case DataLayout.AutomaticSOA:
-					definitions.Add("UNITY_SOA");
+					newDefinitions.Add("UNITY_SOA");
 					materialStorage = MaterialStorage.Buffered;
 					break;
 			}
@@ -65,13 +72,16 @@ namespace RaytracerInOneWeekend
 			switch (materialStorage)
 			{
 				case MaterialStorage.Buffered:
-					definitions.Add("BUFFERED_MATERIALS");
+					newDefinitions.Add("BUFFERED_MATERIALS");
 					break;
 			}
 
-			UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(
-				UnityEditor.BuildTargetGroup.Standalone,
-				string.Join(";", definitions));
+			if (!newDefinitions.SetEquals(originalDefinitions))
+			{
+				UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(
+					UnityEditor.BuildTargetGroup.Standalone,
+					string.Join(";", newDefinitions));
+			}
 		}
 #endif
 	}

@@ -72,15 +72,7 @@ namespace RaytracerInOneWeekend
 #endif
 		float millionRaysPerSecond, avgMRaysPerSecond, lastBatchDuration, lastTraceDuration;
 
-#if ODIN_INSPECTOR
-		[ShowInInspector]
-		[InlineEditor(InlineEditorModes.LargePreview)]
-		[Sirenix.OdinInspector.ReadOnly]
-#else
-		public
-#endif
 		Texture2D frontBufferTexture;
-
 		CommandBuffer commandBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
 		NativeArray<half4> frontBuffer;

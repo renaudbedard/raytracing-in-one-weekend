@@ -51,5 +51,11 @@ namespace RaytracerInOneWeekend
             foreach (uint value in values) total += value;
             return total;
         }
+
+        public static Color GetAlphaReplaced(this Color c, float alpha)
+        {
+            c.a = alpha;
+            return c;
+        }
     }
 }
