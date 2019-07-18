@@ -123,11 +123,7 @@ namespace RaytracerInOneWeekend
 #if UNITY_SOA
 		public static bool Hit(this NativeArrayFullSOA<Sphere> spheres, Ray r, float tMin, float tMax, out HitRecord rec)
 #else
-#if BVH
-		public static bool Hit(this NativeArray<BvhNode> entities, Ray r, float tMin, float tMax, out HitRecord rec)
-#else
 		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, out HitRecord rec)
-#endif
 #endif
 		{
 			bool hitAnything = false;

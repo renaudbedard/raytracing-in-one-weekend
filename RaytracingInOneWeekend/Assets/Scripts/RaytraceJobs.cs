@@ -28,7 +28,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArrayFullSOA<Sphere> World;
 #else
 #if BVH
-		[ReadOnly] public NativeArray<BvhNode> World;
+		[ReadOnly] public BvhNode World;
 #else
 		[ReadOnly] public NativeArray<Entity> World;
 #endif

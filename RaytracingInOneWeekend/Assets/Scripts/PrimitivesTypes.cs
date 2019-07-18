@@ -157,8 +157,8 @@ namespace RaytracerInOneWeekend
 	{
 		public readonly EntityType Type;
 
-		readonly Sphere* sphere;
-		readonly BvhNode* bvhNode;
+		[NativeDisableUnsafePtrRestriction] readonly Sphere* sphere;
+		[NativeDisableUnsafePtrRestriction] readonly BvhNode* bvhNode;
 
 		public Entity(Sphere* sphere) : this()
 		{

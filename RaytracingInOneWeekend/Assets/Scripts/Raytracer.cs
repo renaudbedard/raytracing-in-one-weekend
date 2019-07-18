@@ -97,7 +97,7 @@ namespace RaytracerInOneWeekend
 		NativeArray<Entity> entityBuffer;
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
-		internal NativeArray<BvhNode> World => bvhNodeBuffer;
+		internal BvhNode World => bvhNodeBuffer[bvhNodeBuffer.Length - 1];
 #else
 		internal NativeArray<Entity> World => entityBuffer;
 #endif
