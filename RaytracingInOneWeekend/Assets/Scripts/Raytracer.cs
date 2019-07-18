@@ -97,7 +97,7 @@ namespace RaytracerInOneWeekend
 		NativeArray<Entity> entityBuffer;
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
-		internal BvhNode World => bvhNodeBuffer[bvhNodeBuffer.Length - 1];
+		internal BvhNode World => bvhNodeBuffer.IsCreated ? bvhNodeBuffer[bvhNodeBuffer.Length - 1] : default;
 #else
 		internal NativeArray<Entity> World => entityBuffer;
 #endif
@@ -457,6 +457,19 @@ namespace RaytracerInOneWeekend
 			}
 
 #else
+			RebuildEntityBuffer();
+#if BVH
+			RebuildBvh();
+#endif
+#endif
+
+			worldNeedsRebuild = false;
+
+			Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
+		}
+
+		void RebuildEntityBuffer()
+		{
 			int entityCount = activeSpheres.Count;
 
 			if (!entityBuffer.IsCreated || entityBuffer.Length != entityCount)
@@ -488,8 +501,10 @@ namespace RaytracerInOneWeekend
 					entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
 				}
 			}
+		}
 
-#if BVH
+		void RebuildBvh()
+		{
 			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
 			bvhNodeBuffer.Clear();
 
@@ -497,12 +512,6 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, rng));
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes)");
-#endif
-#endif
-
-			worldNeedsRebuild = false;
-
-			Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
 		}
 
 		void CollectActiveSpheres()

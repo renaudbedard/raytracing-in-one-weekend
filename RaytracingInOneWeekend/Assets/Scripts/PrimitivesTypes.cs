@@ -171,6 +171,8 @@ namespace RaytracerInOneWeekend
 			this.bvhNode = bvhNode;
 		}
 
+		public BvhNode AsNode => *bvhNode;
+
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
 		{

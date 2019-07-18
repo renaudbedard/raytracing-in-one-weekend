@@ -38,6 +38,6 @@ namespace RaytracerInOneWeekend
 		}
 
 		public static AxisAlignedBoundingBox Enclose(AxisAlignedBoundingBox lhs, AxisAlignedBoundingBox rhs) =>
-			new AxisAlignedBoundingBox(min(lhs.Max, rhs.Min), max(lhs.Max, rhs.Max));
+			new AxisAlignedBoundingBox(min(lhs.Min, rhs.Min), max(lhs.Max, rhs.Max));
 	}
 }

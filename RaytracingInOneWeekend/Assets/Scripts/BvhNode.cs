@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine.Assertions;
@@ -5,7 +7,7 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-	struct BvhNode
+	struct BvhNode : IEnumerable<BvhNode>
 	{
 		public readonly Entity Left;
 		public readonly Entity Right;
@@ -49,6 +51,24 @@ namespace RaytracerInOneWeekend
 			Assert.IsTrue(hasRightBounds, $"{Right} has no bounds");
 
 			Bounds = AxisAlignedBoundingBox.Enclose(leftBounds, rightBounds);
+		}
+
+		public IEnumerator<BvhNode> GetEnumerator()
+		{
+			yield return this;
+
+			if (Left.Type == EntityType.BvhNode)
+				foreach (BvhNode node in Left.AsNode)
+					yield return node;
+
+			if (Right.Type == EntityType.BvhNode)
+				foreach (BvhNode node in Right.AsNode)
+					yield return node;
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
 		}
 	}
 }

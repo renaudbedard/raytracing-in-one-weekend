@@ -1,3 +1,5 @@
+
+using Unity.Mathematics;
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Linq;
@@ -27,6 +29,14 @@ namespace RaytracerInOneWeekend
 		[DisableInEditorMode]
 		[Button]
 		void AbortTrace() => traceAborted = true;
+
+		[DisableIf(nameof(TraceActive))]
+		[Button]
+		void ForceRebuildBVH()
+		{
+			RebuildEntityBuffer();
+			RebuildBvh();
+		}
 #endif
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
@@ -163,6 +173,15 @@ namespace RaytracerInOneWeekend
 
 				Gizmos.DrawSphere(sphere.Center, sphere.Radius);
 			}
+
+#if BVH
+			foreach (BvhNode node in World)
+			{
+				Gizmos.color = Color.red.GetAlphaReplaced(0.25f);
+				float3 size = node.Bounds.Max - node.Bounds.Min;
+				Gizmos.DrawCube(node.Bounds.Min + size / 2, size);
+			}
+#endif
 		}
 	}
 }
