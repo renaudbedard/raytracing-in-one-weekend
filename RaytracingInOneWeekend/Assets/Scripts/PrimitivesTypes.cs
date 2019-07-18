@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -144,38 +146,70 @@ namespace RaytracerInOneWeekend
 		}
 	}
 #else
-	enum PrimitiveType
+	enum EntityType
 	{
 		None,
-		Sphere
+		Sphere,
+		BvhNode
 	}
 
-	struct Primitive
+	unsafe struct Entity
 	{
-		public readonly PrimitiveType Type;
+		public readonly EntityType Type;
 
-		[ReadOnly] readonly NativeSlice<Sphere> sphere;
+		readonly Sphere* sphere;
+		readonly BvhNode* bvhNode;
 
-		// TODO: do we need a public accessor to the underlying primitive?
-
-		public Primitive(NativeSlice<Sphere> sphere)
+		public Entity(Sphere* sphere) : this()
 		{
-			UnityEngine.Assertions.Assert.IsTrue(sphere.Length == 1, "Primitive cannot be multi-valued");
-			Type = PrimitiveType.Sphere;
+			Type = EntityType.Sphere;
 			this.sphere = sphere;
 		}
+		public Entity(BvhNode* bvhNode) : this()
+		{
+			Type = EntityType.BvhNode;
+			this.bvhNode = bvhNode;
+		}
 
+		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
 		{
 			switch (Type)
 			{
-				case PrimitiveType.Sphere:
-					return sphere[0].Hit(r, tMin, tMax, out rec);
+				case EntityType.Sphere: return sphere->Hit(r, tMin, tMax, out rec);
+				case EntityType.BvhNode: return bvhNode->Hit(r, tMin, tMax, out rec);
 
 				default:
 					rec = default;
 					return false;
 			}
+		}
+
+		[Pure]
+		public bool GetBounds(out AxisAlignedBoundingBox bounds)
+		{
+			switch (Type)
+			{
+				case EntityType.Sphere: return sphere->GetBounds(out bounds);
+				case EntityType.BvhNode: return bvhNode->GetBounds(out bounds);
+
+				default:
+					bounds = default;
+					return false;
+			}
+		}
+	}
+
+	struct EntityBoundsComparer : IComparer<Entity>
+	{
+		readonly int axis;
+		public EntityBoundsComparer(int axis) => this.axis = axis;
+
+		public int Compare(Entity lhs, Entity rhs)
+		{
+			if (lhs.GetBounds(out var leftBounds) && lhs.GetBounds(out var rightBounds))
+				return (int) sign(leftBounds.Min[axis] - rightBounds.Min[axis]);
+			return 0;
 		}
 	}
 

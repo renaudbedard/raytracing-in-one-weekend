@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
@@ -92,9 +93,14 @@ namespace RaytracerInOneWeekend
 		NativeArrayFullSOA<Sphere> sphereBuffer;
 		internal NativeArrayFullSOA<Sphere> World => sphereBuffer;
 #else
-		NativeArray<Primitive> primitiveBuffer;
 		NativeArray<Sphere> sphereBuffer;
-		internal NativeArray<Primitive> World => primitiveBuffer;
+		NativeArray<Entity> entityBuffer;
+#if BVH
+		NativeList<BvhNode> bvhNodeBuffer;
+		internal NativeArray<BvhNode> World => bvhNodeBuffer;
+#else
+		internal NativeArray<Entity> World => entityBuffer;
+#endif
 #endif
 
 		JobHandle? accumulateJobHandle;
@@ -149,7 +155,7 @@ namespace RaytracerInOneWeekend
 #if MANUAL_SOA || MANUAL_AOSOA || UNITY_SOA
 			sphereBuffer.Dispose();
 #else
-			if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
+			if (entityBuffer.IsCreated) entityBuffer.Dispose();
 			if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
 #endif
 #if BUFFERED_MATERIALS || UNITY_SOA
@@ -158,6 +164,9 @@ namespace RaytracerInOneWeekend
 			if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
 			if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
 			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
+#if BVH
+			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
+#endif
 		}
 
 		void Update()
@@ -289,7 +298,7 @@ namespace RaytracerInOneWeekend
 				ForceUpdateInspector();
 			}
 			else
-				ExchangeBuffers(ref accumulationInputBuffer, ref accumulationOutputBuffer);
+				Util.Swap(ref accumulationInputBuffer, ref accumulationOutputBuffer);
 
 			var accumulateJob = new AccumulateJob
 			{
@@ -448,26 +457,22 @@ namespace RaytracerInOneWeekend
 			}
 
 #else
-			int primitiveCount = activeSpheres.Count;
+			int entityCount = activeSpheres.Count;
 
-			// other typed active primitives would be collected here
-
-			// rebuild primitive buffer
-			if (!primitiveBuffer.IsCreated || primitiveBuffer.Length != primitiveCount)
+			if (!entityBuffer.IsCreated || entityBuffer.Length != entityCount)
 			{
-				if (primitiveBuffer.IsCreated) primitiveBuffer.Dispose();
-				primitiveBuffer = new NativeArray<Primitive>(primitiveCount, Allocator.Persistent);
+				if (entityBuffer.IsCreated) entityBuffer.Dispose();
+				entityBuffer = new NativeArray<Entity>(entityCount, Allocator.Persistent);
 			}
 
-			// rebuild individual typed primitive buffers
 			if (!sphereBuffer.IsCreated || sphereBuffer.Length != activeSpheres.Count)
 			{
 				if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
 				sphereBuffer = new NativeArray<Sphere>(activeSpheres.Count, Allocator.Persistent);
 			}
 
-			// collect primitives
-			int primitiveIndex = 0;
+			int entityIndex = 0;
+
 			for (var i = 0; i < activeSpheres.Count; i++)
 			{
 				var sphereData = activeSpheres[i];
@@ -478,9 +483,21 @@ namespace RaytracerInOneWeekend
 #else
 					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex));
 #endif
-				var sphereSlice = new NativeSlice<Sphere>(sphereBuffer, i, 1);
-				primitiveBuffer[primitiveIndex++] = new Primitive(sphereSlice);
+				unsafe
+				{
+					entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
+				}
 			}
+
+#if BVH
+			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
+			bvhNodeBuffer.Clear();
+
+			var rng = new Random(sceneSeed);
+			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, rng));
+
+			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes)");
+#endif
 #endif
 
 			worldNeedsRebuild = false;
@@ -531,13 +548,6 @@ namespace RaytracerInOneWeekend
 			activeSpheres.Add(new SphereData(float3(0, 1, 0), 1, MaterialData.Dielectric(1.5f)));
 			activeSpheres.Add(new SphereData(float3(-4, 1, 0), 1, MaterialData.Lambertian(float3(0.4f, 0.2f, 0.1f))));
 			activeSpheres.Add(new SphereData(float3(4, 1, 0), 1, MaterialData.Metal(float3(0.7f, 0.6f, 0.5f))));
-		}
-
-		static void ExchangeBuffers(ref NativeArray<float4> lhs, ref NativeArray<float4> rhs)
-		{
-			var temp = lhs;
-			lhs = rhs;
-			rhs = temp;
 		}
 	}
 }

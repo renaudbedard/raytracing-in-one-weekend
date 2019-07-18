@@ -123,7 +123,11 @@ namespace RaytracerInOneWeekend
 #if UNITY_SOA
 		public static bool Hit(this NativeArrayFullSOA<Sphere> spheres, Ray r, float tMin, float tMax, out HitRecord rec)
 #else
-		public static bool Hit(this NativeArray<Primitive> primitives, Ray r, float tMin, float tMax, out HitRecord rec)
+#if BVH
+		public static bool Hit(this NativeArray<BvhNode> entities, Ray r, float tMin, float tMax, out HitRecord rec)
+#else
+		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, out HitRecord rec)
+#endif
 #endif
 		{
 			bool hitAnything = false;
@@ -135,10 +139,9 @@ namespace RaytracerInOneWeekend
 				Sphere sphere = spheres[i];
 				if (sphere.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
 #else
-			for (var i = 0; i < primitives.Length; i++)
+			for (var i = 0; i < entities.Length; i++)
 			{
-				Primitive primitive = primitives[i];
-				if (primitive.Hit(r, tMin, rec.Distance, out HitRecord thisRec))
+				if (entities[i].Hit(r, tMin, rec.Distance, out HitRecord thisRec))
 #endif
 				{
 					hitAnything = true;
@@ -187,6 +190,59 @@ namespace RaytracerInOneWeekend
 
 			rec = default;
 			return false;
+		}
+
+		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
+		{
+			rec = default;
+			if (n.Bounds.Hit(r, tMin, tMax))
+			{
+				bool hitLeft = n.Left.Hit(r, tMin, tMax, out HitRecord leftRecord);
+				bool hitRight = n.Right.Hit(r, tMin, tMax, out HitRecord rightRecord);
+
+				if (hitLeft && hitRight)
+				{
+					rec = leftRecord.Distance < rightRecord.Distance ? leftRecord : rightRecord;
+					return true;
+				}
+				if (hitLeft)
+				{
+					rec = leftRecord;
+					return true;
+				}
+				if (hitRight)
+				{
+					rec = rightRecord;
+					return true;
+				}
+				return false;
+			}
+
+			return false;
+		}
+
+		public static bool GetBounds(this NativeArray<Entity> entities, out AxisAlignedBoundingBox enclosingAabb)
+		{
+			bool anyBox = false;
+			enclosingAabb = default;
+			for (int i = 0; i < entities.Length; i++)
+			{
+				anyBox |= entities[i].GetBounds(out AxisAlignedBoundingBox aabb);
+				enclosingAabb = i == 0 ? aabb : AxisAlignedBoundingBox.Enclose(enclosingAabb, aabb);
+			}
+			return anyBox;
+		}
+
+		public static bool GetBounds(this BvhNode node, out AxisAlignedBoundingBox bounds)
+		{
+			bounds = node.Bounds;
+			return true;
+		}
+
+		public static bool GetBounds(this Sphere s, out AxisAlignedBoundingBox box)
+		{
+			box = new AxisAlignedBoundingBox(s.Center - s.Radius, s.Center + s.Radius);
+			return true;
 		}
 #endif
 	}

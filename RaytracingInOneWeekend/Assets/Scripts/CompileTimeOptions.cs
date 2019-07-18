@@ -24,6 +24,12 @@ namespace RaytracerInOneWeekend
 			Buffered
 		}
 
+		enum SpacePartitioning
+		{
+			None,
+			BVH
+		}
+
 		[SerializeField]
 #if ODIN_INSPECTOR
 		[DisableInPlayMode]
@@ -35,6 +41,12 @@ namespace RaytracerInOneWeekend
 		[DisableInPlayMode] [DisableIf(nameof(dataLayout), DataLayout.AutomaticSOA)]
 #endif
 		MaterialStorage materialStorage = MaterialStorage.Inline;
+
+		[SerializeField]
+#if ODIN_INSPECTOR
+		[DisableInPlayMode]
+#endif
+		SpacePartitioning spacePartitioning = SpacePartitioning.BVH;
 
 #if UNITY_EDITOR
 		void OnValidate()
@@ -52,6 +64,7 @@ namespace RaytracerInOneWeekend
 			newDefinitions.Remove("MANUAL_AOSOA");
 			newDefinitions.Remove("UNITY_SOA");
 			newDefinitions.Remove("BUFFERED_MATERIALS");
+			newDefinitions.Remove("BVH");
 
 			switch (dataLayout)
 			{
@@ -76,11 +89,19 @@ namespace RaytracerInOneWeekend
 					break;
 			}
 
+			switch (spacePartitioning)
+			{
+				case SpacePartitioning.BVH:
+					newDefinitions.Add("BVH");
+					break;
+			}
+
 			if (!newDefinitions.SetEquals(originalDefinitions))
 			{
-				UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(
-					UnityEditor.BuildTargetGroup.Standalone,
-					string.Join(";", newDefinitions));
+				UnityEditor.EditorApplication.delayCall += () =>
+					UnityEditor.PlayerSettings.SetScriptingDefineSymbolsForGroup(
+						UnityEditor.BuildTargetGroup.Standalone,
+						string.Join(";", newDefinitions));
 			}
 		}
 #endif

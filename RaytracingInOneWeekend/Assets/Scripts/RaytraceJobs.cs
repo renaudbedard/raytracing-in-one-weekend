@@ -27,7 +27,11 @@ namespace RaytracerInOneWeekend
 #elif UNITY_SOA
 		[ReadOnly] public NativeArrayFullSOA<Sphere> World;
 #else
-		[ReadOnly] public NativeArray<Primitive> World;
+#if BVH
+		[ReadOnly] public NativeArray<BvhNode> World;
+#else
+		[ReadOnly] public NativeArray<Entity> World;
+#endif
 #endif
 #if BUFFERED_MATERIALS || UNITY_SOA
 		[ReadOnly] public NativeArray<Material> Material;
