@@ -204,13 +204,13 @@ namespace RaytracerInOneWeekend
 
 	struct EntityBoundsComparer : IComparer<Entity>
 	{
-		readonly int axis;
-		public EntityBoundsComparer(int axis) => this.axis = axis;
+		readonly PartitionAxis axis;
+		public EntityBoundsComparer(PartitionAxis axis) => this.axis = axis;
 
 		public int Compare(Entity lhs, Entity rhs)
 		{
-			if (lhs.GetBounds(out var leftBounds) && lhs.GetBounds(out var rightBounds))
-				return (int) sign(leftBounds.Min[axis] - rightBounds.Min[axis]);
+			if (lhs.GetBounds(out var leftBounds) && rhs.GetBounds(out var rightBounds))
+				return (int) sign(leftBounds.Center[(int) axis] - rightBounds.Center[(int) axis]);
 			return 0;
 		}
 	}

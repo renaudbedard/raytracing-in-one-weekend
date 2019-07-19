@@ -10,17 +10,32 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
+	enum PartitionAxis
+	{
+		None = -1,
+		X, Y, Z
+	}
+
 	struct BvhNode
 	{
 		public readonly Entity Left;
 		public readonly Entity Right;
 		public readonly AxisAlignedBoundingBox Bounds;
 
-		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, Random rng)
+		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, Random rng, PartitionAxis parentPartition = default)
 		{
+			PartitionAxis partition;
 			int n = entities.Length;
-			int axis = rng.NextInt(0, 3);
-			entities.Sort(new EntityBoundsComparer(axis));
+
+			switch (parentPartition)
+			{
+				case PartitionAxis.X: partition = rng.NextBool() ? PartitionAxis.Y : PartitionAxis.Z; break;
+				case PartitionAxis.Y: partition = rng.NextBool() ? PartitionAxis.X : PartitionAxis.Z; break;
+				case PartitionAxis.Z: partition = rng.NextBool() ? PartitionAxis.X : PartitionAxis.Y; break;
+				default: partition = (PartitionAxis) rng.NextInt(0, 3); break;
+			}
+
+			entities.Sort(new EntityBoundsComparer(partition));
 
 			switch (n)
 			{
@@ -36,8 +51,8 @@ namespace RaytracerInOneWeekend
 				default:
 					var nodesPointer = (BvhNode*) nodes.GetUnsafePtr();
 
-					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes, rng);
-					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes, rng);
+					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes, rng, partition);
+					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes, rng, partition);
 
 					nodes.Add(leftNode);
 					Left = new Entity(nodesPointer + (nodes.Length - 1));
