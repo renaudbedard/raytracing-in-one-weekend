@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -8,7 +9,6 @@ using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
 #if ODIN_INSPECTOR
-using System;
 using Sirenix.OdinInspector;
 using System.IO;
 #else
@@ -19,16 +19,8 @@ namespace RaytracerInOneWeekend
 {
 	partial class Raytracer
 	{
-#if ODIN_INSPECTOR
 		[Title("Tools")]
-		[DisableIf(nameof(TraceActive))]
-		[Button]
-		void ForceRebuildBVH()
-		{
-			RebuildEntityBuffer();
-			RebuildBvh();
-		}
-
+#if ODIN_INSPECTOR
 		[DisableIf(nameof(TraceActive))]
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
@@ -38,7 +30,8 @@ namespace RaytracerInOneWeekend
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
 		void AbortTrace() => traceAborted = true;
-
+#elif BVH
+		[SerializeField] bool previewBvh = false;
 #endif
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
@@ -91,11 +84,28 @@ namespace RaytracerInOneWeekend
 
 		void UpdatePreview()
 		{
-			if (scene) scene.ClearDirty();
-
-			Transform cameraTransform = targetCamera.transform;
-			cameraTransform.position = scene.CameraPosition;
-			cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
+#if BVH
+			if (previewBvh)
+			{
+				RebuildEntityBuffer();
+				RebuildBvh();
+			}
+			else
+			{
+				if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
+				if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
+				if (entityBuffer.IsCreated) entityBuffer.Dispose();
+				activeSpheres.Clear();
+			}
+#endif
+			if (scene)
+			{
+				scene.ClearDirty();
+				
+				Transform cameraTransform = targetCamera.transform;
+				cameraTransform.position = scene.CameraPosition;
+				cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
+			}
 
 			Action updateDelegate = OnEditorUpdate;
 			if (EditorApplication.update.GetInvocationList().All(x => x != (Delegate) updateDelegate))

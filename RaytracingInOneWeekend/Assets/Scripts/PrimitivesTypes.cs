@@ -210,7 +210,7 @@ namespace RaytracerInOneWeekend
 		public int Compare(Entity lhs, Entity rhs)
 		{
 			if (lhs.GetBounds(out var leftBounds) && rhs.GetBounds(out var rightBounds))
-				return (int) sign(leftBounds.Center[(int) axis] - rightBounds.Center[(int) axis]);
+				return (int) sign(leftBounds.Center[axis.GetAxisId()] - rightBounds.Center[axis.GetAxisId()]);
 			return 0;
 		}
 	}

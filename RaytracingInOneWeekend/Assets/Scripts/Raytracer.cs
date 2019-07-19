@@ -504,10 +504,9 @@ namespace RaytracerInOneWeekend
 			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
 			bvhNodeBuffer.Clear();
 
-			var rng = new Random(0x6E624EB7u);
-			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, rng));
+			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
 
-			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes)");
+			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
 
 		void CollectActiveSpheres()

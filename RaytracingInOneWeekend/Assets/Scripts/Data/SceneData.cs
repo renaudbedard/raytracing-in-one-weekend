@@ -17,11 +17,11 @@ namespace RaytracerInOneWeekend
 #if ODIN_INSPECTOR
 		[InlineButton(nameof(UpdateFromCameraTransform), "Update")]
 #endif
-		[SerializeField] Vector3 cameraPosition;
+		[SerializeField] Vector3 cameraPosition = default;
 #if ODIN_INSPECTOR
 		[InlineButton(nameof(UpdateFromCameraTransform), "Update")]
 #endif
-		[SerializeField] Vector3 cameraTarget;
+		[SerializeField] Vector3 cameraTarget = default;
 
 		[Title("World")]
 		[SerializeField] bool randomScene = true;

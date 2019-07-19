@@ -10,33 +10,68 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
+	[Flags]
 	enum PartitionAxis
 	{
-		None = -1,
-		X, Y, Z
+		None = 0,
+		X = 1, 
+		Y = 2, 
+		Z = 4,
+		All = X | Y | Z
 	}
+	static class PartitionAxisExtensions
+	{
+		public static int GetAxisId(this PartitionAxis axis)
+		{
+			switch (axis)
+			{
+				case PartitionAxis.X: return 0;
+				case PartitionAxis.Y: return 1;
+				case PartitionAxis.Z: return 2;
+			}
+			Assert.IsTrue(false, "Multivalued or unset axis");
+			return -1;
+		}
 
+		public static IEnumerable<PartitionAxis> Enumerate(this PartitionAxis axis)
+		{
+			if ((axis & PartitionAxis.X) != 0) yield return PartitionAxis.X;
+			if ((axis & PartitionAxis.Y) != 0) yield return PartitionAxis.Y;
+			if ((axis & PartitionAxis.Z) != 0) yield return PartitionAxis.Z;
+		}
+	}
+	
 	struct BvhNode
 	{
 		public readonly Entity Left;
 		public readonly Entity Right;
 		public readonly AxisAlignedBoundingBox Bounds;
 
-		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, Random rng, PartitionAxis parentPartition = default)
+		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
 		{
-			PartitionAxis partition;
-			int n = entities.Length;
-
-			switch (parentPartition)
+			var possiblePartitions = PartitionAxis.All;
+			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
+			foreach (var entity in entities)
 			{
-				case PartitionAxis.X: partition = rng.NextBool() ? PartitionAxis.Y : PartitionAxis.Z; break;
-				case PartitionAxis.Y: partition = rng.NextBool() ? PartitionAxis.X : PartitionAxis.Z; break;
-				case PartitionAxis.Z: partition = rng.NextBool() ? PartitionAxis.X : PartitionAxis.Y; break;
-				default: partition = (PartitionAxis) rng.NextInt(0, 3); break;
+				if (entity.GetBounds(out var bounds))
+					entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, bounds);
+			}
+			
+			var biggestPartition = PartitionAxis.None;
+			var biggestPartitionSize = float.MinValue;
+			foreach (PartitionAxis partition in possiblePartitions.Enumerate())
+			{
+				float size = entireBounds.Size[partition.GetAxisId()];
+				if (size > biggestPartitionSize)
+				{
+					biggestPartition = partition;
+					biggestPartitionSize = size;
+				}
 			}
 
-			entities.Sort(new EntityBoundsComparer(partition));
+			entities.Sort(new EntityBoundsComparer(biggestPartition));
 
+			int n = entities.Length;
 			switch (n)
 			{
 				case 1:
@@ -51,8 +86,8 @@ namespace RaytracerInOneWeekend
 				default:
 					var nodesPointer = (BvhNode*) nodes.GetUnsafePtr();
 
-					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes, rng, partition);
-					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes, rng, partition);
+					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes);
+					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes);
 
 					nodes.Add(leftNode);
 					Left = new Entity(nodesPointer + (nodes.Length - 1));
