@@ -1,4 +1,5 @@
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
 
 #if !MANUAL_AOSOA
@@ -237,7 +238,8 @@ namespace RaytracerInOneWeekend
 
 		public static bool GetBounds(this Sphere s, out AxisAlignedBoundingBox box)
 		{
-			box = new AxisAlignedBoundingBox(s.Center - s.Radius, s.Center + s.Radius);
+			float absRadius = abs(s.Radius);
+			box = new AxisAlignedBoundingBox(s.Center - absRadius, s.Center + absRadius);
 			return true;
 		}
 #endif

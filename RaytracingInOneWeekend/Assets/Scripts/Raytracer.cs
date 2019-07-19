@@ -41,18 +41,15 @@ namespace RaytracerInOneWeekend
 		[Title("Camera")]
 		[SerializeField] float cameraAperture = 0.1f;
 
-		[Title("World")]
+		[Title("Sky")]
 		[SerializeField] Color skyBottomColor = Color.white;
 		[SerializeField] Color skyTopColor = new Color(0.5f, 0.7f, 1);
-		[SerializeField] bool randomScene = true;
+
+		[Title("World")]
 #if ODIN_INSPECTOR
-		[ShowIf(nameof(randomScene))]
+		[InlineEditor(DrawHeader = false)]
 #endif
-		[SerializeField] uint sceneSeed = 45573880;
-#if ODIN_INSPECTOR
-		[HideIf(nameof(randomScene))]
-#endif
-		[SerializeField] SphereData[] spheres = null;
+		[SerializeField] SceneData scene = null;
 
 		[Title("Debug")]
 		[UsedImplicitly]
@@ -171,7 +168,7 @@ namespace RaytracerInOneWeekend
 
 		void Update()
 		{
-			WatchForDirtyMaterials();
+			WatchForWorldChanges();
 
 			uint2 currentSize = uint2(
 				(uint) ceil(targetCamera.pixelWidth * resolutionScaling),
@@ -370,8 +367,7 @@ namespace RaytracerInOneWeekend
 		void RebuildWorld()
 		{
 #if UNITY_EDITOR
-			foreach (SphereData sphere in spheres)
-				sphere.Material.Dirty = false;
+			if (scene) scene.ClearDirty();
 #endif
 			CollectActiveSpheres();
 
@@ -508,7 +504,7 @@ namespace RaytracerInOneWeekend
 			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
 			bvhNodeBuffer.Clear();
 
-			var rng = new Random(sceneSeed);
+			var rng = new Random(0x6E624EB7u);
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, rng));
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes)");
@@ -516,12 +512,15 @@ namespace RaytracerInOneWeekend
 
 		void CollectActiveSpheres()
 		{
-			if (randomScene)
+			activeSpheres.Clear();
+
+			if (!scene) return;
+
+			if (scene.RandomScene)
 				BuildRandomScene();
 			else
 			{
-				activeSpheres.Clear();
-				foreach (SphereData sphere in spheres)
+				foreach (SphereData sphere in scene.Spheres)
 					if (sphere.Enabled)
 						activeSpheres.Add(sphere);
 			}
@@ -532,7 +531,7 @@ namespace RaytracerInOneWeekend
 			activeSpheres.Clear();
 			activeSpheres.Add(new SphereData(new Vector3(0, -1000, 0), 1000, MaterialData.Lambertian(0.5f)));
 
-			var rng = new Random(sceneSeed);
+			var rng = new Random(scene.Seed);
 
 			for (int a = -11; a < 11; a++)
 			{

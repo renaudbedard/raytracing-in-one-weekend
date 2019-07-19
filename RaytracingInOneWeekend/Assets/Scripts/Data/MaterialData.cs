@@ -58,7 +58,12 @@ namespace RaytracerInOneWeekend
 		}
 
 #if UNITY_EDITOR
-		public bool Dirty { get; set; }
+		public bool Dirty { get; private set; }
+
+		public void ClearDirty()
+		{
+			Dirty = false;
+		}
 
 		void OnValidate()
 		{

@@ -1,11 +1,11 @@
-
-using Unity.Mathematics;
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
 
 #if ODIN_INSPECTOR
 using System;
@@ -20,16 +20,7 @@ namespace RaytracerInOneWeekend
 	partial class Raytracer
 	{
 #if ODIN_INSPECTOR
-		[DisableIf(nameof(TraceActive))]
-		[DisableInEditorMode]
-		[Button]
-		void TriggerTrace() => ScheduleAccumulate(true);
-
-		[EnableIf(nameof(TraceActive))]
-		[DisableInEditorMode]
-		[Button]
-		void AbortTrace() => traceAborted = true;
-
+		[Title("Tools")]
 		[DisableIf(nameof(TraceActive))]
 		[Button]
 		void ForceRebuildBVH()
@@ -37,6 +28,17 @@ namespace RaytracerInOneWeekend
 			RebuildEntityBuffer();
 			RebuildBvh();
 		}
+
+		[DisableIf(nameof(TraceActive))]
+		[DisableInEditorMode]
+		[ButtonGroup("Trace")]
+		void TriggerTrace() => ScheduleAccumulate(true);
+
+		[EnableIf(nameof(TraceActive))]
+		[DisableInEditorMode]
+		[ButtonGroup("Trace")]
+		void AbortTrace() => traceAborted = true;
+
 #endif
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
@@ -45,11 +47,15 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [HideInInspector] GameObject previewObject;
 		[SerializeField] [HideInInspector] List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
 
-		void WatchForDirtyMaterials()
+		void WatchForWorldChanges()
 		{
-			// watch for material data changes (won't catch those from OnValidate)
-			if (!randomScene && spheres.Any(x => x.Material.Dirty))
+			// watch for world data changes (won't catch those from OnValidate)
+			if (scene && scene.Dirty)
 			{
+				Transform cameraTransform = targetCamera.transform;
+				cameraTransform.position = scene.CameraPosition;
+				cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
+
 				if (Application.isPlaying)
 					worldNeedsRebuild = true;
 				else
@@ -65,17 +71,35 @@ namespace RaytracerInOneWeekend
 				EditorApplication.delayCall += UpdatePreview;
 		}
 
+		void OnEditorUpdate()
+		{
+			if (!this)
+			{
+				// ReSharper disable once DelegateSubtraction
+				EditorApplication.update -= OnEditorUpdate;
+				return;
+			}
+
+			if (!EditorApplication.isPlaying)
+				WatchForWorldChanges();
+
+#if BVH
+			if (bvhNodeBuffer.IsCreated && !EditorApplication.isPlaying)
+				EditorWindow.GetWindow<SceneView>().Repaint();
+#endif
+		}
+
 		void UpdatePreview()
 		{
-			if (!hookedEditorUpdate)
-			{
-				EditorApplication.update += () =>
-				{
-					if (!EditorApplication.isPlaying)
-						WatchForDirtyMaterials();
-				};
-				hookedEditorUpdate = true;
-			}
+			if (scene) scene.ClearDirty();
+
+			Transform cameraTransform = targetCamera.transform;
+			cameraTransform.position = scene.CameraPosition;
+			cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
+
+			Action updateDelegate = OnEditorUpdate;
+			if (EditorApplication.update.GetInvocationList().All(x => x != (Delegate) updateDelegate))
+				EditorApplication.update += OnEditorUpdate;
 
 			if (opaquePreviewCommandBuffer == null)
 				opaquePreviewCommandBuffer = new CommandBuffer { name = "World Preview (Opaque)" };
@@ -113,8 +137,6 @@ namespace RaytracerInOneWeekend
 
 			foreach (SphereData sphere in activeSpheres)
 			{
-				sphere.Material.Dirty = false;
-
 				bool transparent = sphere.Material.Type == MaterialType.Dielectric;
 
 				Color color = transparent ? sphere.Material.Albedo.GetAlphaReplaced(0.5f) : sphere.Material.Albedo;
@@ -175,11 +197,19 @@ namespace RaytracerInOneWeekend
 			}
 
 #if BVH
-			foreach (BvhNode node in World)
+			if (bvhNodeBuffer.IsCreated)
 			{
-				Gizmos.color = Color.red.GetAlphaReplaced(0.25f);
-				float3 size = node.Bounds.Max - node.Bounds.Min;
-				Gizmos.DrawCube(node.Bounds.Min + size / 2, size);
+				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
+				var subBounds = World.GetAllSubBounds().ToArray();
+				int maxDepth = subBounds.Max(x => x.Item2);
+				int shownLayer = DateTime.Now.Second % (maxDepth + 1);
+				foreach ((var bounds, int depth) in subBounds)
+				{
+					if (depth != shownLayer) continue;
+
+					Gizmos.color = Color.HSVToRGB(frac(depth * silverRatio), 1, 1).GetAlphaReplaced(0.6f);
+					Gizmos.DrawCube(bounds.Center, bounds.Size);
+				}
 			}
 #endif
 		}
