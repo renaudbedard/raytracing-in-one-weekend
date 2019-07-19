@@ -499,6 +499,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
+#if BVH
 		void RebuildBvh()
 		{
 			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
@@ -508,6 +509,7 @@ namespace RaytracerInOneWeekend
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
+#endif
 
 		void CollectActiveSpheres()
 		{
