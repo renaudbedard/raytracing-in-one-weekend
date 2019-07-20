@@ -21,6 +21,16 @@ namespace RaytracerInOneWeekend
 	{
 		[Title("Tools")]
 #if ODIN_INSPECTOR
+		[Button]
+		[DisableInEditorMode]
+		void SaveFrontBuffer()
+		{
+			byte[] pngBytes = frontBufferTexture.EncodeToPNG();
+			File.WriteAllBytes(
+				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
+		}
+
 		[DisableIf(nameof(TraceActive))]
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
@@ -30,7 +40,8 @@ namespace RaytracerInOneWeekend
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
 		void AbortTrace() => traceAborted = true;
-#elif BVH
+#endif
+#if BVH
 		[SerializeField] bool previewBvh = false;
 #endif
 
@@ -85,7 +96,7 @@ namespace RaytracerInOneWeekend
 		void UpdatePreview()
 		{
 #if BVH
-			if (previewBvh)
+			if (previewBvh && !bvhNodeBuffer.IsCreated)
 			{
 				RebuildEntityBuffer();
 				RebuildBvh();
@@ -101,7 +112,7 @@ namespace RaytracerInOneWeekend
 			if (scene)
 			{
 				scene.ClearDirty();
-				
+
 				Transform cameraTransform = targetCamera.transform;
 				cameraTransform.position = scene.CameraPosition;
 				cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
@@ -180,18 +191,6 @@ namespace RaytracerInOneWeekend
 			EditorUtility.SetDirty(this);
 		}
 
-#if ODIN_INSPECTOR
-		[Button]
-		[DisableInEditorMode]
-		void SaveFrontBuffer()
-		{
-			byte[] pngBytes = frontBufferTexture.EncodeToPNG();
-			File.WriteAllBytes(
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
-		}
-#endif
-
 		void OnDrawGizmos()
 		{
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
@@ -207,10 +206,10 @@ namespace RaytracerInOneWeekend
 			}
 
 #if BVH
-			if (bvhNodeBuffer.IsCreated)
+			if (previewBvh && bvhNodeBuffer.IsCreated)
 			{
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
-				var subBounds = World.GetAllSubBounds().ToArray();
+				(AxisAlignedBoundingBox, int)[] subBounds = World.GetAllSubBounds().ToArray();
 				int maxDepth = subBounds.Max(x => x.Item2);
 				int shownLayer = DateTime.Now.Second % (maxDepth + 1);
 				foreach ((var bounds, int depth) in subBounds)

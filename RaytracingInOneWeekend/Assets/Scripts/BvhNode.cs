@@ -1,12 +1,10 @@
+#if BVH
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using UnityEngine.Assertions;
-using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
@@ -14,8 +12,8 @@ namespace RaytracerInOneWeekend
 	enum PartitionAxis
 	{
 		None = 0,
-		X = 1, 
-		Y = 2, 
+		X = 1,
+		Y = 2,
 		Z = 4,
 		All = X | Y | Z
 	}
@@ -40,7 +38,7 @@ namespace RaytracerInOneWeekend
 			if ((axis & PartitionAxis.Z) != 0) yield return PartitionAxis.Z;
 		}
 	}
-	
+
 	struct BvhNode
 	{
 		public readonly Entity Left;
@@ -56,7 +54,7 @@ namespace RaytracerInOneWeekend
 				if (entity.GetBounds(out var bounds))
 					entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, bounds);
 			}
-			
+
 			var biggestPartition = PartitionAxis.None;
 			var biggestPartitionSize = float.MinValue;
 			foreach (PartitionAxis partition in possiblePartitions.Enumerate())
@@ -126,3 +124,4 @@ namespace RaytracerInOneWeekend
 		}
 	}
 }
+#endif

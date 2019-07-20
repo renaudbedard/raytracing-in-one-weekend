@@ -464,6 +464,7 @@ namespace RaytracerInOneWeekend
 			Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
 		}
 
+#if !MANUAL_SOA && !MANUAL_AOSOA
 		void RebuildEntityBuffer()
 		{
 			int entityCount = activeSpheres.Count;
@@ -498,6 +499,7 @@ namespace RaytracerInOneWeekend
 				}
 			}
 		}
+#endif
 
 #if BVH
 		void RebuildBvh()
