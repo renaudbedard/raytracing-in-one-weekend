@@ -17,7 +17,7 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax)
 		{
-			// TODO: vectorize
+			// NOTE: I tried a SIMD version of it instead of a loop, and it only ended up slower :(
 			for (int a = 0; a < 3; a++)
 			{
 				float invDirection = 1 / r.Direction[a];
@@ -28,7 +28,7 @@ namespace RaytracerInOneWeekend
 					Util.Swap(ref t0, ref t1);
 
 				tMin = t0 > tMin ? t0 : tMin;
-				tMax = t1 < tMax? t1 : tMax;
+				tMax = t1 < tMax ? t1 : tMax;
 
 				if (tMax <= tMin)
 					return false;

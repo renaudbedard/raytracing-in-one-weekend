@@ -189,6 +189,27 @@ namespace RaytracerInOneWeekend
 			return false;
 		}
 
+		public static bool GetBounds(this NativeArray<Entity> entities, out AxisAlignedBoundingBox enclosingAabb)
+		{
+			bool anyBox = false;
+			enclosingAabb = default;
+			for (int i = 0; i < entities.Length; i++)
+			{
+				anyBox |= entities[i].GetBounds(out AxisAlignedBoundingBox aabb);
+				enclosingAabb = i == 0 ? aabb : AxisAlignedBoundingBox.Enclose(enclosingAabb, aabb);
+			}
+			return anyBox;
+		}
+
+		public static bool GetBounds(this Sphere s, out AxisAlignedBoundingBox box)
+		{
+			float absRadius = abs(s.Radius);
+			box = new AxisAlignedBoundingBox(s.Center - absRadius, s.Center + absRadius);
+			return true;
+		}
+#endif
+
+#if BVH
 		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
 			rec = default;
@@ -218,28 +239,9 @@ namespace RaytracerInOneWeekend
 			return false;
 		}
 
-		public static bool GetBounds(this NativeArray<Entity> entities, out AxisAlignedBoundingBox enclosingAabb)
-		{
-			bool anyBox = false;
-			enclosingAabb = default;
-			for (int i = 0; i < entities.Length; i++)
-			{
-				anyBox |= entities[i].GetBounds(out AxisAlignedBoundingBox aabb);
-				enclosingAabb = i == 0 ? aabb : AxisAlignedBoundingBox.Enclose(enclosingAabb, aabb);
-			}
-			return anyBox;
-		}
-
 		public static bool GetBounds(this BvhNode node, out AxisAlignedBoundingBox bounds)
 		{
 			bounds = node.Bounds;
-			return true;
-		}
-
-		public static bool GetBounds(this Sphere s, out AxisAlignedBoundingBox box)
-		{
-			float absRadius = abs(s.Radius);
-			box = new AxisAlignedBoundingBox(s.Center - absRadius, s.Center + absRadius);
 			return true;
 		}
 #endif

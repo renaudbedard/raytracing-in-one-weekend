@@ -160,7 +160,8 @@ namespace RaytracerInOneWeekend
 			{
 				bool transparent = sphere.Material.Type == MaterialType.Dielectric;
 
-				Color color = transparent ? sphere.Material.Albedo.GetAlphaReplaced(0.5f) : sphere.Material.Albedo;
+				Color albedoMainColor = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
+				Color color = transparent ? albedoMainColor.GetAlphaReplaced(0.5f) : albedoMainColor;
 				var material = new UnityEngine.Material(meshRenderer.sharedMaterial) { color = color };
 				previewMaterials.Add(material);
 
@@ -197,7 +198,7 @@ namespace RaytracerInOneWeekend
 			foreach (SphereData sphere in activeSpheres
 				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center, sceneCameraTransform.forward)))
 			{
-				Color albedo = sphere.Material.Albedo;
+				Color albedo = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
 				Gizmos.color = sphere.Material.Type == MaterialType.Dielectric
 					? albedo.GetAlphaReplaced(0.5f)
 					: albedo;

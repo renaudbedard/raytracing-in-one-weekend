@@ -387,7 +387,11 @@ namespace RaytracerInOneWeekend
 			for (var i = 0; i < activeMaterials.Count; i++)
 			{
 				MaterialData material = activeMaterials[i];
-				materialBuffer[i] = new Material(material.Type, material.Albedo.ToFloat3(),
+				TextureData albedo = material.Albedo;
+				materialBuffer[i] = new Material(material.Type,
+					albedo
+						? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3())
+						: default,
 					material.Fuzz, material.RefractiveIndex);
 			}
 #endif
@@ -532,7 +536,9 @@ namespace RaytracerInOneWeekend
 		void BuildRandomScene()
 		{
 			activeSpheres.Clear();
-			activeSpheres.Add(new SphereData(new Vector3(0, -1000, 0), 1000, MaterialData.Lambertian(0.5f)));
+			activeSpheres.Add(new SphereData(new Vector3(0, -1000, 0), 1000,
+				MaterialData.Lambertian(TextureData.CheckerPattern(float3(0.2f, 0.3f, 0.1f),
+					float3(0.9f, 0.9f, 0.9f)))));
 
 			var rng = new Random(scene.Seed);
 
@@ -547,18 +553,25 @@ namespace RaytracerInOneWeekend
 						continue;
 
 					if (materialProb < 0.8)
-						activeSpheres.Add(new SphereData(center, 0.2f, MaterialData.Lambertian(rng.NextFloat3() * rng.NextFloat3())));
-					else if (materialProb < 0.95)
+					{
 						activeSpheres.Add(new SphereData(center, 0.2f,
-							MaterialData.Metal(rng.NextFloat3(0.5f, 1), rng.NextFloat(0, 0.5f))));
+							MaterialData.Lambertian(TextureData.Constant(rng.NextFloat3() * rng.NextFloat3()))));
+					}
+					else if (materialProb < 0.95)
+					{
+						activeSpheres.Add(new SphereData(center, 0.2f,
+							MaterialData.Metal(TextureData.Constant(rng.NextFloat3(0.5f, 1)), rng.NextFloat(0, 0.5f))));
+					}
 					else
 						activeSpheres.Add(new SphereData(center, 0.2f, MaterialData.Dielectric(1.5f)));
 				}
 			}
 
 			activeSpheres.Add(new SphereData(float3(0, 1, 0), 1, MaterialData.Dielectric(1.5f)));
-			activeSpheres.Add(new SphereData(float3(-4, 1, 0), 1, MaterialData.Lambertian(float3(0.4f, 0.2f, 0.1f))));
-			activeSpheres.Add(new SphereData(float3(4, 1, 0), 1, MaterialData.Metal(float3(0.7f, 0.6f, 0.5f))));
+			activeSpheres.Add(new SphereData(float3(-4, 1, 0), 1,
+				MaterialData.Lambertian(TextureData.Constant(float3(0.4f, 0.2f, 0.1f)))));
+			activeSpheres.Add(new SphereData(float3(4, 1, 0), 1,
+				MaterialData.Metal(TextureData.Constant(float3(0.7f, 0.6f, 0.5f)))));
 		}
 	}
 }

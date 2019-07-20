@@ -45,6 +45,11 @@ namespace RaytracerInOneWeekend
             return float3(c.r, c.g, c.b);
         }
 
+        public static Color ToColor(this float3 c)
+        {
+            return new Color(c.x, c.y, c.z);
+        }
+
         public static uint Sum(this NativeArray<uint> values)
         {
             uint total = 0;

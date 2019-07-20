@@ -12,7 +12,7 @@ namespace RaytracerInOneWeekend
 	class MaterialData : ScriptableObject, IEquatable<MaterialData>
 	{
 		[SerializeField] MaterialType type = MaterialType.None;
-		[SerializeField] Color albedo = Color.white;
+		[SerializeField] TextureData albedo = null;
 
 #if ODIN_INSPECTOR
 		[ShowIf(nameof(Type), MaterialType.Metal)]
@@ -25,25 +25,25 @@ namespace RaytracerInOneWeekend
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
 		public MaterialType Type => type;
-		public Color Albedo => albedo;
+		public TextureData Albedo => albedo;
 		public float Fuzz => fuzz;
 		public float RefractiveIndex => refractiveIndex;
 
-		public static MaterialData Lambertian(float3 albedo)
+		public static MaterialData Lambertian(TextureData albedoTexture)
 		{
 			var data = CreateInstance<MaterialData>();
 			data.hideFlags = HideFlags.HideAndDontSave;
 			data.type = MaterialType.Lambertian;
-			data.albedo = new Color(albedo.x, albedo.y, albedo.z);
+			data.albedo = albedoTexture;
 			return data;
 		}
 
-		public static MaterialData Metal(float3 albedo, float fuzz = 0)
+		public static MaterialData Metal(TextureData albedoTexture, float fuzz = 0)
 		{
 			var data = CreateInstance<MaterialData>();
 			data.hideFlags = HideFlags.HideAndDontSave;
 			data.type = MaterialType.Metal;
-			data.albedo = new Color(albedo.x, albedo.y, albedo.z);
+			data.albedo = albedoTexture;
 			data.fuzz = fuzz;
 			return data;
 		}
@@ -58,16 +58,18 @@ namespace RaytracerInOneWeekend
 		}
 
 #if UNITY_EDITOR
-		public bool Dirty { get; private set; }
+		bool dirty;
+		public bool Dirty => dirty || (albedo && albedo.Dirty);
 
 		public void ClearDirty()
 		{
-			Dirty = false;
+			dirty = false;
+			if (albedo) albedo.ClearDirty();
 		}
 
 		void OnValidate()
 		{
-			Dirty = true;
+			dirty = true;
 		}
 #endif
 

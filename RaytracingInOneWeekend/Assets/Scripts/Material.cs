@@ -5,13 +5,21 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
+	enum MaterialType
+	{
+		None,
+		Lambertian,
+		Metal,
+		Dielectric
+	}
+
 	struct Material
 	{
 		public readonly MaterialType Type;
-		public readonly float3 Albedo;
+		public readonly Texture Albedo;
 		public readonly float Parameter;
 
-		public Material(MaterialType type, float3 albedo = default, float fuzz = 0, float refractiveIndex = 1) : this()
+		public Material(MaterialType type, Texture albedo = default, float fuzz = 0, float refractiveIndex = 1) : this()
 		{
 			Type = type;
 			Albedo = albedo;
@@ -32,7 +40,7 @@ namespace RaytracerInOneWeekend
 				{
 					float3 target = rec.Point + rec.Normal + rng.UnitVector();
 					scattered = new Ray(rec.Point, target - rec.Point);
-					attenuation = Albedo;
+					attenuation = Albedo.Value(rec.Point);
 					return true;
 				}
 
@@ -41,7 +49,7 @@ namespace RaytracerInOneWeekend
 					float fuzz = Parameter;
 					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
 					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere());
-					attenuation = Albedo;
+					attenuation = Albedo.Value(rec.Point);
 					return dot(scattered.Direction, rec.Normal) > 0;
 				}
 
@@ -106,13 +114,5 @@ namespace RaytracerInOneWeekend
 			r0 *= r0;
 			return r0 + (1 - r0) * pow((1 - cosine), 5);
 		}
-	}
-
-	enum MaterialType : byte
-	{
-		None,
-		Lambertian,
-		Metal,
-		Dielectric
 	}
 }

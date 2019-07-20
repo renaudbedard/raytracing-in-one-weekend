@@ -85,7 +85,15 @@ namespace RaytracerInOneWeekend
 #endif
 		}
 	}
+
 #elif MANUAL_SOA
+#if BVH
+	struct SoaBvh : IDisposable
+	{
+		// TODO
+	}
+#endif
+
 	struct SoaSpheres : IDisposable
 	{
 		public readonly int BlockCount;
@@ -145,7 +153,8 @@ namespace RaytracerInOneWeekend
 #endif
 		}
 	}
-#else
+
+#else // AOS (or possibly Unity AOS)
 	enum EntityType
 	{
 		None,
