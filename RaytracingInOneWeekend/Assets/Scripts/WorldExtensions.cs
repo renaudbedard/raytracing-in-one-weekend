@@ -1,9 +1,9 @@
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
-
 #if !MANUAL_AOSOA
 using Unity.Collections;
+
 #endif
 
 #if MANUAL_SOA || MANUAL_AOSOA
@@ -203,28 +203,58 @@ namespace RaytracerInOneWeekend
 				return false;
 			}
 
-			// TODO: can those be SIMDfied? (probably)
-			var recordList = new NativeList<HitRecord>(4, Allocator.Temp);
-			if (boundHits[0] && n.NorthEast.Hit(r, tMin, tMax, out HitRecord neRec)) recordList.Add(neRec);
-			if (boundHits[1] && n.SouthEast.Hit(r, tMin, tMax, out HitRecord seRec)) recordList.Add(seRec);
-			if (boundHits[2] && n.SouthWest.Hit(r, tMin, tMax, out HitRecord swRec)) recordList.Add(swRec);
-			if (boundHits[3] && n.NorthWest.Hit(r, tMin, tMax, out HitRecord nwRec)) recordList.Add(nwRec);
+			bool4 hitResult = false;
+			float4 distance = float.MaxValue;
+			float4 pointX = 0, pointY = 0, pointZ = 0;
+			float4 normalX = 0, normalY = 0, normalZ = 0;
+			int4 materialIndex = 0;
 
-			if (recordList.Length == 0)
+			// TODO: can those be better SIMDfied? (probably)
+
+			if (boundHits[0] && (hitResult[0] = n.NorthEast.Hit(r, tMin, tMax, out HitRecord neRec)))
 			{
-				recordList.Dispose();
+				distance[0] = neRec.Distance;
+				pointX[0] = neRec.Point.x; pointY[0] = neRec.Point.y; pointZ[0] = neRec.Point.z;
+				normalX[0] = neRec.Normal.x; normalY[0] = neRec.Normal.y; normalZ[0] = neRec.Normal.z;
+				materialIndex[0] = neRec.MaterialIndex;
+			}
+
+			if (boundHits[1] && (hitResult[1] = n.SouthEast.Hit(r, tMin, tMax, out HitRecord seRec)))
+			{
+				distance[1] = seRec.Distance;
+				pointX[1] = seRec.Point.x; pointY[1] = seRec.Point.y; pointZ[1] = seRec.Point.z;
+				normalX[1] = seRec.Normal.x; normalY[1] = seRec.Normal.y; normalZ[1] = seRec.Normal.z;
+				materialIndex[1] = seRec.MaterialIndex;
+			}
+
+			if (boundHits[2] && (hitResult[2] = n.SouthWest.Hit(r, tMin, tMax, out HitRecord swRec)))
+			{
+				distance[2] = swRec.Distance;
+				pointX[2] = swRec.Point.x; pointY[2] = swRec.Point.y; pointZ[2] = swRec.Point.z;
+				normalX[2] = swRec.Normal.x; normalY[2] = swRec.Normal.y; normalZ[2] = swRec.Normal.z;
+				materialIndex[2] = swRec.MaterialIndex;
+			}
+
+			if (boundHits[3] && (hitResult[3] = n.NorthWest.Hit(r, tMin, tMax, out HitRecord nwRec)))
+			{
+				distance[3] = nwRec.Distance;
+				pointX[3] = nwRec.Point.x; pointY[3] = nwRec.Point.y; pointZ[3] = nwRec.Point.z;
+				normalX[3] = nwRec.Normal.x; normalY[3] = nwRec.Normal.y; normalZ[3] = nwRec.Normal.z;
+				materialIndex[3] = nwRec.MaterialIndex;
+			}
+
+			if (!any(hitResult))
+			{
 				rec = default;
 				return false;
 			}
 
-			rec = recordList[0];
-			for (int i = 1; i < recordList.Length; i++)
-			{
-				HitRecord subRecord = recordList[i];
-				if (subRecord.Distance < rec.Distance) rec = subRecord;
-			}
+			float minDistance = cmin(distance);
+			int laneMask = bitmask(distance == minDistance);
+			int i = tzcnt(laneMask); // first closest lane
 
-			recordList.Dispose();
+			rec = new HitRecord(distance[i], float3(pointX[i], pointY[i], pointZ[i]),
+				float3(normalX[i], normalY[i], normalZ[i]), materialIndex[i]);
 			return true;
 #else
 			if (n.Bounds.Hit(r, tMin, tMax))

@@ -56,7 +56,7 @@ namespace RaytracerInOneWeekend
 					retValue &= tMax > tMin;
 
 					// TODO: is this faster?
-					if (!all(retValue)) return false;
+					if (!any(retValue)) return false;
 				}
 			}
 
