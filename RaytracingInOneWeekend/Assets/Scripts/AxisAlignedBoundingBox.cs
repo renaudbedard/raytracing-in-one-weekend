@@ -15,17 +15,11 @@ namespace RaytracerInOneWeekend
 		fixed float components[4 * 6];
 #pragma warning restore 649
 
-		public QuadAabb(AxisAlignedBoundingBox box1, AxisAlignedBoundingBox box2, AxisAlignedBoundingBox box3, AxisAlignedBoundingBox box4)
+		public QuadAabb(params AxisAlignedBoundingBox[] boxes)
 		{
 			fixed (float* componentsPtr = components)
 			{
 				float* fillPtr = componentsPtr;
-
-				var boxes = new NativeArray<AxisAlignedBoundingBox>(4, Allocator.Temp,
-					NativeArrayOptions.UninitializedMemory)
-				{
-					[0] = box1, [1] = box2, [2] = box3, [3] = box4
-				};
 
 				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.x;
 				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.x;
@@ -35,8 +29,6 @@ namespace RaytracerInOneWeekend
 
 				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.z;
 				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.z;
-
-				boxes.Dispose();
 			}
 		}
 
