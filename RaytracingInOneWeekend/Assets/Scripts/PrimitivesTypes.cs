@@ -155,75 +155,6 @@ namespace RaytracerInOneWeekend
 	}
 
 #else // AOS (or possibly Unity AOS)
-	enum EntityType
-	{
-		None,
-		Sphere,
-		BvhNode
-	}
-
-	unsafe struct Entity
-	{
-		public readonly EntityType Type;
-
-		[NativeDisableUnsafePtrRestriction] readonly Sphere* sphere;
-		[NativeDisableUnsafePtrRestriction] readonly BvhNode* bvhNode;
-
-		public Entity(Sphere* sphere) : this()
-		{
-			Type = EntityType.Sphere;
-			this.sphere = sphere;
-		}
-		public Entity(BvhNode* bvhNode) : this()
-		{
-			Type = EntityType.BvhNode;
-			this.bvhNode = bvhNode;
-		}
-
-		public BvhNode AsNode => *bvhNode;
-
-		[Pure]
-		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
-		{
-			switch (Type)
-			{
-				case EntityType.Sphere: return sphere->Hit(r, tMin, tMax, out rec);
-				case EntityType.BvhNode: return bvhNode->Hit(r, tMin, tMax, out rec);
-
-				default:
-					rec = default;
-					return false;
-			}
-		}
-
-		[Pure]
-		public bool GetBounds(out AxisAlignedBoundingBox bounds)
-		{
-			switch (Type)
-			{
-				case EntityType.Sphere: return sphere->GetBounds(out bounds);
-				case EntityType.BvhNode: return bvhNode->GetBounds(out bounds);
-
-				default:
-					bounds = default;
-					return false;
-			}
-		}
-	}
-
-	struct EntityBoundsComparer : IComparer<Entity>
-	{
-		readonly PartitionAxis axis;
-		public EntityBoundsComparer(PartitionAxis axis) => this.axis = axis;
-
-		public int Compare(Entity lhs, Entity rhs)
-		{
-			if (lhs.GetBounds(out var leftBounds) && rhs.GetBounds(out var rightBounds))
-				return (int) sign(leftBounds.Center[axis.GetAxisId()] - rightBounds.Center[axis.GetAxisId()]);
-			return 0;
-		}
-	}
-
 	struct Sphere
 	{
 		public readonly float3 Center;
@@ -250,6 +181,15 @@ namespace RaytracerInOneWeekend
 			Material = material;
 #endif
 		}
+		
+		public AxisAlignedBoundingBox Bounds
+		{
+			get
+			{
+				float absRadius = abs(Radius);
+				return new AxisAlignedBoundingBox(Center - absRadius, Center + absRadius);
+			}
+		}		
 	}
 #endif
 }

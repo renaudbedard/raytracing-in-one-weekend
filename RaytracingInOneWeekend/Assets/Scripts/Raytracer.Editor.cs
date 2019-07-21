@@ -95,6 +95,7 @@ namespace RaytracerInOneWeekend
 
 		void UpdatePreview()
 		{
+			if (!this) return;
 #if BVH
 			if (previewBvh && !bvhNodeBuffer.IsCreated)
 			{

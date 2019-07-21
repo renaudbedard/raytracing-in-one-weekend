@@ -1,3 +1,5 @@
+
+using System.Linq;
 #if BVH
 using System;
 using System.Collections.Generic;
@@ -38,14 +40,105 @@ namespace RaytracerInOneWeekend
 			if ((axis & PartitionAxis.Z) != 0) yield return PartitionAxis.Z;
 		}
 	}
+	
+#if QUAD_BVH
+	struct BvhNode : IDisposable
+	{
+		public readonly QuadAabb ElementBounds;
+		public readonly Entity NorthEast, SouthEast, SouthWest, NorthWest;
+		public readonly AxisAlignedBoundingBox Bounds;
+		
+		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
+		{
+			int n = entities.Length;
+			if (n <= 4)
+			{
+				NorthEast = entities[min(0, n - 1)];
+				SouthEast = entities[min(1, n - 1)];
+				SouthWest = entities[min(2, n - 1)];
+				NorthWest = entities[min(3, n - 1)];
+			}
+			else
+			{
+				(NativeSlice<Entity>, NativeSlice<Entity>) Partition(NativeSlice<Entity> source)
+				{
+					var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
+					foreach (Entity entity in source)
+						entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, entity.Bounds);
 
+					PartitionAxis biggestPartition = PartitionAxis.All.Enumerate()
+						.OrderByDescending(x => entireBounds.Size[x.GetAxisId()]).First();
+
+					source.Sort(new EntityBoundsComparer(biggestPartition));
+					
+					return (new NativeSlice<Entity>(source, 0, source.Length / 2),
+						new NativeSlice<Entity>(source, source.Length / 2));
+				}
+
+				unsafe Entity AddNode(NativeSlice<Entity> slice)
+				{
+					nodes.Add(new BvhNode(slice, nodes));
+					return new Entity((BvhNode*) nodes.GetUnsafePtr() + (nodes.Length - 1));
+				}
+
+				var (eastSlice, westSlice) = Partition(entities);
+				var (northEastSlice, southEastSlice) = Partition(eastSlice);
+				var (northWestSlice, southWestSlice) = Partition(westSlice);
+
+				NorthEast = northEastSlice.Length == 1 ? northEastSlice[0] : AddNode(northEastSlice);
+				SouthEast = southEastSlice.Length == 1 ? southEastSlice[0] : AddNode(southEastSlice);
+				SouthWest = southWestSlice.Length == 1 ? southWestSlice[0] : AddNode(southWestSlice);
+				NorthWest = northWestSlice.Length == 1 ? northWestSlice[0] : AddNode(northWestSlice);
+			}
+			
+			ElementBounds = new QuadAabb(NorthEast.Bounds, SouthEast.Bounds, SouthWest.Bounds, NorthWest.Bounds);
+			Bounds = ElementBounds.Enclosure;
+		}
+
+		public IEnumerable<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(int depth = 0)
+		{
+			yield return (Bounds, depth);
+
+			if (NorthEast.Type == EntityType.BvhNode)
+				foreach ((var bounds, int subdepth) in NorthEast.AsNode.GetAllSubBounds(depth + 1))
+					yield return (bounds, subdepth);
+			else
+				yield return (NorthEast.Bounds, depth + 1);
+
+			if (SouthEast.Type == EntityType.BvhNode)
+				foreach ((var bounds, int subdepth) in SouthEast.AsNode.GetAllSubBounds(depth + 1))
+					yield return (bounds, subdepth);
+			else
+				yield return (SouthEast.Bounds, depth + 1);
+			
+			if (SouthWest.Type == EntityType.BvhNode)
+				foreach ((var bounds, int subdepth) in SouthWest.AsNode.GetAllSubBounds(depth + 1))
+					yield return (bounds, subdepth);
+			else
+				yield return (SouthWest.Bounds, depth + 1);
+			
+			if (NorthWest.Type == EntityType.BvhNode)
+				foreach ((var bounds, int subdepth) in NorthWest.AsNode.GetAllSubBounds(depth + 1))
+					yield return (bounds, subdepth);
+			else
+				yield return (NorthWest.Bounds, depth + 1);
+		}
+
+		public void Dispose()
+		{
+			// ReSharper disable once ImpureMethodCallOnReadonlyValueField
+			ElementBounds.Dispose();
+		}
+	}
+	
+#else
 	struct BvhNode
 	{
 		public readonly Entity Left;
 		public readonly Entity Right;
 		public readonly AxisAlignedBoundingBox Bounds;
 
-		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
+		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes) : this()
 		{
 			var possiblePartitions = PartitionAxis.All;
 			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
@@ -123,5 +216,6 @@ namespace RaytracerInOneWeekend
 				yield return (rightBounds, depth + 1);
 		}
 	}
+#endif
 }
 #endif

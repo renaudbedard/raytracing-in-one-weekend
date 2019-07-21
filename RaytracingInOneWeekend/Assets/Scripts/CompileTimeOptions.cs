@@ -27,7 +27,8 @@ namespace RaytracerInOneWeekend
 		enum SpacePartitioning
 		{
 			None,
-			BVH
+			BinaryBVH,
+			QuadBVH
 		}
 
 		[SerializeField]
@@ -46,7 +47,7 @@ namespace RaytracerInOneWeekend
 #if ODIN_INSPECTOR
 		[DisableInPlayMode]
 #endif
-		SpacePartitioning spacePartitioning = SpacePartitioning.BVH;
+		SpacePartitioning spacePartitioning = SpacePartitioning.BinaryBVH;
 
 #if UNITY_EDITOR
 		void OnValidate()
@@ -65,6 +66,7 @@ namespace RaytracerInOneWeekend
 			newDefinitions.Remove("UNITY_SOA");
 			newDefinitions.Remove("BUFFERED_MATERIALS");
 			newDefinitions.Remove("BVH");
+			newDefinitions.Remove("QUAD_BVH");
 
 			switch (dataLayout)
 			{
@@ -91,8 +93,12 @@ namespace RaytracerInOneWeekend
 
 			switch (spacePartitioning)
 			{
-				case SpacePartitioning.BVH:
+				case SpacePartitioning.BinaryBVH:
 					newDefinitions.Add("BVH");
+					break;
+				case SpacePartitioning.QuadBVH:
+					newDefinitions.Add("BVH");
+					newDefinitions.Add("QUAD_BVH");
 					break;
 			}
 
