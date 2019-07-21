@@ -120,7 +120,7 @@ namespace RaytracerInOneWeekend
 			return true;
 		}
 
-#else
+#elif !BVH
 #if UNITY_SOA
 		public static bool Hit(this NativeArrayFullSOA<Sphere> spheres, Ray r, float tMin, float tMax, out HitRecord rec)
 #else
@@ -148,7 +148,9 @@ namespace RaytracerInOneWeekend
 
 			return hitAnything;
 		}
+#endif
 
+#if !(MANUAL_AOSOA || MANUAL_SOA)
 		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
 			float3 center = s.Center;
@@ -188,21 +190,47 @@ namespace RaytracerInOneWeekend
 			rec = default;
 			return false;
 		}
-#endif
 
 #if BVH
 		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
-			rec = default;
-			
 #if QUAD_BVH
-			// TODO
-			return false;
+			bool4 boundHits = n.ElementBounds.Hit(r, tMin, tMax);
+
+			if (!any(boundHits))
+			{
+				rec = default;
+				return false;
+			}
+
+			// TODO: can those be SIMDfied? (probably)
+			var recordList = new NativeList<HitRecord>(4, Allocator.Temp);
+			if (boundHits[0] && n.NorthEast.Hit(r, tMin, tMax, out HitRecord neRec)) recordList.Add(neRec);
+			if (boundHits[1] && n.SouthEast.Hit(r, tMin, tMax, out HitRecord seRec)) recordList.Add(seRec);
+			if (boundHits[2] && n.SouthWest.Hit(r, tMin, tMax, out HitRecord swRec)) recordList.Add(swRec);
+			if (boundHits[3] && n.NorthWest.Hit(r, tMin, tMax, out HitRecord nwRec)) recordList.Add(nwRec);
+
+			if (recordList.Length == 0)
+			{
+				recordList.Dispose();
+				rec = default;
+				return false;
+			}
+
+			rec = recordList[0];
+			for (int i = 1; i < recordList.Length; i++)
+			{
+				HitRecord subRecord = recordList[i];
+				if (subRecord.Distance < rec.Distance) rec = subRecord;
+			}
+
+			recordList.Dispose();
+			return true;
 #else
 			if (n.Bounds.Hit(r, tMin, tMax))
 			{
 				bool hitLeft = n.Left.Hit(r, tMin, tMax, out HitRecord leftRecord);
-				
+
 				// optimization for when left and right are the same entity (no idea if it helps performance yet)
 				if (n.LeftIsRight)
 				{
@@ -227,12 +255,14 @@ namespace RaytracerInOneWeekend
 					rec = rightRecord;
 					return true;
 				}
+				rec = default;
 				return false;
 			}
-
+			rec = default;
 			return false;
 #endif
 		}
+#endif
 #endif
 	}
 }

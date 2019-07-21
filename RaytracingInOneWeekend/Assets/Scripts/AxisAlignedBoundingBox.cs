@@ -7,73 +7,87 @@ using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-	struct QuadAabb : IDisposable
+#if QUAD_BVH
+	unsafe struct QuadAabb
 	{
+#pragma warning disable 649
 		// MinX, MaxX, MinY, MaxY, MinZ, MaxZ (4-wide)
-		readonly NativeArray<float4> components;
+		fixed float components[4 * 6];
+#pragma warning restore 649
 
-		public unsafe QuadAabb(AxisAlignedBoundingBox box1, AxisAlignedBoundingBox box2, AxisAlignedBoundingBox box3, AxisAlignedBoundingBox box4)
+		public QuadAabb(AxisAlignedBoundingBox box1, AxisAlignedBoundingBox box2, AxisAlignedBoundingBox box3, AxisAlignedBoundingBox box4)
 		{
-			components = new NativeArray<float4>(6, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-
-			var fillPtr = (float*) components.GetUnsafePtr();
-
-			var boxes = new NativeArray<AxisAlignedBoundingBox>(4, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
+			fixed (float* componentsPtr = components)
 			{
-				[0] = box1, [1] = box2, [2] = box3, [3] = box4
-			};
+				float* fillPtr = componentsPtr;
 
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.x;
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.x;
+				var boxes = new NativeArray<AxisAlignedBoundingBox>(4, Allocator.Temp,
+					NativeArrayOptions.UninitializedMemory)
+				{
+					[0] = box1, [1] = box2, [2] = box3, [3] = box4
+				};
 
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.y;
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.y;
+				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.x;
+				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.x;
 
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.z;
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.z;
-			
-			boxes.Dispose();
+				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.y;
+				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.y;
+
+				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.z;
+				for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.z;
+
+				boxes.Dispose();
+			}
 		}
 
-		public unsafe bool4 Hit(Ray r, float4 tMin, float4 tMax)
+		[Pure]
+		public bool4 Hit(Ray r, float4 tMin, float4 tMax)
 		{
 			bool4 retValue = true;
 
-			var fetchPtr = (float4*) components.GetUnsafeReadOnlyPtr();
-			for (int a = 0; a < 3; a++)
+			fixed (float* componentsPtr = components)
 			{
-				float4 invDirection = 1 / r.Direction[a];
-				float4 t0 = (*fetchPtr++ - r.Origin[a]) * invDirection; // Min
-				float4 t1 = (*fetchPtr++ - r.Origin[a]) * invDirection; // Max
+				var fetchPtr = (float4*) componentsPtr;
+				for (int a = 0; a < 3; a++)
+				{
+					float4 invDirection = 1 / r.Direction[a];
+					float4 t0 = (*fetchPtr++ - r.Origin[a]) * invDirection; // Min
+					float4 t1 = (*fetchPtr++ - r.Origin[a]) * invDirection; // Max
 
-				bool4 invDirectionNegative = invDirection < 0;
-				float4 tt0 = select(t0, t1, invDirectionNegative);
-				float4 tt1 = select(t1, t0, invDirectionNegative);
+					bool4 invDirectionNegative = invDirection < 0;
+					float4 tt0 = select(t0, t1, invDirectionNegative);
+					float4 tt1 = select(t1, t0, invDirectionNegative);
 
-				tMin = select(tt0, tMin, tt0 > tMin);
-				tMax = select(tt1, tMax, tt1 < tMax);
+					tMin = select(tt0, tMin, tt0 > tMin);
+					tMax = select(tt1, tMax, tt1 < tMax);
 
-				retValue &= tMax > tMin;
+					retValue &= tMax > tMin;
 
-				// TODO: is this faster?
-				if (!all(retValue)) return false;
+					// TODO: is this faster?
+					if (!all(retValue)) return false;
+				}
 			}
 
 			return retValue;
 		}
 
-		public void Dispose()
+		public AxisAlignedBoundingBox Enclosure
 		{
-			// ReSharper disable once ImpureMethodCallOnReadonlyValueField
-			if (components.IsCreated) components.Dispose();
-		}
+			get
+			{
+				fixed (float* componentsPtr = components)
+				{
+					var fetchPtr = (float4*) componentsPtr;
 
-		public AxisAlignedBoundingBox Enclosure =>
-			new AxisAlignedBoundingBox(
-				float3(cmin(components[0]), cmin(components[2]), cmin(components[4])),
-				float3(cmax(components[1]), cmax(components[3]), cmax(components[5])));
+					return new AxisAlignedBoundingBox(
+						float3(cmin(fetchPtr[0]), cmin(fetchPtr[2]), cmin(fetchPtr[4])),
+						float3(cmax(fetchPtr[1]), cmax(fetchPtr[3]), cmax(fetchPtr[5])));
+				}
+			}
+		}
 	}
-	
+#endif
+
 	struct AxisAlignedBoundingBox
 	{
 		public readonly float3 Min, Max;

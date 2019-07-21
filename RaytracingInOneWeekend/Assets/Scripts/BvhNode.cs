@@ -40,14 +40,14 @@ namespace RaytracerInOneWeekend
 			if ((axis & PartitionAxis.Z) != 0) yield return PartitionAxis.Z;
 		}
 	}
-	
+
 #if QUAD_BVH
-	struct BvhNode : IDisposable
+	struct BvhNode
 	{
 		public readonly QuadAabb ElementBounds;
 		public readonly Entity NorthEast, SouthEast, SouthWest, NorthWest;
 		public readonly AxisAlignedBoundingBox Bounds;
-		
+
 		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
 		{
 			int n = entities.Length;
@@ -70,7 +70,7 @@ namespace RaytracerInOneWeekend
 						.OrderByDescending(x => entireBounds.Size[x.GetAxisId()]).First();
 
 					source.Sort(new EntityBoundsComparer(biggestPartition));
-					
+
 					return (new NativeSlice<Entity>(source, 0, source.Length / 2),
 						new NativeSlice<Entity>(source, source.Length / 2));
 				}
@@ -90,7 +90,7 @@ namespace RaytracerInOneWeekend
 				SouthWest = southWestSlice.Length == 1 ? southWestSlice[0] : AddNode(southWestSlice);
 				NorthWest = northWestSlice.Length == 1 ? northWestSlice[0] : AddNode(northWestSlice);
 			}
-			
+
 			ElementBounds = new QuadAabb(NorthEast.Bounds, SouthEast.Bounds, SouthWest.Bounds, NorthWest.Bounds);
 			Bounds = ElementBounds.Enclosure;
 		}
@@ -110,27 +110,21 @@ namespace RaytracerInOneWeekend
 					yield return (bounds, subdepth);
 			else
 				yield return (SouthEast.Bounds, depth + 1);
-			
+
 			if (SouthWest.Type == EntityType.BvhNode)
 				foreach ((var bounds, int subdepth) in SouthWest.AsNode.GetAllSubBounds(depth + 1))
 					yield return (bounds, subdepth);
 			else
 				yield return (SouthWest.Bounds, depth + 1);
-			
+
 			if (NorthWest.Type == EntityType.BvhNode)
 				foreach ((var bounds, int subdepth) in NorthWest.AsNode.GetAllSubBounds(depth + 1))
 					yield return (bounds, subdepth);
 			else
 				yield return (NorthWest.Bounds, depth + 1);
 		}
-
-		public void Dispose()
-		{
-			// ReSharper disable once ImpureMethodCallOnReadonlyValueField
-			ElementBounds.Dispose();
-		}
 	}
-	
+
 #else
 	struct BvhNode
 	{
