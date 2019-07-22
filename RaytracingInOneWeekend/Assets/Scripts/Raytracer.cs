@@ -535,7 +535,7 @@ namespace RaytracerInOneWeekend
 #else
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
 #endif
-			
+
 #if BVH_ITERATIVE
 			int workingBufferSize = entityBuffer.Length * SystemInfo.processorCount;
 			if (!nodeWorkingBuffer.IsCreated || nodeWorkingBuffer.Length != workingBufferSize)

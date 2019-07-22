@@ -3,7 +3,9 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
 
 #if UNITY_SOA
 using Unity.Collections.Experimental;
@@ -38,7 +40,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<Material> Material;
 #endif
 		[ReadOnly] public NativeArray<float4> InputSamples;
-		
+
 #if BVH_ITERATIVE
 		[NativeSetThreadIndex] int threadIndex;
 
@@ -89,8 +91,10 @@ namespace RaytracerInOneWeekend
 			rayCount++;
 
 #if BVH_ITERATIVE
-			var nodeWA = (BvhNode*) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() + threadIndex * WorkingBufferSize;
-			var entityWA = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() + threadIndex * WorkingBufferSize;
+			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
+			var actualThreadIndex = threadIndex - 1;
+			var nodeWA = (BvhNode*) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * WorkingBufferSize;
+			var entityWA = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * WorkingBufferSize;
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, nodeWA, entityWA, out HitRecord rec))
 #else
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
