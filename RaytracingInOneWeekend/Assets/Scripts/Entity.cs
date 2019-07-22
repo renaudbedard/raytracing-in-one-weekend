@@ -1,3 +1,4 @@
+#if !(MANUAL_AOSOA || MANUAL_SOA)
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
@@ -84,3 +85,4 @@ namespace RaytracerInOneWeekend
 	}
 #endif
 }
+#endif
