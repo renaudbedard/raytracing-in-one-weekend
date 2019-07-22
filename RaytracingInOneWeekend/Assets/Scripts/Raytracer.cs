@@ -94,6 +94,9 @@ namespace RaytracerInOneWeekend
 		NativeArray<Entity> entityBuffer;
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
+#if QUAD_BVH
+		NativeList<QuadAabbData> quadAabbDataBuffer;
+#endif
 		internal BvhNode World => bvhNodeBuffer.IsCreated ? bvhNodeBuffer[bvhNodeBuffer.Length - 1] : default;
 #else
 		internal NativeArray<Entity> World => entityBuffer;
@@ -163,6 +166,9 @@ namespace RaytracerInOneWeekend
 			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
 #if BVH
 			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
+#if QUAD_BVH
+			if (quadAabbDataBuffer.IsCreated) quadAabbDataBuffer.Dispose();
+#endif
 #endif
 		}
 
@@ -508,10 +514,17 @@ namespace RaytracerInOneWeekend
 #if BVH
 		void RebuildBvh()
 		{
+			// TODO: figure out how many nodes we need for a given entity count
 			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
 			bvhNodeBuffer.Clear();
 
+#if QUAD_BVH
+			if (!quadAabbDataBuffer.IsCreated) quadAabbDataBuffer = new NativeList<QuadAabbData>(512, Allocator.Persistent);
+			quadAabbDataBuffer.Clear();
+			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, quadAabbDataBuffer));
+#else
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
+#endif
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}

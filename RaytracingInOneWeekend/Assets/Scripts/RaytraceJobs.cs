@@ -41,34 +41,6 @@ namespace RaytracerInOneWeekend
 		[WriteOnly] public NativeArray<float4> OutputSamples;
 		[WriteOnly] public NativeArray<uint> OutputRayCount;
 
-		bool Color(Ray r, uint depth, Random rng, out float3 color, ref uint rayCount)
-		{
-			rayCount++;
-
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
-			{
-#if BUFFERED_MATERIALS || UNITY_SOA
-				if (depth < TraceDepth && Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
-#else
-				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
-#endif
-				{
-					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
-					{
-						color = attenuation * scatteredColor;
-						return true;
-					}
-				}
-				color = default;
-				return false;
-			}
-
-			float3 unitDirection = normalize(r.Direction);
-			float t = 0.5f * (unitDirection.y + 1);
-			color = lerp(SkyBottomColor, SkyTopColor, t);
-			return true;
-		}
-
 		public void Execute(int index)
 		{
 			uint2 coordinates = uint2(
@@ -84,19 +56,75 @@ namespace RaytracerInOneWeekend
 			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
 			uint rayCount = 0;
 
+#if BVH_ITERATIVE
+			var nodeStack = new NativeList<BvhNode>(Allocator.Temp);
+			var candidates = new NativeList<Entity>(Allocator.Temp);
+#endif
+
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + rng.NextFloat2()) / Size; // (u, v)
 				Ray r = Camera.GetRay(normalizedCoordinates, rng);
+
+#if BVH_ITERATIVE
+				if (Color(r, 0, rng, nodeStack, candidates, out float3 sampleColor, ref rayCount))
+#else
 				if (Color(r, 0, rng, out float3 sampleColor, ref rayCount))
+#endif
 				{
 					colorAcc += sampleColor;
 					sampleCount++;
 				}
 			}
 
+#if BVH_ITERATIVE
+			candidates.Dispose();
+			nodeStack.Dispose();
+#endif
+
 			OutputSamples[index] = float4(colorAcc, sampleCount);
 			OutputRayCount[index] = rayCount;
+		}
+
+#if BVH_ITERATIVE
+		bool Color(Ray r, uint depth, Random rng, NativeList<BvhNode> nodeStack,
+			NativeList<Entity> candidates, out float3 color, ref uint rayCount)
+#else
+		bool Color(Ray r, uint depth, Random rng, out float3 color, ref uint rayCount)
+#endif
+		{
+			rayCount++;
+
+#if BVH_ITERATIVE
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, nodeStack, candidates, out HitRecord rec))
+#else
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
+#endif
+			{
+#if BUFFERED_MATERIALS || UNITY_SOA
+				if (depth < TraceDepth && Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+#else
+				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+#endif
+				{
+#if BVH_ITERATIVE
+					if (Color(scattered, depth + 1, rng, nodeStack, candidates, out float3 scatteredColor, ref rayCount))
+#else
+					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
+#endif
+					{
+						color = attenuation * scatteredColor;
+						return true;
+					}
+				}
+				color = default;
+				return false;
+			}
+
+			float3 unitDirection = normalize(r.Direction);
+			float t = 0.5f * (unitDirection.y + 1);
+			color = lerp(SkyBottomColor, SkyTopColor, t);
+			return true;
 		}
 	}
 

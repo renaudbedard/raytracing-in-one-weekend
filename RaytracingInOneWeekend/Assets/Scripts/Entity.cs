@@ -9,7 +9,9 @@ namespace RaytracerInOneWeekend
 	{
 		None,
 		Sphere,
-		BvhNode
+#if BVH
+		BvhNode,
+#endif
 	}
 
 	unsafe struct Entity
@@ -17,13 +19,16 @@ namespace RaytracerInOneWeekend
 		public readonly EntityType Type;
 
 		[NativeDisableUnsafePtrRestriction] readonly Sphere* sphere;
+#if BVH
 		[NativeDisableUnsafePtrRestriction] readonly BvhNode* bvhNode;
+#endif
 
 		public Entity(Sphere* sphere) : this()
 		{
 			Type = EntityType.Sphere;
 			this.sphere = sphere;
 		}
+#if BVH
 		public Entity(BvhNode* bvhNode) : this()
 		{
 			Type = EntityType.BvhNode;
@@ -31,6 +36,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		public BvhNode AsNode => *bvhNode;
+#endif
 
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
@@ -38,14 +44,15 @@ namespace RaytracerInOneWeekend
 			switch (Type)
 			{
 				case EntityType.Sphere: return sphere->Hit(r, tMin, tMax, out rec);
+#if BVH
 				case EntityType.BvhNode: return bvhNode->Hit(r, tMin, tMax, out rec);
-
+#endif
 				default:
 					rec = default;
 					return false;
 			}
 		}
-		
+
 		public AxisAlignedBoundingBox Bounds
 		{
 			get
@@ -53,17 +60,20 @@ namespace RaytracerInOneWeekend
 				switch (Type)
 				{
 					case EntityType.Sphere: return sphere->Bounds;
+#if BVH
 					case EntityType.BvhNode: return bvhNode->Bounds;
+#endif
 					default: return default;
 				}
 			}
 		}
 	}
 
+#if BVH
 	struct EntityBoundsComparer : IComparer<Entity>
 	{
 		readonly PartitionAxis axis;
-		
+
 		public EntityBoundsComparer(PartitionAxis axis) => this.axis = axis;
 
 		public int Compare(Entity lhs, Entity rhs)
@@ -72,4 +82,5 @@ namespace RaytracerInOneWeekend
 			return (int) sign(lhs.Bounds.Center[axisId] - rhs.Bounds.Center[axisId]);
 		}
 	}
+#endif
 }

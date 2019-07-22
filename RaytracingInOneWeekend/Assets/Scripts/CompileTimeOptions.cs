@@ -28,6 +28,7 @@ namespace RaytracerInOneWeekend
 		{
 			None,
 			BinaryBVH,
+			IterativeBinaryBVH,
 			QuadBVH
 		}
 
@@ -66,6 +67,7 @@ namespace RaytracerInOneWeekend
 			newDefinitions.Remove("UNITY_SOA");
 			newDefinitions.Remove("BUFFERED_MATERIALS");
 			newDefinitions.Remove("BVH");
+			newDefinitions.Remove("BVH_ITERATIVE");
 			newDefinitions.Remove("QUAD_BVH");
 
 			switch (dataLayout)
@@ -95,6 +97,10 @@ namespace RaytracerInOneWeekend
 			{
 				case SpacePartitioning.BinaryBVH:
 					newDefinitions.Add("BVH");
+					break;
+				case SpacePartitioning.IterativeBinaryBVH:
+					newDefinitions.Add("BVH");
+					newDefinitions.Add("BVH_ITERATIVE");
 					break;
 				case SpacePartitioning.QuadBVH:
 					newDefinitions.Add("BVH");

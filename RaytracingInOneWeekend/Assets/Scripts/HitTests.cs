@@ -16,7 +16,7 @@ using Unity.Collections.Experimental;
 
 namespace RaytracerInOneWeekend
 {
-	static class WorldExtensions
+	static class HitTests
 	{
 #if MANUAL_AOSOA || MANUAL_SOA
 #if MANUAL_SOA
@@ -192,56 +192,37 @@ namespace RaytracerInOneWeekend
 		}
 
 #if BVH
+#if QUAD_BVH
 		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
-#if QUAD_BVH
-			bool4 boundHits = n.ElementBounds.Hit(r, tMin, tMax);
-
-			if (!any(boundHits))
+			if (!n.Bounds.Hit(r, tMin, tMax))
 			{
 				rec = default;
 				return false;
 			}
 
+			bool4 boundHits = n.ElementBounds.Hit(r, tMin, tMax);
+
 			bool4 hitResult = false;
 			float4 distance = float.MaxValue;
-			float4 pointX = 0, pointY = 0, pointZ = 0;
-			float4 normalX = 0, normalY = 0, normalZ = 0;
-			int4 materialIndex = 0;
 
 			// TODO: can those be better SIMDfied? (probably)
 
 			if (boundHits[0] && (hitResult[0] = n.NorthEast.Hit(r, tMin, tMax, out HitRecord neRec)))
-			{
 				distance[0] = neRec.Distance;
-				pointX[0] = neRec.Point.x; pointY[0] = neRec.Point.y; pointZ[0] = neRec.Point.z;
-				normalX[0] = neRec.Normal.x; normalY[0] = neRec.Normal.y; normalZ[0] = neRec.Normal.z;
-				materialIndex[0] = neRec.MaterialIndex;
-			}
+			else neRec = default;
 
 			if (boundHits[1] && (hitResult[1] = n.SouthEast.Hit(r, tMin, tMax, out HitRecord seRec)))
-			{
 				distance[1] = seRec.Distance;
-				pointX[1] = seRec.Point.x; pointY[1] = seRec.Point.y; pointZ[1] = seRec.Point.z;
-				normalX[1] = seRec.Normal.x; normalY[1] = seRec.Normal.y; normalZ[1] = seRec.Normal.z;
-				materialIndex[1] = seRec.MaterialIndex;
-			}
+			else seRec = default;
 
 			if (boundHits[2] && (hitResult[2] = n.SouthWest.Hit(r, tMin, tMax, out HitRecord swRec)))
-			{
 				distance[2] = swRec.Distance;
-				pointX[2] = swRec.Point.x; pointY[2] = swRec.Point.y; pointZ[2] = swRec.Point.z;
-				normalX[2] = swRec.Normal.x; normalY[2] = swRec.Normal.y; normalZ[2] = swRec.Normal.z;
-				materialIndex[2] = swRec.MaterialIndex;
-			}
+			else swRec = default;
 
 			if (boundHits[3] && (hitResult[3] = n.NorthWest.Hit(r, tMin, tMax, out HitRecord nwRec)))
-			{
 				distance[3] = nwRec.Distance;
-				pointX[3] = nwRec.Point.x; pointY[3] = nwRec.Point.y; pointZ[3] = nwRec.Point.z;
-				normalX[3] = nwRec.Normal.x; normalY[3] = nwRec.Normal.y; normalZ[3] = nwRec.Normal.z;
-				materialIndex[3] = nwRec.MaterialIndex;
-			}
+			else nwRec = default;
 
 			if (!any(hitResult))
 			{
@@ -253,21 +234,84 @@ namespace RaytracerInOneWeekend
 			int laneMask = bitmask(distance == minDistance);
 			int i = tzcnt(laneMask); // first closest lane
 
-			rec = new HitRecord(distance[i], float3(pointX[i], pointY[i], pointZ[i]),
-				float3(normalX[i], normalY[i], normalZ[i]), materialIndex[i]);
+			switch (i)
+			{
+				case 0: rec = neRec; break;
+				case 1: rec = seRec; break;
+				case 2: rec = swRec; break;
+				default: rec = nwRec; break;
+			}
 			return true;
+		}
+
+#elif BVH_ITERATIVE
+		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
+		{
+			var nodeStack = new NativeList<BvhNode>(Allocator.Temp);
+			var candidates = new NativeList<Entity>(Allocator.Temp);
+
+			bool result = n.Hit(r, tMin, tMax, nodeStack, candidates, out rec);
+
+			nodeStack.Dispose();
+			candidates.Dispose();
+
+			return result;
+		}
+
+		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, NativeList<BvhNode> nodeStack,
+			NativeList<Entity> candidates, out HitRecord rec)
+		{
+			nodeStack.Clear();
+			candidates.Clear();
+
+			nodeStack.Add(n);
+			while (nodeStack.Length > 0)
+			{
+				n = nodeStack[nodeStack.Length - 1];
+				nodeStack.RemoveAtSwapBack(nodeStack.Length - 1);
+
+				if (!n.Bounds.Hit(r, tMin, tMax))
+					continue;
+
+				if (n.Left.Type == EntityType.BvhNode)
+					nodeStack.Add(n.Left.AsNode);
+				else
+					candidates.Add(n.Left);
+
+				if (n.Right.Type == EntityType.BvhNode)
+					nodeStack.Add(n.Right.AsNode);
+				else
+					candidates.Add(n.Right);
+			}
+
+			if (candidates.Length == 0)
+			{
+				rec = default;
+				return false;
+			}
+
+			bool anyHit = candidates[0].Hit(r, tMin, tMax, out rec);
+			for (int i = 1; i < candidates.Length; i++)
+			{
+				bool thisHit = candidates[i].Hit(r, tMin, tMax, out HitRecord thisRec);
+				anyHit |= thisHit;
+				if (thisHit && thisRec.Distance < rec.Distance)
+					rec = thisRec;
+			}
+
+			if (anyHit)
+				return true;
+
+			rec = default;
+			return false;
+		}
+
 #else
+		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
+		{
 			if (n.Bounds.Hit(r, tMin, tMax))
 			{
 				bool hitLeft = n.Left.Hit(r, tMin, tMax, out HitRecord leftRecord);
-
-				// optimization for when left and right are the same entity (no idea if it helps performance yet)
-				if (n.LeftIsRight)
-				{
-					rec = leftRecord;
-					return hitLeft;
-				}
-
 				bool hitRight = n.Right.Hit(r, tMin, tMax, out HitRecord rightRecord);
 
 				if (hitLeft && hitRight)
@@ -290,8 +334,8 @@ namespace RaytracerInOneWeekend
 			}
 			rec = default;
 			return false;
-#endif
 		}
+#endif
 #endif
 #endif
 	}
