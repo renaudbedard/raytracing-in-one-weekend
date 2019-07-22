@@ -1,12 +1,15 @@
-
-using System.Linq;
 #if BVH
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using static Unity.Mathematics.math;
 using UnityEngine.Assertions;
+
+#if QUAD_BVH
+using System.Linq;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
+#endif
 
 namespace RaytracerInOneWeekend
 {
@@ -48,7 +51,7 @@ namespace RaytracerInOneWeekend
 		public readonly Entity NorthEast, SouthEast, SouthWest, NorthWest;
 		public readonly AxisAlignedBoundingBox Bounds;
 
-		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
+		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, NativeList<QuadAabbData> aabbData)
 		{
 			int n = entities.Length;
 			if (n <= 4)
@@ -77,7 +80,7 @@ namespace RaytracerInOneWeekend
 
 				unsafe Entity AddNode(NativeSlice<Entity> slice)
 				{
-					nodes.Add(new BvhNode(slice, nodes));
+					nodes.Add(new BvhNode(slice, nodes, aabbData));
 					return new Entity((BvhNode*) nodes.GetUnsafePtr() + (nodes.Length - 1));
 				}
 
@@ -91,7 +94,12 @@ namespace RaytracerInOneWeekend
 				NorthWest = northWestSlice.Length == 1 ? northWestSlice[0] : AddNode(northWestSlice);
 			}
 
-			ElementBounds = new QuadAabb(NorthEast.Bounds, SouthEast.Bounds, SouthWest.Bounds, NorthWest.Bounds);
+			aabbData.Add(default);
+			unsafe
+			{
+				ElementBounds = new QuadAabb((QuadAabbData*) aabbData.GetUnsafePtr() + (aabbData.Length - 1),
+					NorthEast.Bounds, SouthEast.Bounds, SouthWest.Bounds, NorthWest.Bounds);
+			}
 			Bounds = ElementBounds.Enclosure;
 		}
 
@@ -128,19 +136,15 @@ namespace RaytracerInOneWeekend
 #else
 	struct BvhNode
 	{
-		public readonly Entity Left;
-		public readonly Entity Right;
 		public readonly AxisAlignedBoundingBox Bounds;
+		public readonly Entity Left, Right;
 
-		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes) : this()
+		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
 		{
 			var possiblePartitions = PartitionAxis.All;
 			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
 			foreach (var entity in entities)
-			{
-				if (entity.GetBounds(out var bounds))
-					entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, bounds);
-			}
+				entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, entity.Bounds);
 
 			var biggestPartition = PartitionAxis.None;
 			var biggestPartitionSize = float.MinValue;
@@ -182,15 +186,7 @@ namespace RaytracerInOneWeekend
 					break;
 			}
 
-			bool hasLeftBounds = Left.GetBounds(out AxisAlignedBoundingBox leftBounds);
-			Assert.IsTrue(hasLeftBounds, $"{Left} has no bounds");
-			Assert.IsTrue(lengthsq(leftBounds.Size) > 0, $"{Left} has zero bounds");
-
-			bool hasRightBounds = Right.GetBounds(out AxisAlignedBoundingBox rightBounds);
-			Assert.IsTrue(hasRightBounds, $"{Right} has no bounds");
-			Assert.IsTrue(lengthsq(rightBounds.Size) > 0, $"{Right} has zero bounds");
-
-			Bounds = AxisAlignedBoundingBox.Enclose(leftBounds, rightBounds);
+			Bounds = AxisAlignedBoundingBox.Enclose(Left.Bounds, Right.Bounds);
 		}
 
 		public IEnumerable<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(int depth = 0)
@@ -200,14 +196,14 @@ namespace RaytracerInOneWeekend
 			if (Left.Type == EntityType.BvhNode)
 				foreach ((var bounds, int subdepth) in Left.AsNode.GetAllSubBounds(depth + 1))
 					yield return (bounds, subdepth);
-			else if (Left.GetBounds(out var leftBounds))
-				yield return (leftBounds, depth + 1);
+			else
+				yield return (Left.Bounds, depth + 1);
 
 			if (Right.Type == EntityType.BvhNode)
 				foreach ((var bounds, int subdepth) in Right.AsNode.GetAllSubBounds(depth + 1))
 					yield return (bounds, subdepth);
-			else if (Right.GetBounds(out var rightBounds))
-				yield return (rightBounds, depth + 1);
+			else
+				yield return (Right.Bounds, depth + 1);
 		}
 	}
 #endif
