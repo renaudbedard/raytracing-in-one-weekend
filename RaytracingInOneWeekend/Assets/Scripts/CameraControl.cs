@@ -76,8 +76,7 @@ namespace RaytracerInOneWeekend
 					var origin = transform.localPosition;
 					var forward = transform.forward;
 					float distance = 1;
-					if (raytracer.World.Hit(new Ray(origin, forward), 0, float.PositiveInfinity,
-						out HitRecord hitRec))
+					if (raytracer.HitWorld(new Ray(origin, forward), out HitRecord hitRec))
 					{
 						distance = hitRec.Distance;
 					}
@@ -106,8 +105,7 @@ namespace RaytracerInOneWeekend
 
 					var origin = transform.localPosition;
 					var forward = transform.forward;
-					if (raytracer.World.Hit(new Ray(origin, forward), 0, float.PositiveInfinity,
-						out HitRecord hitRec))
+					if (raytracer.HitWorld(new Ray(origin, forward), out HitRecord hitRec))
 					{
 						dragDistance = hitRec.Distance;
 					}

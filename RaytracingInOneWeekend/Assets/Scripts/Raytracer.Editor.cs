@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Mathematics;
+using Unity.Collections.LowLevel.Unsafe;
 using static Unity.Mathematics.math;
 
 #if ODIN_INSPECTOR
@@ -50,6 +51,21 @@ namespace RaytracerInOneWeekend
 
 		[SerializeField] [HideInInspector] GameObject previewObject;
 		[SerializeField] [HideInInspector] List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
+
+#if BVH_ITERATIVE
+		public unsafe bool HitWorld(Ray r, out HitRecord hitRec)
+		{
+			var nodeWA = (BvhNode*) nodeWorkingBuffer.GetUnsafeReadOnlyPtr();
+			var entityWA = (Entity*) entityWorkingBuffer.GetUnsafeReadOnlyPtr();
+
+			return World.Hit(r, 0, float.PositiveInfinity, nodeWA, entityWA, out hitRec);
+		}
+#else
+		public bool HitWorld(Ray r, out HitRecord hitRec)
+		{
+			return World.Hit(r, 0, float.PositiveInfinity, out hitRec);
+		}
+#endif
 
 		void WatchForWorldChanges()
 		{

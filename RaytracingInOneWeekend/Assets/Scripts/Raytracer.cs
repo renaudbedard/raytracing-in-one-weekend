@@ -94,6 +94,10 @@ namespace RaytracerInOneWeekend
 		NativeArray<Entity> entityBuffer;
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
+#if BVH_ITERATIVE
+		NativeArray<BvhNode> nodeWorkingBuffer;
+		NativeArray<Entity> entityWorkingBuffer;
+#endif
 #if QUAD_BVH
 		NativeList<QuadAabbData> quadAabbDataBuffer;
 #endif
@@ -166,6 +170,10 @@ namespace RaytracerInOneWeekend
 			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
 #if BVH
 			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
+#if BVH_ITERATIVE
+			if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
+			if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
+#endif
 #if QUAD_BVH
 			if (quadAabbDataBuffer.IsCreated) quadAabbDataBuffer.Dispose();
 #endif
@@ -277,11 +285,8 @@ namespace RaytracerInOneWeekend
 			Vector3 origin = cameraTransform.localPosition;
 			Vector3 lookAt = origin + cameraTransform.forward;
 
-			if (World.Hit(new Ray(origin, cameraTransform.forward), 0, float.PositiveInfinity,
-				out HitRecord hitRec))
-			{
+			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
-			}
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView,
 				(float) bufferSize.x / bufferSize.y, cameraAperture, focusDistance);
@@ -317,7 +322,12 @@ namespace RaytracerInOneWeekend
 				OutputSamples = accumulationOutputBuffer,
 				OutputRayCount = rayCountBuffer,
 #if BUFFERED_MATERIALS || UNITY_SOA
-				Material = materialBuffer
+				Material = materialBuffer,
+#endif
+#if BVH_ITERATIVE
+				NodeWorkingBuffer = nodeWorkingBuffer,
+				EntityWorkingBuffer = entityWorkingBuffer,
+				WorkingBufferSize = entityBuffer.Length
 #endif
 			};
 
@@ -495,8 +505,8 @@ namespace RaytracerInOneWeekend
 
 			for (var i = 0; i < activeSpheres.Count; i++)
 			{
-				var sphereData = activeSpheres[i];
-				var material = sphereData.Material;
+				SphereData sphereData = activeSpheres[i];
+				MaterialData material = sphereData.Material;
 				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius,
 #if BUFFERED_MATERIALS
 					activeMaterials.IndexOf(material));
@@ -524,6 +534,20 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, quadAabbDataBuffer));
 #else
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
+#endif
+			
+#if BVH_ITERATIVE
+			int workingBufferSize = entityBuffer.Length * SystemInfo.processorCount;
+			if (!nodeWorkingBuffer.IsCreated || nodeWorkingBuffer.Length != workingBufferSize)
+			{
+				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
+				nodeWorkingBuffer = new NativeArray<BvhNode>(workingBufferSize, Allocator.Persistent);
+			}
+			if (!entityWorkingBuffer.IsCreated || entityWorkingBuffer.Length != workingBufferSize)
+			{
+				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
+				entityWorkingBuffer = new NativeArray<Entity>(workingBufferSize, Allocator.Persistent);
+			}
 #endif
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");

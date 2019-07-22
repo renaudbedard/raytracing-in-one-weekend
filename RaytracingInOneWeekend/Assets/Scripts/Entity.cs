@@ -44,7 +44,7 @@ namespace RaytracerInOneWeekend
 			switch (Type)
 			{
 				case EntityType.Sphere: return sphere->Hit(r, tMin, tMax, out rec);
-#if BVH
+#if BVH && !BVH_ITERATIVE
 				case EntityType.BvhNode: return bvhNode->Hit(r, tMin, tMax, out rec);
 #endif
 				default:

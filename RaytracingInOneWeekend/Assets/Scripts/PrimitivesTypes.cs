@@ -87,13 +87,6 @@ namespace RaytracerInOneWeekend
 	}
 
 #elif MANUAL_SOA
-#if BVH
-	struct SoaBvh : IDisposable
-	{
-		// TODO
-	}
-#endif
-
 	struct SoaSpheres : IDisposable
 	{
 		public readonly int BlockCount;

@@ -245,55 +245,49 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
-		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, 
+			BvhNode* nodeWorkingArea, Entity* entityWorkingArea, out HitRecord rec)
 		{
-			var nodeStack = new NativeList<BvhNode>(Allocator.Temp);
-			var candidates = new NativeList<Entity>(Allocator.Temp);
+			int candidateCount = 0, nodeStackHeight = 0;
+			BvhNode* nodeStackTail = nodeWorkingArea - 1;
+			Entity* candidateListTail = entityWorkingArea - 1, candidateListHead = entityWorkingArea;
 
-			bool result = n.Hit(r, tMin, tMax, nodeStack, candidates, out rec);
-
-			nodeStack.Dispose();
-			candidates.Dispose();
-
-			return result;
-		}
-
-		public static bool Hit(this BvhNode n, Ray r, float tMin, float tMax, NativeList<BvhNode> nodeStack,
-			NativeList<Entity> candidates, out HitRecord rec)
-		{
-			nodeStack.Clear();
-			candidates.Clear();
-
-			nodeStack.Add(n);
-			while (nodeStack.Length > 0)
+			*++nodeStackTail = n; nodeStackHeight++;
+			
+			while (nodeStackHeight > 0)
 			{
-				n = nodeStack[nodeStack.Length - 1];
-				nodeStack.RemoveAtSwapBack(nodeStack.Length - 1);
+				n = *nodeStackTail--; nodeStackHeight--;
 
 				if (!n.Bounds.Hit(r, tMin, tMax))
 					continue;
 
 				if (n.Left.Type == EntityType.BvhNode)
-					nodeStack.Add(n.Left.AsNode);
+				{
+					*++nodeStackTail = n.Left.AsNode; nodeStackHeight++;
+				}
 				else
-					candidates.Add(n.Left);
+				{
+					*++candidateListTail = n.Left; candidateCount++;
+				}
 
 				if (n.Right.Type == EntityType.BvhNode)
-					nodeStack.Add(n.Right.AsNode);
+				{
+					*++nodeStackTail = n.Right.AsNode; nodeStackHeight++;
+				}
 				else
-					candidates.Add(n.Right);
+					*++candidateListTail = n.Right; candidateCount++;
 			}
 
-			if (candidates.Length == 0)
+			if (candidateCount == 0)
 			{
 				rec = default;
 				return false;
 			}
 
-			bool anyHit = candidates[0].Hit(r, tMin, tMax, out rec);
-			for (int i = 1; i < candidates.Length; i++)
+			bool anyHit = candidateListHead->Hit(r, tMin, tMax, out rec);
+			for (int i = 1; i < candidateCount; i++)
 			{
-				bool thisHit = candidates[i].Hit(r, tMin, tMax, out HitRecord thisRec);
+				bool thisHit = candidateListHead[i].Hit(r, tMin, tMax, out HitRecord thisRec);
 				anyHit |= thisHit;
 				if (thisHit && thisRec.Distance < rec.Distance)
 					rec = thisRec;
