@@ -24,6 +24,8 @@ namespace RaytracerInOneWeekend
 			this.sphere = sphere;
 		}
 
+		public Sphere* AsSphere => sphere;
+
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
 		{

@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -13,7 +14,7 @@ using Unity.Collections.Experimental;
 namespace RaytracerInOneWeekend
 {
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
-	struct AccumulateJob : IJobParallelFor
+	unsafe struct AccumulateJob : IJobParallelFor
 	{
 		[ReadOnly] public uint2 Size;
 		[ReadOnly] public Camera Camera;
@@ -42,15 +43,21 @@ namespace RaytracerInOneWeekend
 
 		[WriteOnly] public NativeArray<float4> OutputSamples;
 		[WriteOnly] public NativeArray<uint> OutputRayCount;
-		
+
 #if BVH_ITERATIVE
 #pragma warning disable 649
 		[NativeSetThreadIndex] int threadIndex;
 #pragma warning restore 649
 
-		public int WorkingBufferSize;
-		public NativeArray<BvhNode> NodeWorkingBuffer;
+		public int ThreadCount;
+		public NativeArray<SpherePointer> NodeWorkingBuffer;
 		public NativeArray<Entity> EntityWorkingBuffer;
+		public NativeArray<float4> VectorWorkingBuffer;
+
+		// worker local state
+		[NativeDisableUnsafePtrRestriction] BvhNode** nodeWorkingArea;
+		[NativeDisableUnsafePtrRestriction] Entity* entityWorkingArea;
+		[NativeDisableUnsafePtrRestriction] float4* vectorWorkingArea;
 #endif
 
 		public void Execute(int index)
@@ -67,6 +74,12 @@ namespace RaytracerInOneWeekend
 
 			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
 			uint rayCount = 0;
+
+			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
+			int actualThreadIndex = threadIndex - 1;
+			nodeWorkingArea = (BvhNode**) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * (NodeWorkingBuffer.Length / ThreadCount);
+			entityWorkingArea = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * (EntityWorkingBuffer.Length / ThreadCount);
+			vectorWorkingArea = (float4*) VectorWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * (VectorWorkingBuffer.Length / ThreadCount);
 
 			for (int s = 0; s < SampleCount; s++)
 			{
@@ -92,17 +105,14 @@ namespace RaytracerInOneWeekend
 			rayCount++;
 
 #if BVH_ITERATIVE
-			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
-			var actualThreadIndex = threadIndex - 1;
-			var nodeWA = (BvhNode*) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * WorkingBufferSize;
-			var entityWA = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * WorkingBufferSize;
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, nodeWA, entityWA, out HitRecord rec))
+			if (World.Hit(r, 0.001f, float.PositiveInfinity,
+				nodeWorkingArea, entityWorkingArea, vectorWorkingArea, out HitRecord rec))
 #else
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
 #if BUFFERED_MATERIALS || UNITY_SOA
-				if (depth < TraceDepth && 
+				if (depth < TraceDepth &&
 				    Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #else
 				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))

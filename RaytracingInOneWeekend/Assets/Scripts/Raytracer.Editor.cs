@@ -55,10 +55,11 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		public unsafe bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			var nodeWA = (BvhNode*) nodeWorkingBuffer.GetUnsafeReadOnlyPtr();
+			var nodeWA = (BvhNode**) nodeWorkingBuffer.GetUnsafeReadOnlyPtr();
 			var entityWA = (Entity*) entityWorkingBuffer.GetUnsafeReadOnlyPtr();
+			var vectorWA = (float4*) vectorWorkingBuffer.GetUnsafeReadOnlyPtr();
 
-			return World.Hit(r, 0, float.PositiveInfinity, nodeWA, entityWA, out hitRec);
+			return World.Hit(r, 0, float.PositiveInfinity, nodeWA, entityWA, vectorWA, out hitRec);
 		}
 #else
 		public bool HitWorld(Ray r, out HitRecord hitRec)
@@ -118,7 +119,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 			if (previewBvh)
 			{
-				if (!entityBuffer.IsCreated) RebuildEntityBuffer();				
+				if (!entityBuffer.IsCreated) RebuildEntityBuffer();
 				if (!bvhNodeBuffer.IsCreated) RebuildBvh();
 			}
 			else
@@ -127,8 +128,9 @@ namespace RaytracerInOneWeekend
 				if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
 				if (entityBuffer.IsCreated) entityBuffer.Dispose();
 #if BVH_ITERATIVE
-				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose(); 
+				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
 				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
+				if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
 #endif
 				activeSpheres.Clear();
 			}
@@ -183,7 +185,7 @@ namespace RaytracerInOneWeekend
 			foreach (SphereData sphere in activeSpheres)
 			{
 				if (!sphere.Material) continue;
-				
+
 				bool transparent = sphere.Material.Type == MaterialType.Dielectric;
 
 				Color albedoMainColor = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;

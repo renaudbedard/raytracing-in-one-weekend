@@ -174,7 +174,7 @@ namespace RaytracerInOneWeekend
 			Material = material;
 #endif
 		}
-		
+
 		public AxisAlignedBoundingBox Bounds
 		{
 			get
@@ -182,7 +182,20 @@ namespace RaytracerInOneWeekend
 				float absRadius = abs(Radius);
 				return new AxisAlignedBoundingBox(Center - absRadius, Center + absRadius);
 			}
-		}		
+		}
+	}
+#endif
+
+#if BVH_ITERATIVE
+	struct Sphere4
+	{
+		public const int StreamCount = 4;
+		public float4 CenterX, CenterY, CenterZ, SquaredRadius;
+	}
+
+	unsafe struct SpherePointer
+	{
+		[NativeDisableUnsafePtrRestriction] public Sphere* Pointer;
 	}
 #endif
 }

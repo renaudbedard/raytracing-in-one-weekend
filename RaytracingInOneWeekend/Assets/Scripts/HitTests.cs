@@ -245,34 +245,33 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, 
-			BvhNode* nodeWorkingArea, Entity* entityWorkingArea, out HitRecord rec)
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
+			BvhNode** nodeWorkingArea, Entity* entityWorkingArea, float4* vectorWorkingArea,
+			out HitRecord rec)
 		{
 			int candidateCount = 0, nodeStackHeight = 1;
-			BvhNode* nodeStackTail = nodeWorkingArea;
+			BvhNode** nodeStackTail = nodeWorkingArea;
 			Entity* candidateListTail = entityWorkingArea - 1, candidateListHead = entityWorkingArea;
 
-			// TODO: node stack could be a stack of pointers to avoid copies
-			
-			*nodeStackTail = n;
-			
+			*nodeStackTail = &n;
+
 			while (nodeStackHeight > 0)
 			{
-				n = *nodeStackTail--; 
+				BvhNode* nodePtr = *nodeStackTail--;
 				nodeStackHeight--;
-				
-				if (!n.Bounds.Hit(r, tMin, tMax))
+
+				if (!nodePtr->Bounds.Hit(r, tMin, tMax))
 					continue;
-				
-				if (n.IsLeaf)
+
+				if (nodePtr->IsLeaf)
 				{
-					*++candidateListTail = n.Content; 
+					*++candidateListTail = nodePtr->Content;
 					candidateCount++;
 				}
 				else
 				{
-					*++nodeStackTail = *n.Left;
-					*++nodeStackTail = *n.Right;
+					*++nodeStackTail = nodePtr->Left;
+					*++nodeStackTail = nodePtr->Right;
 					nodeStackHeight += 2;
 				}
 			}
@@ -282,12 +281,95 @@ namespace RaytracerInOneWeekend
 				rec = default;
 				return false;
 			}
-			
+
 			// TODO: visualization for candidate count per pixel
 
-			// TODO: this could absolutely be SIMDified
-			// (load entities into SoA or AoSoA sphere buffer (a float4 working area))
+#if !FALSE
+			var simdSpheresHead = (Sphere4*) vectorWorkingArea;
+			int simdBufferCount = (int) ceil(candidateCount / 4.0f);
 
+			if (candidateCount % 4 != 0)
+			{
+				Sphere4* lastBlock = simdSpheresHead + (simdBufferCount - 1);
+				lastBlock->CenterX = float.MaxValue;
+				lastBlock->CenterY = float.MaxValue;
+				lastBlock->CenterZ = float.MaxValue;
+				lastBlock->SquaredRadius = 0;
+			}
+
+			Sphere4* blockCursor = simdSpheresHead;
+			for (int i = 0; i < simdBufferCount; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					int candidateIndex = i * 4 + j;
+					if (candidateIndex < candidateCount)
+					{
+						var sphereData = candidateListHead[i * 4 + j].AsSphere;
+						blockCursor->CenterX[j] = sphereData->Center.x;
+						blockCursor->CenterY[j] = sphereData->Center.y;
+						blockCursor->CenterZ[j] = sphereData->Center.z;
+						blockCursor->SquaredRadius[j] = sphereData->SquaredRadius;
+					}
+				}
+				++blockCursor;
+			}
+
+			float4 a = dot(r.Direction, r.Direction);
+			int4 curId = int4(0, 1, 2, 3), hitId = -1;
+			float4 hitT = tMax;
+
+			blockCursor = simdSpheresHead;
+			for (int i = 0; i < simdBufferCount; i++)
+			{
+				// TODO: is it faster to make a local copy than dereference the pointer every time?
+
+				float4 ocX = r.Origin.x - blockCursor->CenterX,
+					ocY = r.Origin.y - blockCursor->CenterY,
+					ocZ = r.Origin.z - blockCursor->CenterZ;
+
+				float4 b = ocX * r.Direction.x + ocY * r.Direction.y + ocZ * r.Direction.z;
+				float4 c = ocX * ocX + ocY * ocY + ocZ * ocZ - blockCursor->SquaredRadius;
+				float4 discriminant = b * b - a * c;
+
+				bool4 discriminantTest = discriminant > 0;
+
+				if (any(discriminantTest))
+				{
+					float4 sqrtDiscriminant = sqrt(discriminant);
+
+					float4 t0 = (-b - sqrtDiscriminant) / a;
+					float4 t1 = (-b + sqrtDiscriminant) / a;
+
+					float4 t = select(t1, t0, t0 > tMin);
+					bool4 mask = discriminantTest & t > tMin & t < hitT;
+
+					hitId = select(hitId, curId, mask);
+					hitT = select(hitT, t, mask);
+				}
+
+				curId += 4;
+				++blockCursor;
+			}
+
+			if (all(hitId == -1))
+			{
+				rec = default;
+				return false;
+			}
+
+			float minDistance = cmin(hitT);
+			int laneMask = bitmask(hitT == minDistance);
+			int firstLane = tzcnt(laneMask);
+			int closestId = hitId[firstLane];
+			Sphere* closestSphere = candidateListHead[closestId].AsSphere;
+
+			float3 point = r.GetPoint(minDistance);
+			rec = new HitRecord(minDistance, point, (point - closestSphere->Center) / closestSphere->Radius,
+				closestSphere->MaterialIndex);
+			return true;
+
+#else
 			bool anyHit = candidateListHead->Hit(r, tMin, tMax, out rec);
 			for (int i = 1; i < candidateCount; i++)
 			{
@@ -303,6 +385,7 @@ namespace RaytracerInOneWeekend
 
 			rec = default;
 			return false;
+#endif
 		}
 
 #else

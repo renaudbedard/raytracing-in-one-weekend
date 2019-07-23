@@ -95,8 +95,9 @@ namespace RaytracerInOneWeekend
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
 #if BVH_ITERATIVE
-		NativeArray<BvhNode> nodeWorkingBuffer;
+		NativeArray<SpherePointer> nodeWorkingBuffer;
 		NativeArray<Entity> entityWorkingBuffer;
+		NativeArray<float4> vectorWorkingBuffer;
 #endif
 #if QUAD_BVH
 		NativeList<QuadAabbData> quadAabbDataBuffer;
@@ -173,6 +174,7 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 			if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
 			if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
+			if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
 #endif
 #if QUAD_BVH
 			if (quadAabbDataBuffer.IsCreated) quadAabbDataBuffer.Dispose();
@@ -327,7 +329,8 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 				NodeWorkingBuffer = nodeWorkingBuffer,
 				EntityWorkingBuffer = entityWorkingBuffer,
-				WorkingBufferSize = entityBuffer.Length
+				VectorWorkingBuffer = vectorWorkingBuffer,
+				ThreadCount = SystemInfo.processorCount
 #endif
 			};
 
@@ -541,12 +544,17 @@ namespace RaytracerInOneWeekend
 			if (!nodeWorkingBuffer.IsCreated || nodeWorkingBuffer.Length != workingBufferSize)
 			{
 				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
-				nodeWorkingBuffer = new NativeArray<BvhNode>(workingBufferSize, Allocator.Persistent);
+				nodeWorkingBuffer = new NativeArray<SpherePointer>(workingBufferSize, Allocator.Persistent);
 			}
 			if (!entityWorkingBuffer.IsCreated || entityWorkingBuffer.Length != workingBufferSize)
 			{
 				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
 				entityWorkingBuffer = new NativeArray<Entity>(workingBufferSize, Allocator.Persistent);
+			}
+			if (!vectorWorkingBuffer.IsCreated || vectorWorkingBuffer.Length != workingBufferSize * Sphere4.StreamCount)
+			{
+				if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
+				vectorWorkingBuffer = new NativeArray<float4>(workingBufferSize * Sphere4.StreamCount, Allocator.Persistent);
 			}
 #endif
 
