@@ -250,37 +250,30 @@ namespace RaytracerInOneWeekend
 		{
 			int candidateCount = 0, nodeStackHeight = 1;
 			BvhNode* nodeStackTail = nodeWorkingArea;
-			*nodeStackTail = n;
 			Entity* candidateListTail = entityWorkingArea - 1, candidateListHead = entityWorkingArea;
 
+			// TODO: node stack could be a stack of pointers to avoid copies
+			
+			*nodeStackTail = n;
+			
 			while (nodeStackHeight > 0)
 			{
 				n = *nodeStackTail--; 
 				nodeStackHeight--;
-
+				
 				if (!n.Bounds.Hit(r, tMin, tMax))
 					continue;
-
-				if (n.Left.Type == EntityType.BvhNode)
+				
+				if (n.IsLeaf)
 				{
-					*++nodeStackTail = n.Left.AsNode; 
-					nodeStackHeight++;
+					*++candidateListTail = n.Content; 
+					candidateCount++;
 				}
 				else
 				{
-					*++candidateListTail = n.Left; 
-					candidateCount++;
-				}
-
-				if (n.Right.Type == EntityType.BvhNode)
-				{
-					*++nodeStackTail = n.Right.AsNode; 
-					nodeStackHeight++;
-				}
-				else
-				{
-					*++candidateListTail = n.Right;
-					candidateCount++;
+					*++nodeStackTail = *n.Left;
+					*++nodeStackTail = *n.Right;
+					nodeStackHeight += 2;
 				}
 			}
 
@@ -289,9 +282,13 @@ namespace RaytracerInOneWeekend
 				rec = default;
 				return false;
 			}
+			
+			// TODO: visualization for candidate count per pixel
+
+			// TODO: this could absolutely be SIMDified
+			// (load entities into SoA or AoSoA sphere buffer (a float4 working area))
 
 			bool anyHit = candidateListHead->Hit(r, tMin, tMax, out rec);
-
 			for (int i = 1; i < candidateCount; i++)
 			{
 				bool thisHit = candidateListHead[i].Hit(r, tMin, tMax, out HitRecord thisRec);
@@ -301,7 +298,6 @@ namespace RaytracerInOneWeekend
 					rec = thisRec;
 				}
 			}
-
 			if (anyHit)
 				return true;
 

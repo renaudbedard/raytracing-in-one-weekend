@@ -134,12 +134,14 @@ namespace RaytracerInOneWeekend
 	}
 
 #else
-	struct BvhNode
+	unsafe struct BvhNode
 	{
 		public readonly AxisAlignedBoundingBox Bounds;
-		public readonly Entity Left, Right;
+		public readonly bool IsLeaf;
+		[NativeDisableUnsafePtrRestriction] public readonly BvhNode* Left, Right;
+		public readonly Entity Content;
 
-		public unsafe BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes)
+		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes) : this()
 		{
 			var possiblePartitions = PartitionAxis.All;
 			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
@@ -164,12 +166,9 @@ namespace RaytracerInOneWeekend
 			switch (n)
 			{
 				case 1:
-					Left = Right = entities[0];
-					break;
-
-				case 2:
-					Left = entities[0];
-					Right = entities[1];
+					Content = entities[0];
+					Bounds = Content.Bounds;
+					IsLeaf = true;
 					break;
 
 				default:
@@ -179,31 +178,31 @@ namespace RaytracerInOneWeekend
 					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes);
 
 					nodes.Add(leftNode);
-					Left = new Entity(nodesPointer + (nodes.Length - 1));
+					Left = nodesPointer + (nodes.Length - 1);
 
 					nodes.Add(rightNode);
-					Right = new Entity(nodesPointer + (nodes.Length - 1));
+					Right = nodesPointer + (nodes.Length - 1);
+					
+					Bounds = AxisAlignedBoundingBox.Enclose(Left->Bounds, Right->Bounds);
 					break;
 			}
-
-			Bounds = AxisAlignedBoundingBox.Enclose(Left.Bounds, Right.Bounds);
 		}
 
-		public IEnumerable<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(int depth = 0)
+		public IReadOnlyList<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(int depth = 0,
+			List<ValueTuple<AxisAlignedBoundingBox, int>> workingList = null)
 		{
-			yield return (Bounds, depth);
+			if (workingList == null)
+				workingList = new List<ValueTuple<AxisAlignedBoundingBox, int>>();
 
-			if (Left.Type == EntityType.BvhNode)
-				foreach ((var bounds, int subdepth) in Left.AsNode.GetAllSubBounds(depth + 1))
-					yield return (bounds, subdepth);
-			else
-				yield return (Left.Bounds, depth + 1);
+			workingList.Add((Bounds, depth));
 
-			if (Right.Type == EntityType.BvhNode)
-				foreach ((var bounds, int subdepth) in Right.AsNode.GetAllSubBounds(depth + 1))
-					yield return (bounds, subdepth);
-			else
-				yield return (Right.Bounds, depth + 1);
+			if (!IsLeaf)
+			{
+				Left->GetAllSubBounds(depth + 1, workingList);
+				Right->GetAllSubBounds(depth + 1, workingList);
+			}
+
+			return workingList;
 		}
 	}
 #endif

@@ -525,7 +525,7 @@ namespace RaytracerInOneWeekend
 		void RebuildBvh()
 		{
 			// TODO: figure out how many nodes we need for a given entity count
-			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(512, Allocator.Persistent);
+			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(1024, Allocator.Persistent);
 			bvhNodeBuffer.Clear();
 
 #if QUAD_BVH

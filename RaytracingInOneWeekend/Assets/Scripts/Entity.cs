@@ -9,10 +9,7 @@ namespace RaytracerInOneWeekend
 	enum EntityType
 	{
 		None,
-		Sphere,
-#if BVH
-		BvhNode,
-#endif
+		Sphere
 	}
 
 	unsafe struct Entity
@@ -20,24 +17,12 @@ namespace RaytracerInOneWeekend
 		public readonly EntityType Type;
 
 		[NativeDisableUnsafePtrRestriction] readonly Sphere* sphere;
-#if BVH
-		[NativeDisableUnsafePtrRestriction] readonly BvhNode* bvhNode;
-#endif
 
 		public Entity(Sphere* sphere) : this()
 		{
 			Type = EntityType.Sphere;
 			this.sphere = sphere;
 		}
-#if BVH
-		public Entity(BvhNode* bvhNode) : this()
-		{
-			Type = EntityType.BvhNode;
-			this.bvhNode = bvhNode;
-		}
-
-		public BvhNode AsNode => *bvhNode;
-#endif
 
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
@@ -45,9 +30,6 @@ namespace RaytracerInOneWeekend
 			switch (Type)
 			{
 				case EntityType.Sphere: return sphere->Hit(r, tMin, tMax, out rec);
-#if BVH && !BVH_ITERATIVE
-				case EntityType.BvhNode: return bvhNode->Hit(r, tMin, tMax, out rec);
-#endif
 				default:
 					rec = default;
 					return false;
@@ -61,9 +43,6 @@ namespace RaytracerInOneWeekend
 				switch (Type)
 				{
 					case EntityType.Sphere: return sphere->Bounds;
-#if BVH
-					case EntityType.BvhNode: return bvhNode->Bounds;
-#endif
 					default: return default;
 				}
 			}
