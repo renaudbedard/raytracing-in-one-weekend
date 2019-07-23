@@ -248,34 +248,40 @@ namespace RaytracerInOneWeekend
 		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, 
 			BvhNode* nodeWorkingArea, Entity* entityWorkingArea, out HitRecord rec)
 		{
-			int candidateCount = 0, nodeStackHeight = 0;
-			BvhNode* nodeStackTail = nodeWorkingArea - 1;
+			int candidateCount = 0, nodeStackHeight = 1;
+			BvhNode* nodeStackTail = nodeWorkingArea;
+			*nodeStackTail = n;
 			Entity* candidateListTail = entityWorkingArea - 1, candidateListHead = entityWorkingArea;
 
-			*++nodeStackTail = n; nodeStackHeight++;
-			
 			while (nodeStackHeight > 0)
 			{
-				n = *nodeStackTail--; nodeStackHeight--;
+				n = *nodeStackTail--; 
+				nodeStackHeight--;
 
 				if (!n.Bounds.Hit(r, tMin, tMax))
 					continue;
 
 				if (n.Left.Type == EntityType.BvhNode)
 				{
-					*++nodeStackTail = n.Left.AsNode; nodeStackHeight++;
+					*++nodeStackTail = n.Left.AsNode; 
+					nodeStackHeight++;
 				}
 				else
 				{
-					*++candidateListTail = n.Left; candidateCount++;
+					*++candidateListTail = n.Left; 
+					candidateCount++;
 				}
 
 				if (n.Right.Type == EntityType.BvhNode)
 				{
-					*++nodeStackTail = n.Right.AsNode; nodeStackHeight++;
+					*++nodeStackTail = n.Right.AsNode; 
+					nodeStackHeight++;
 				}
 				else
-					*++candidateListTail = n.Right; candidateCount++;
+				{
+					*++candidateListTail = n.Right;
+					candidateCount++;
+				}
 			}
 
 			if (candidateCount == 0)
@@ -285,12 +291,15 @@ namespace RaytracerInOneWeekend
 			}
 
 			bool anyHit = candidateListHead->Hit(r, tMin, tMax, out rec);
+
 			for (int i = 1; i < candidateCount; i++)
 			{
 				bool thisHit = candidateListHead[i].Hit(r, tMin, tMax, out HitRecord thisRec);
-				anyHit |= thisHit;
-				if (thisHit && thisRec.Distance < rec.Distance)
+				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
+				{
+					anyHit = true;
 					rec = thisRec;
+				}
 			}
 
 			if (anyHit)

@@ -31,5 +31,5 @@ MonoBehaviour:
     material: {fileID: 11400000, guid: 2b589fea2cde947bb9dd0396429df3b6, type: 2}
   - enabled: 1
     center: {x: -1, y: 0, z: -1.25}
-    radius: -0.45
+    radius: 0.5
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}

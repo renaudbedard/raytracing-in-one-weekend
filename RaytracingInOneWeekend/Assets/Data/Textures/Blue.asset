@@ -9,10 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Polished Metal
+  m_Script: {fileID: 11500000, guid: c2b8e2f3256a44a7a01951131f79a6e6, type: 3}
+  m_Name: Blue
   m_EditorClassIdentifier: 
-  type: 2
-  albedo: {r: 0.8, g: 0.6, b: 0.2, a: 1}
-  fuzz: 0.3
-  refractiveIndex: 1
+  type: 1
+  mainColor: {r: 0, g: 0.11334373, b: 0.6431373, a: 0}
+  secondaryColor: {r: 0, g: 0, b: 0, a: 0}

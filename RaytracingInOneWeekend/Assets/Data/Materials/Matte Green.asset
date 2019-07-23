@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Ground
+  m_Name: Matte Green
   m_EditorClassIdentifier: 
   type: 1
-  albedo: {r: 0.8, g: 0.8, b: 0, a: 1}
+  albedo: {fileID: 11400000, guid: 8427dac63a75e4494a7b553d5e1ca7a8, type: 2}
   fuzz: 0
   refractiveIndex: 1

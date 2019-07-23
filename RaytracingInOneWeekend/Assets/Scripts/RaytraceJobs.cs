@@ -3,7 +3,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -41,16 +40,18 @@ namespace RaytracerInOneWeekend
 #endif
 		[ReadOnly] public NativeArray<float4> InputSamples;
 
+		[WriteOnly] public NativeArray<float4> OutputSamples;
+		[WriteOnly] public NativeArray<uint> OutputRayCount;
+		
 #if BVH_ITERATIVE
+#pragma warning disable 649
 		[NativeSetThreadIndex] int threadIndex;
+#pragma warning restore 649
 
 		public int WorkingBufferSize;
 		public NativeArray<BvhNode> NodeWorkingBuffer;
 		public NativeArray<Entity> EntityWorkingBuffer;
 #endif
-
-		[WriteOnly] public NativeArray<float4> OutputSamples;
-		[WriteOnly] public NativeArray<uint> OutputRayCount;
 
 		public void Execute(int index)
 		{
@@ -101,7 +102,8 @@ namespace RaytracerInOneWeekend
 #endif
 			{
 #if BUFFERED_MATERIALS || UNITY_SOA
-				if (depth < TraceDepth && Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+				if (depth < TraceDepth && 
+				    Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #else
 				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #endif

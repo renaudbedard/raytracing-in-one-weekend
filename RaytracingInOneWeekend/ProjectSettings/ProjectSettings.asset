@@ -520,7 +520,7 @@ PlayerSettings:
   webGLThreadsSupport: 0
   webGLWasmStreaming: 0
   scriptingDefineSymbols:
-    1: ODIN_INSPECTOR;BVH;BUFFERED_MATERIALS;QUAD_BVH
+    1: BVH;BVH_ITERATIVE;BUFFERED_MATERIALS
   platformArchitecture: {}
   scriptingBackend: {}
   il2cppCompilerConfiguration: {}

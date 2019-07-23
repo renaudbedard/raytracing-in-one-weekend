@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Mirror
+  m_Name: Matte Blue
   m_EditorClassIdentifier: 
-  type: 2
-  albedo: {fileID: 11400000, guid: 0fed801ef31b140e09c99f419a6b1a10, type: 2}
+  type: 1
+  albedo: {fileID: 11400000, guid: d5a458f30d83e4271a8892c35035064b, type: 2}
   fuzz: 0
   refractiveIndex: 1

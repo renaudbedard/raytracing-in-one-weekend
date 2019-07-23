@@ -104,8 +104,11 @@ namespace RaytracerInOneWeekend
 				WatchForWorldChanges();
 
 #if BVH
-			if (bvhNodeBuffer.IsCreated && !EditorApplication.isPlaying)
+			if (bvhNodeBuffer.IsCreated && !EditorApplication.isPlaying &&
+			    UnityEditorInternal.InternalEditorUtility.isApplicationActive)
+			{
 				EditorWindow.GetWindow<SceneView>().Repaint();
+			}
 #endif
 		}
 
@@ -113,16 +116,20 @@ namespace RaytracerInOneWeekend
 		{
 			if (!this) return;
 #if BVH
-			if (previewBvh && !bvhNodeBuffer.IsCreated)
+			if (previewBvh)
 			{
-				RebuildEntityBuffer();
-				RebuildBvh();
+				if (!entityBuffer.IsCreated) RebuildEntityBuffer();				
+				if (!bvhNodeBuffer.IsCreated) RebuildBvh();
 			}
 			else
 			{
 				if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
 				if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
 				if (entityBuffer.IsCreated) entityBuffer.Dispose();
+#if BVH_ITERATIVE
+				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose(); 
+				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
+#endif
 				activeSpheres.Clear();
 			}
 #endif
@@ -175,6 +182,8 @@ namespace RaytracerInOneWeekend
 
 			foreach (SphereData sphere in activeSpheres)
 			{
+				if (!sphere.Material) continue;
+				
 				bool transparent = sphere.Material.Type == MaterialType.Dielectric;
 
 				Color albedoMainColor = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
@@ -213,12 +222,13 @@ namespace RaytracerInOneWeekend
 		{
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
 			foreach (SphereData sphere in activeSpheres
+				.Where(x => x.Material)
 				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center, sceneCameraTransform.forward)))
 			{
 				Color albedo = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
 				Gizmos.color = sphere.Material.Type == MaterialType.Dielectric
 					? albedo.GetAlphaReplaced(0.5f)
-					: albedo;
+					: albedo.GetAlphaReplaced(1);
 
 				Gizmos.DrawSphere(sphere.Center, sphere.Radius);
 			}
@@ -230,11 +240,13 @@ namespace RaytracerInOneWeekend
 				(AxisAlignedBoundingBox, int)[] subBounds = World.GetAllSubBounds().ToArray();
 				int maxDepth = subBounds.Max(x => x.Item2);
 				int shownLayer = DateTime.Now.Second % (maxDepth + 1);
+				int i = -1;
 				foreach ((var bounds, int depth) in subBounds)
 				{
+					i++;
 					if (depth != shownLayer) continue;
 
-					Gizmos.color = Color.HSVToRGB(frac(depth * silverRatio), 1, 1).GetAlphaReplaced(0.6f);
+					Gizmos.color = Color.HSVToRGB(frac(i * silverRatio), 1, 1).GetAlphaReplaced(0.6f);
 					Gizmos.DrawCube(bounds.Center, bounds.Size);
 				}
 			}

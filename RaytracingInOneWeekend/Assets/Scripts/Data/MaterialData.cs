@@ -1,5 +1,3 @@
-using System;
-using Unity.Mathematics;
 using UnityEngine;
 
 #if ODIN_INSPECTOR
@@ -9,7 +7,7 @@ using Sirenix.OdinInspector;
 namespace RaytracerInOneWeekend
 {
 	[CreateAssetMenu]
-	class MaterialData : ScriptableObject, IEquatable<MaterialData>
+	class MaterialData : ScriptableObject
 	{
 		[SerializeField] MaterialType type = MaterialType.None;
 		[SerializeField] TextureData albedo = null;
@@ -72,47 +70,5 @@ namespace RaytracerInOneWeekend
 			dirty = true;
 		}
 #endif
-
-		public bool Equals(MaterialData other)
-		{
-			if (ReferenceEquals(null, other)) return false;
-			if (ReferenceEquals(this, other)) return true;
-			return base.Equals(other) &&
-				   type == other.type &&
-				   albedo.Equals(other.albedo) &&
-				   fuzz.Equals(other.fuzz) &&
-				   refractiveIndex.Equals(other.refractiveIndex);
-		}
-
-		public override bool Equals(object obj)
-		{
-			if (ReferenceEquals(null, obj)) return false;
-			if (ReferenceEquals(this, obj)) return true;
-			if (obj.GetType() != this.GetType()) return false;
-			return Equals((MaterialData) obj);
-		}
-
-		public override int GetHashCode()
-		{
-			unchecked
-			{
-				int hashCode = base.GetHashCode();
-				hashCode = (hashCode * 397) ^ (int) type;
-				hashCode = (hashCode * 397) ^ albedo.GetHashCode();
-				hashCode = (hashCode * 397) ^ fuzz.GetHashCode();
-				hashCode = (hashCode * 397) ^ refractiveIndex.GetHashCode();
-				return hashCode;
-			}
-		}
-
-		public static bool operator ==(MaterialData left, MaterialData right)
-		{
-			return Equals(left, right);
-		}
-
-		public static bool operator !=(MaterialData left, MaterialData right)
-		{
-			return !Equals(left, right);
-		}
 	}
 }

@@ -9,10 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Matte
+  m_Script: {fileID: 11500000, guid: c2b8e2f3256a44a7a01951131f79a6e6, type: 3}
+  m_Name: Green
   m_EditorClassIdentifier: 
   type: 1
-  albedo: {r: 0.1, g: 0.2, b: 0.5, a: 1}
-  fuzz: 0
-  refractiveIndex: 1
+  mainColor: {r: 0, g: 0.6415094, b: 0.022073574, a: 0}
+  secondaryColor: {r: 0, g: 0, b: 0, a: 0}
