@@ -12,13 +12,40 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct AccumulateJob : IJobParallelFor
 	{
-		[ReadOnly] public uint2 Size;
+		public struct Diagnostics
+		{
+			public int RayCount, BoundsHitCount, CandidateCount;
+#pragma warning disable 649
+			public int Unused;
+#pragma warning restore 649
+		}
+
+#if BVH_ITERATIVE
+		public unsafe struct WorkingArea
+		{
+			public BvhNode** Nodes;
+			public Entity* Entities;
+#if BVH_SIMD
+			public float4* Vectors;
+#endif
+		}
+#endif
+
+		[ReadOnly] public float2 Size;
+		[ReadOnly] public uint Seed;
+		[ReadOnly] public int ThreadCount;
+#if BVH_ITERATIVE
+#pragma warning disable 649
+		[NativeSetThreadIndex] [ReadOnly] int threadIndex;
+#pragma warning restore 649
+#endif
 		[ReadOnly] public Camera Camera;
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public uint TraceDepth;
 		[ReadOnly] public float3 SkyBottomColor;
 		[ReadOnly] public float3 SkyTopColor;
-		[ReadOnly] public uint Seed;
+
+		[ReadOnly] public NativeArray<float4> InputSamples;
 
 #if BASIC
 		[ReadOnly] public NativeArray<Entity> World;
@@ -30,41 +57,27 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public BvhNode World;
 #endif
 
-#if BUFFERED_MATERIALS
-		[ReadOnly] public NativeArray<Material> Material;
-#endif
-
-		[ReadOnly] public NativeArray<float4> InputSamples;
-		[WriteOnly] public NativeArray<float4> OutputSamples;
-		[WriteOnly] public NativeArray<uint> OutputRayCount;
-
 #if BVH_ITERATIVE
-#pragma warning disable 649
-		[NativeSetThreadIndex] int threadIndex;
-#pragma warning restore 649
-
-		public int ThreadCount;
 		public NativeArray<IntPtr> NodeWorkingBuffer;
 		public NativeArray<Entity> EntityWorkingBuffer;
 #if BVH_SIMD
 		public NativeArray<float4> VectorWorkingBuffer;
 #endif
+#endif
 
-		public unsafe struct WorkingArea
-		{
-			public BvhNode** Nodes;
-			public Entity* Entities;
-#if BVH_SIMD
-			public float4* Vectors;
+#if BUFFERED_MATERIALS
+		[ReadOnly] public NativeArray<Material> Material;
 #endif
-		}
-#endif
+
+		[WriteOnly] public NativeArray<float4> OutputSamples;
+		[WriteOnly] public NativeArray<Diagnostics> OutputDiagnostics;
 
 		public void Execute(int index)
 		{
-			uint2 coordinates = uint2(
-				(uint) (index % Size.x), // column
-				(uint) (index / Size.x)  // row
+			// ReSharper disable once PossibleLossOfFraction
+			float2 coordinates = float2(
+				index % Size.x, // column
+				index / Size.x  // row
 			);
 
 			float4 lastValue = InputSamples[index];
@@ -73,7 +86,7 @@ namespace RaytracerInOneWeekend
 			int sampleCount = (int) lastValue.w;
 
 			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
-			uint rayCount = 0;
+			Diagnostics diagnostics = default;
 
 #if BVH_ITERATIVE
 			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
@@ -101,7 +114,7 @@ namespace RaytracerInOneWeekend
 				Ray r = Camera.GetRay(normalizedCoordinates, rng);
 
 #if BVH_ITERATIVE
-				if (Color(r, 0, rng, workingArea, out float3 sampleColor, ref rayCount))
+				if (Color(r, 0, rng, workingArea, out float3 sampleColor, ref diagnostics))
 #else
 				if (Color(r, 0, rng, out float3 sampleColor, ref rayCount))
 #endif
@@ -112,19 +125,19 @@ namespace RaytracerInOneWeekend
 			}
 
 			OutputSamples[index] = float4(colorAcc, sampleCount);
-			OutputRayCount[index] = rayCount;
+			OutputDiagnostics[index] = diagnostics;
 		}
 
 #if BVH_ITERATIVE
-		bool Color(Ray r, uint depth, Random rng, WorkingArea wa, out float3 color, ref uint rayCount)
+		bool Color(Ray r, uint depth, Random rng, WorkingArea wa, out float3 color, ref Diagnostics diagnostics)
 #else
 		bool Color(Ray r, uint depth, Random rng, out float3 color, ref uint rayCount)
 #endif
 		{
-			rayCount++;
+			diagnostics.RayCount++;
 
 #if BVH_ITERATIVE
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, out HitRecord rec))
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, ref diagnostics, out HitRecord rec))
 #else
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
@@ -137,7 +150,7 @@ namespace RaytracerInOneWeekend
 #endif
 				{
 #if BVH_ITERATIVE
-					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref rayCount))
+					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref diagnostics))
 #else
 					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
 #endif
@@ -163,19 +176,36 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
 
 		[ReadOnly] public NativeArray<float4> Input;
-		[WriteOnly] public NativeArray<half4> Output;
+		[WriteOnly] public NativeArray<BGRA8> Output;
 
 		public void Execute(int index)
 		{
-			var realSampleCount = (int) Input[index].w;
+			float4 inputSample = Input[index];
+
+			var realSampleCount = (int) inputSample.w;
 
 			float3 finalColor;
 			if (realSampleCount == 0)
 				finalColor = NoSamplesColor;
 			else
-				finalColor = Input[index].xyz / realSampleCount;
+				finalColor = inputSample.xyz / realSampleCount;
 
-			Output[index] = half4(half3(finalColor), half(1));
+			float3 outputColor = finalColor.zyx * 255;
+
+			Output[index] = new BGRA8
+			{
+				b = (short) outputColor.x,
+				g = (short) outputColor.y,
+				r = (short) outputColor.z
+			};
 		}
+	}
+
+	struct BGRA8
+	{
+		public short b, g, r;
+#pragma warning disable 649
+		public short a;
+#pragma warning restore 649
 	}
 }

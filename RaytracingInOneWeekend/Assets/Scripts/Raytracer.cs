@@ -66,11 +66,12 @@ namespace RaytracerInOneWeekend
 #endif
 		float millionRaysPerSecond, avgMRaysPerSecond, lastBatchDuration, lastTraceDuration;
 
-		Texture2D frontBufferTexture;
+		Texture2D frontBufferTexture, rayCountTexture, bvhHitCountTexture, candidateCountTexture;
+
 		CommandBuffer commandBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
-		NativeArray<half4> frontBuffer;
-		NativeArray<uint> rayCountBuffer;
+		NativeArray<BGRA8> frontBuffer;
+		NativeArray<AccumulateJob.Diagnostics> diagnosticsBuffer;
 
 #if BUFFERED_MATERIALS
 		NativeArray<Material> materialBuffer;
@@ -121,17 +122,20 @@ namespace RaytracerInOneWeekend
 		readonly List<SphereData> activeSpheres = new List<SphereData>();
 		readonly List<MaterialData> activeMaterials = new List<MaterialData>();
 
-		uint2 bufferSize;
+		float2 bufferSize;
 
 		bool TraceActive => accumulateJobHandle.HasValue || combineJobHandle.HasValue;
 
 		void Awake()
 		{
 			commandBuffer = new CommandBuffer { name = "Raytracer" };
-			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBAHalf, false)
-			{
-				hideFlags = HideFlags.HideAndDontSave
-			};
+
+			const HideFlags flags = HideFlags.HideAndDontSave;
+			frontBufferTexture = new Texture2D(0, 0, TextureFormat.BGRA32, false) { hideFlags = flags };
+			rayCountTexture = new Texture2D(0, 0, TextureFormat.R8, false) { hideFlags = flags };
+			bvhHitCountTexture = new Texture2D(0, 0, TextureFormat.R8, false) { hideFlags = flags };
+			candidateCountTexture = new Texture2D(0, 0, TextureFormat.R8, false) { hideFlags = flags };
+
 			ignoreBatchTimings = true;
 		}
 
@@ -163,7 +167,7 @@ namespace RaytracerInOneWeekend
 #endif
 			if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
 			if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
-			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
+			if (diagnosticsBuffer.IsCreated) diagnosticsBuffer.Dispose();
 #if BVH
 			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
 #endif
@@ -204,11 +208,11 @@ namespace RaytracerInOneWeekend
 				accumulateJobHandle.Value.Complete();
 				accumulateJobHandle = null;
 
-				uint rayCount = rayCountBuffer.Sum();
+				float totalRayCount = diagnosticsBuffer.Sum(x => x.RayCount);
 
 				accumulatedSamples += samplesPerBatch;
 				lastBatchDuration = (float) elapsedTime.TotalMilliseconds;
-				millionRaysPerSecond = rayCount / (float) elapsedTime.TotalSeconds / 1000000;
+				millionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
 				if (!ignoreBatchTimings) mraysPerSecResults.Add(millionRaysPerSecond);
 				avgMRaysPerSecond = mraysPerSecResults.Count == 0 ? 0 : mraysPerSecResults.Average();
 				ignoreBatchTimings = false;
@@ -290,12 +294,12 @@ namespace RaytracerInOneWeekend
 				focusDistance = hitRec.Distance;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView,
-				(float) bufferSize.x / bufferSize.y, cameraAperture, focusDistance);
+				bufferSize.x / bufferSize.y, cameraAperture, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
-			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
-			rayCountBuffer = new NativeArray<uint>(totalBufferSize, Allocator.Persistent);
+			if (diagnosticsBuffer.IsCreated) diagnosticsBuffer.Dispose();
+			diagnosticsBuffer = new NativeArray<AccumulateJob.Diagnostics>(totalBufferSize, Allocator.Persistent);
 
 			if (firstBatch)
 			{
@@ -323,14 +327,14 @@ namespace RaytracerInOneWeekend
 				TraceDepth = traceDepth,
 				World = World,
 				OutputSamples = accumulationOutputBuffer,
-				OutputRayCount = rayCountBuffer,
+				OutputDiagnostics = diagnosticsBuffer,
 #if BUFFERED_MATERIALS
 				Material = materialBuffer,
 #endif
 #if BVH_ITERATIVE
+				ThreadCount = SystemInfo.processorCount,
 				NodeWorkingBuffer = nodeWorkingBuffer,
 				EntityWorkingBuffer = entityWorkingBuffer,
-				ThreadCount = SystemInfo.processorCount,
 #endif
 #if BVH_SIMD
 				VectorWorkingBuffer = vectorWorkingBuffer,
@@ -365,7 +369,7 @@ namespace RaytracerInOneWeekend
 
 				frontBufferTexture.Resize(width, height);
 				frontBufferTexture.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
-				frontBuffer = frontBufferTexture.GetRawTextureData<half4>();
+				frontBuffer = frontBufferTexture.GetRawTextureData<BGRA8>();
 
 				commandBuffer.Clear();
 				commandBuffer.Blit(frontBufferTexture, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
@@ -383,7 +387,7 @@ namespace RaytracerInOneWeekend
 				Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
 			}
 
-			bufferSize = uint2((uint) width, (uint) height);
+			bufferSize = float2(width, height);
 		}
 
 		void RebuildWorld()
@@ -549,8 +553,9 @@ namespace RaytracerInOneWeekend
 				Vectors = (float4*) vectorWorkingBuffer.GetUnsafeReadOnlyPtr()
 #endif
 			};
+			AccumulateJob.Diagnostics _ = default;
 
-			return World.Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+			return World.Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
 		}
 
 #else // !BVH_ITERATIVE

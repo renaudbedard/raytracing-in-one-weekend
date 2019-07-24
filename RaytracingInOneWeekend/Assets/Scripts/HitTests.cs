@@ -214,7 +214,7 @@ namespace RaytracerInOneWeekend
 
 #elif BVH_ITERATIVE
 		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, AccumulateJob.WorkingArea wa,
-			out HitRecord rec)
+			ref AccumulateJob.Diagnostics diagnostics, out HitRecord rec)
 		{
 			int candidateCount = 0, nodeStackHeight = 1;
 			BvhNode** nodeStackTail = wa.Nodes;
@@ -230,6 +230,8 @@ namespace RaytracerInOneWeekend
 				if (!nodePtr->Bounds.Hit(r, tMin, tMax))
 					continue;
 
+				diagnostics.BoundsHitCount++;
+
 				if (nodePtr->IsLeaf)
 				{
 					*++candidateListTail = nodePtr->Content;
@@ -242,6 +244,8 @@ namespace RaytracerInOneWeekend
 					nodeStackHeight += 2;
 				}
 			}
+
+			diagnostics.CandidateCount = candidateCount;
 
 			if (candidateCount == 0)
 			{
