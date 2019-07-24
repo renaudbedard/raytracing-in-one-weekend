@@ -34,10 +34,10 @@ namespace RaytracerInOneWeekend
 
 		[SerializeField]
 #if ODIN_INSPECTOR
-		[DisableInPlayMode] [DisableIf(nameof(dataLayout), DataLayout.AutomaticSOA)]
+		[DisableInPlayMode]
 #endif
 		MaterialStorage materialStorage = MaterialStorage.Inline;
-		
+
 #if UNITY_EDITOR
 		void OnValidate()
 		{
@@ -65,7 +65,7 @@ namespace RaytracerInOneWeekend
 				case HitTestingMode.Basic:
 					newDefinitions.Add("BASIC");
 					break;
-				
+
 				case HitTestingMode.SoaSimd:
 					newDefinitions.Add("SOA_SIMD");
 					break;
@@ -78,12 +78,12 @@ namespace RaytracerInOneWeekend
 					newDefinitions.Add("BVH");
 					newDefinitions.Add("BVH_RECURSIVE");
 					break;
-				
+
 				case HitTestingMode.IterativeBvh:
 					newDefinitions.Add("BVH");
 					newDefinitions.Add("BVH_ITERATIVE");
 					break;
-				
+
 				case HitTestingMode.IterativeBvhSimd:
 					newDefinitions.Add("BVH");
 					newDefinitions.Add("BVH_ITERATIVE");
