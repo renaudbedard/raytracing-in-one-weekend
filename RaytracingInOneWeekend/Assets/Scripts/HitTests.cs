@@ -259,40 +259,36 @@ namespace RaytracerInOneWeekend
 			var simdSpheresHead = (Sphere4*) wa.Vectors;
 			int simdBlockCount = (int) ceil(candidateCount / 4.0f);
 
-			if (candidateCount % 4 != 0)
-			{
-				Sphere4* lastBlock = simdSpheresHead + (simdBlockCount - 1);
-				lastBlock->CenterX = float.MaxValue;
-				lastBlock->CenterY = float.MaxValue;
-				lastBlock->CenterZ = float.MaxValue;
-				lastBlock->SquaredRadius = 0;
-			}
-
-			Sphere4* blockCursor = simdSpheresHead;
-			for (int i = 0; i < simdBlockCount; i++)
-			{
-				for (int j = 0; j < 4; j++)
-				{
-					int candidateIndex = i * 4 + j;
-					if (candidateIndex < candidateCount)
-					{
-						var sphereData = candidateListHead[i * 4 + j].AsSphere;
-						blockCursor->CenterX[j] = sphereData->Center.x;
-						blockCursor->CenterY[j] = sphereData->Center.y;
-						blockCursor->CenterZ[j] = sphereData->Center.z;
-						blockCursor->SquaredRadius[j] = sphereData->SquaredRadius;
-					}
-				}
-				++blockCursor;
-			}
-
 			float4 a = dot(r.Direction, r.Direction);
 			int4 curId = int4(0, 1, 2, 3), hitId = -1;
 			float4 hitT = tMax;
 
-			blockCursor = simdSpheresHead;
+			Sphere4* blockCursor = simdSpheresHead;
+			Entity* candidateCursor = candidateListHead;
+			int candidateIndex = 0;
 			for (int i = 0; i < simdBlockCount; i++)
 			{
+				for (int j = 0; j < 4; j++)
+				{
+					if (candidateIndex < candidateCount)
+					{
+						Sphere* sphereData = candidateCursor->AsSphere;
+						blockCursor->CenterX[j] = sphereData->Center.x;
+						blockCursor->CenterY[j] = sphereData->Center.y;
+						blockCursor->CenterZ[j] = sphereData->Center.z;
+						blockCursor->SquaredRadius[j] = sphereData->SquaredRadius;
+						++candidateCursor;
+						++candidateIndex;
+					}
+					else
+					{
+						blockCursor->CenterX[j] = float.MaxValue;
+						blockCursor->CenterY[j] = float.MaxValue;
+						blockCursor->CenterZ[j] = float.MaxValue;
+						blockCursor->SquaredRadius[j] = 0;
+					}
+				}
+
 				float4 ocX = r.Origin.x - blockCursor->CenterX,
 					ocY = r.Origin.y - blockCursor->CenterY,
 					ocZ = r.Origin.z - blockCursor->CenterZ;
@@ -332,8 +328,8 @@ namespace RaytracerInOneWeekend
 			int firstLane = tzcnt(laneMask);
 			int closestId = hitId[firstLane];
 			Sphere* closestSphere = candidateListHead[closestId].AsSphere;
-
 			float3 point = r.GetPoint(minDistance);
+
 			rec = new HitRecord(minDistance, point, (point - closestSphere->Center) / closestSphere->Radius,
 #if BUFFERED_MATERIALS
 				closestSphere->MaterialIndex);
