@@ -2,79 +2,8 @@ using JetBrains.Annotations;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
-#if QUAD_BVH
-using Unity.Collections.LowLevel.Unsafe;
-#endif
-
 namespace RaytracerInOneWeekend
 {
-#if QUAD_BVH
-	struct QuadAabbData
-	{
-#pragma warning disable 649
-		public float4 MinX, MaxX, MinY, MaxY, MinZ, MaxZ;
-#pragma warning restore 649
-	}
-
-	unsafe struct QuadAabb
-	{
-		// actually always 6x QuadAabbData, but used as float4
-		[NativeDisableUnsafePtrRestriction] readonly float4* components;
-
-		public QuadAabb(QuadAabbData* dataSlice, params AxisAlignedBoundingBox[] boxes)
-		{
-			components = (float4*) dataSlice;
-			float* fillPtr = (float*) components;
-
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.x;
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.x;
-
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.y;
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.y;
-
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Min.z;
-			for (int i = 0; i < 4; i++) *fillPtr++ = boxes[i].Max.z;
-		}
-
-		[Pure]
-		public bool4 Hit(Ray r, float4 tMin, float4 tMax)
-		{
-			bool4 retValue = true;
-
-			float4* fetchPtr = components;
-			for (int a = 0; a < 3; a++)
-			{
-				float4 invDirection = 1 / r.Direction[a];
-				float4 t0 = (*fetchPtr++ - r.Origin[a]) * invDirection; // Min
-				float4 t1 = (*fetchPtr++ - r.Origin[a]) * invDirection; // Max
-
-				bool4 invDirectionNegative = invDirection < 0;
-				float4 tt0 = select(t0, t1, invDirectionNegative);
-				float4 tt1 = select(t1, t0, invDirectionNegative);
-
-				tMin = select(tt0, tMin, tt0 > tMin);
-				tMax = select(tt1, tMax, tt1 < tMax);
-
-				retValue &= tMax > tMin;
-			}
-
-			return retValue;
-		}
-
-		public AxisAlignedBoundingBox Enclosure
-		{
-			get
-			{
-				float4* fetchPtr = components;
-
-				return new AxisAlignedBoundingBox(
-					float3(cmin(fetchPtr[0]), cmin(fetchPtr[2]), cmin(fetchPtr[4])),
-					float3(cmax(fetchPtr[1]), cmax(fetchPtr[3]), cmax(fetchPtr[5])));
-			}
-		}
-	}
-#endif
-
 	struct AxisAlignedBoundingBox
 	{
 		public readonly float3 Min, Max;

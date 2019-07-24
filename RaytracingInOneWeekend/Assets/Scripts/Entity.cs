@@ -1,4 +1,4 @@
-#if !(MANUAL_AOSOA || MANUAL_SOA)
+#if !(AOSOA_SIMD || SOA_SIMD)
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;

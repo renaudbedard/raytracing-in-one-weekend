@@ -7,14 +7,10 @@ using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
-#if UNITY_SOA
-using Unity.Collections.Experimental;
-#endif
-
 namespace RaytracerInOneWeekend
 {
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
-	unsafe struct AccumulateJob : IJobParallelFor
+	struct AccumulateJob : IJobParallelFor
 	{
 		[ReadOnly] public uint2 Size;
 		[ReadOnly] public Camera Camera;
@@ -23,24 +19,22 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public float3 SkyBottomColor;
 		[ReadOnly] public float3 SkyTopColor;
 		[ReadOnly] public uint Seed;
-#if MANUAL_AOSOA
-		[ReadOnly] public AosoaSpheres World;
-#elif MANUAL_SOA
-		[ReadOnly] public SoaSpheres World;
-#elif UNITY_SOA
-		[ReadOnly] public NativeArrayFullSOA<Sphere> World;
-#else
-#if BVH
-		[ReadOnly] public BvhNode World;
-#else
+
+#if BASIC
 		[ReadOnly] public NativeArray<Entity> World;
+#elif SOA_SIMD
+		[ReadOnly] public SoaSpheres World;
+#elif AOSOA_SIMD
+		[ReadOnly] public AosoaSpheres World;
+#elif BVH
+		[ReadOnly] public BvhNode World;
 #endif
-#endif
-#if BUFFERED_MATERIALS || UNITY_SOA
+
+#if BUFFERED_MATERIALS
 		[ReadOnly] public NativeArray<Material> Material;
 #endif
-		[ReadOnly] public NativeArray<float4> InputSamples;
 
+		[ReadOnly] public NativeArray<float4> InputSamples;
 		[WriteOnly] public NativeArray<float4> OutputSamples;
 		[WriteOnly] public NativeArray<uint> OutputRayCount;
 
@@ -50,14 +44,20 @@ namespace RaytracerInOneWeekend
 #pragma warning restore 649
 
 		public int ThreadCount;
-		public NativeArray<SpherePointer> NodeWorkingBuffer;
+		public NativeArray<IntPtr> NodeWorkingBuffer;
 		public NativeArray<Entity> EntityWorkingBuffer;
+#if BVH_SIMD
 		public NativeArray<float4> VectorWorkingBuffer;
+#endif
 
-		// worker local state
-		[NativeDisableUnsafePtrRestriction] BvhNode** nodeWorkingArea;
-		[NativeDisableUnsafePtrRestriction] Entity* entityWorkingArea;
-		[NativeDisableUnsafePtrRestriction] float4* vectorWorkingArea;
+		public unsafe struct WorkingArea
+		{
+			public BvhNode** Nodes;
+			public Entity* Entities;
+#if BVH_SIMD
+			public float4* Vectors;
+#endif
+		}
 #endif
 
 		public void Execute(int index)
@@ -75,18 +75,36 @@ namespace RaytracerInOneWeekend
 			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
 			uint rayCount = 0;
 
+#if BVH_ITERATIVE
 			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
 			int actualThreadIndex = threadIndex - 1;
-			nodeWorkingArea = (BvhNode**) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * (NodeWorkingBuffer.Length / ThreadCount);
-			entityWorkingArea = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * (EntityWorkingBuffer.Length / ThreadCount);
-			vectorWorkingArea = (float4*) VectorWorkingBuffer.GetUnsafeReadOnlyPtr() + actualThreadIndex * (VectorWorkingBuffer.Length / ThreadCount);
+			WorkingArea workingArea;
+			unsafe
+			{
+				workingArea = new WorkingArea
+				{
+					Nodes = (BvhNode**) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() +
+					        actualThreadIndex * (NodeWorkingBuffer.Length / ThreadCount),
+					Entities = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() +
+					           actualThreadIndex * (EntityWorkingBuffer.Length / ThreadCount),
+#if BVH_SIMD
+					Vectors = (float4*) VectorWorkingBuffer.GetUnsafeReadOnlyPtr() +
+					          actualThreadIndex * (VectorWorkingBuffer.Length / ThreadCount)
+#endif
+				};
+			}
+#endif
 
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + rng.NextFloat2()) / Size; // (u, v)
 				Ray r = Camera.GetRay(normalizedCoordinates, rng);
 
+#if BVH_ITERATIVE
+				if (Color(r, 0, rng, workingArea, out float3 sampleColor, ref rayCount))
+#else
 				if (Color(r, 0, rng, out float3 sampleColor, ref rayCount))
+#endif
 				{
 					colorAcc += sampleColor;
 					sampleCount++;
@@ -98,27 +116,31 @@ namespace RaytracerInOneWeekend
 		}
 
 #if BVH_ITERATIVE
-		unsafe
-#endif
+		bool Color(Ray r, uint depth, Random rng, WorkingArea wa, out float3 color, ref uint rayCount)
+#else
 		bool Color(Ray r, uint depth, Random rng, out float3 color, ref uint rayCount)
+#endif
 		{
 			rayCount++;
 
 #if BVH_ITERATIVE
-			if (World.Hit(r, 0.001f, float.PositiveInfinity,
-				nodeWorkingArea, entityWorkingArea, vectorWorkingArea, out HitRecord rec))
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, out HitRecord rec))
 #else
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
-#if BUFFERED_MATERIALS || UNITY_SOA
+#if BUFFERED_MATERIALS
 				if (depth < TraceDepth &&
 				    Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #else
 				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
 #endif
 				{
+#if BVH_ITERATIVE
+					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref rayCount))
+#else
 					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
+#endif
 					{
 						color = attenuation * scatteredColor;
 						return true;

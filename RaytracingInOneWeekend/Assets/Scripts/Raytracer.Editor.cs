@@ -52,22 +52,6 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [HideInInspector] GameObject previewObject;
 		[SerializeField] [HideInInspector] List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
 
-#if BVH_ITERATIVE
-		public unsafe bool HitWorld(Ray r, out HitRecord hitRec)
-		{
-			var nodeWA = (BvhNode**) nodeWorkingBuffer.GetUnsafeReadOnlyPtr();
-			var entityWA = (Entity*) entityWorkingBuffer.GetUnsafeReadOnlyPtr();
-			var vectorWA = (float4*) vectorWorkingBuffer.GetUnsafeReadOnlyPtr();
-
-			return World.Hit(r, 0, float.PositiveInfinity, nodeWA, entityWA, vectorWA, out hitRec);
-		}
-#else
-		public bool HitWorld(Ray r, out HitRecord hitRec)
-		{
-			return World.Hit(r, 0, float.PositiveInfinity, out hitRec);
-		}
-#endif
-
 		void WatchForWorldChanges()
 		{
 			// watch for world data changes (won't catch those from OnValidate)
@@ -130,11 +114,14 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
 				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
+#endif
+#if BVH_SIMD
 				if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
 #endif
 				activeSpheres.Clear();
 			}
-#endif
+#endif // BVH
+
 			if (scene)
 			{
 				scene.ClearDirty();
@@ -252,8 +239,8 @@ namespace RaytracerInOneWeekend
 					Gizmos.DrawCube(bounds.Center, bounds.Size);
 				}
 			}
-#endif
+#endif // BVH
 		}
 	}
 }
-#endif
+#endif // UNITY_EDITOR

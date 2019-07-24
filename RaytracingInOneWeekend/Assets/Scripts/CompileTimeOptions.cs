@@ -10,12 +10,14 @@ namespace RaytracerInOneWeekend
 	[ExecuteInEditMode]
 	class CompileTimeOptions : MonoBehaviour
 	{
-		enum DataLayout
+		enum HitTestingMode
 		{
-			ArrayOfStructs,
-			StructOfArrays,
-			Interleaved,
-			AutomaticSOA
+			Basic,
+			SoaSimd,
+			AosoaSimd,
+			RecursiveBvh,
+			IterativeBvh,
+			IterativeBvhSimd
 		}
 
 		enum MaterialStorage
@@ -24,32 +26,18 @@ namespace RaytracerInOneWeekend
 			Buffered
 		}
 
-		enum SpacePartitioning
-		{
-			None,
-			BinaryBVH,
-			IterativeBinaryBVH,
-			QuadBVH
-		}
-
 		[SerializeField]
 #if ODIN_INSPECTOR
 		[DisableInPlayMode]
 #endif
-		DataLayout dataLayout = DataLayout.StructOfArrays;
+		HitTestingMode hitTestingMode = HitTestingMode.Basic;
 
 		[SerializeField]
 #if ODIN_INSPECTOR
 		[DisableInPlayMode] [DisableIf(nameof(dataLayout), DataLayout.AutomaticSOA)]
 #endif
 		MaterialStorage materialStorage = MaterialStorage.Inline;
-
-		[SerializeField]
-#if ODIN_INSPECTOR
-		[DisableInPlayMode]
-#endif
-		SpacePartitioning spacePartitioning = SpacePartitioning.BinaryBVH;
-
+		
 #if UNITY_EDITOR
 		void OnValidate()
 		{
@@ -62,27 +50,44 @@ namespace RaytracerInOneWeekend
 			var originalDefinitions = new HashSet<string>(currentDefines.Split(';'));
 			var newDefinitions = new HashSet<string>(originalDefinitions);
 
-			newDefinitions.Remove("MANUAL_SOA");
-			newDefinitions.Remove("MANUAL_AOSOA");
-			newDefinitions.Remove("UNITY_SOA");
+			newDefinitions.Remove("BASIC");
+			newDefinitions.Remove("SOA_SIMD");
+			newDefinitions.Remove("AOSOA_SIMD");
 			newDefinitions.Remove("BUFFERED_MATERIALS");
 			newDefinitions.Remove("BVH");
+			newDefinitions.Remove("BVH_RECURSIVE");
 			newDefinitions.Remove("BVH_ITERATIVE");
+			newDefinitions.Remove("BVH_SIMD");
 			newDefinitions.Remove("QUAD_BVH");
 
-			switch (dataLayout)
+			switch (hitTestingMode)
 			{
-				case DataLayout.StructOfArrays:
-					newDefinitions.Add("MANUAL_SOA");
+				case HitTestingMode.Basic:
+					newDefinitions.Add("BASIC");
+					break;
+				
+				case HitTestingMode.SoaSimd:
+					newDefinitions.Add("SOA_SIMD");
 					break;
 
-				case DataLayout.Interleaved:
-					newDefinitions.Add("MANUAL_AOSOA");
+				case HitTestingMode.AosoaSimd:
+					newDefinitions.Add("AOSOA_SIMD");
 					break;
 
-				case DataLayout.AutomaticSOA:
-					newDefinitions.Add("UNITY_SOA");
-					materialStorage = MaterialStorage.Buffered;
+				case HitTestingMode.RecursiveBvh:
+					newDefinitions.Add("BVH");
+					newDefinitions.Add("BVH_RECURSIVE");
+					break;
+				
+				case HitTestingMode.IterativeBvh:
+					newDefinitions.Add("BVH");
+					newDefinitions.Add("BVH_ITERATIVE");
+					break;
+				
+				case HitTestingMode.IterativeBvhSimd:
+					newDefinitions.Add("BVH");
+					newDefinitions.Add("BVH_ITERATIVE");
+					newDefinitions.Add("BVH_SIMD");
 					break;
 			}
 
@@ -90,21 +95,6 @@ namespace RaytracerInOneWeekend
 			{
 				case MaterialStorage.Buffered:
 					newDefinitions.Add("BUFFERED_MATERIALS");
-					break;
-			}
-
-			switch (spacePartitioning)
-			{
-				case SpacePartitioning.BinaryBVH:
-					newDefinitions.Add("BVH");
-					break;
-				case SpacePartitioning.IterativeBinaryBVH:
-					newDefinitions.Add("BVH");
-					newDefinitions.Add("BVH_ITERATIVE");
-					break;
-				case SpacePartitioning.QuadBVH:
-					newDefinitions.Add("BVH");
-					newDefinitions.Add("QUAD_BVH");
 					break;
 			}
 

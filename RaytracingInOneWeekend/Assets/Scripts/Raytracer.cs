@@ -19,10 +19,6 @@ using Sirenix.OdinInspector;
 using Title = UnityEngine.HeaderAttribute;
 #endif
 
-#if UNITY_SOA
-using Unity.Collections.Experimental;
-#endif
-
 namespace RaytracerInOneWeekend
 {
 	partial class Raytracer : MonoBehaviour
@@ -76,36 +72,35 @@ namespace RaytracerInOneWeekend
 		NativeArray<half4> frontBuffer;
 		NativeArray<uint> rayCountBuffer;
 
-#if BUFFERED_MATERIALS || UNITY_SOA
+#if BUFFERED_MATERIALS
 		NativeArray<Material> materialBuffer;
 #endif
 
-#if MANUAL_SOA
+#if SOA_SIMD
 		SoaSpheres sphereBuffer;
 		internal SoaSpheres World => sphereBuffer;
-#elif MANUAL_AOSOA
+#elif AOSOA_SIMD
 		AosoaSpheres sphereBuffer;
 		internal AosoaSpheres World => sphereBuffer;
-#elif UNITY_SOA
-		NativeArrayFullSOA<Sphere> sphereBuffer;
-		internal NativeArrayFullSOA<Sphere> World => sphereBuffer;
-#else
+#else // !SOA_SIMD && !AOSOA_SIMD
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Entity> entityBuffer;
+#if !BVH
+		NativeArray<Entity> World => entityBuffer;
+#endif
+#endif
+
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
+		BvhNode World => bvhNodeBuffer.IsCreated ? bvhNodeBuffer[bvhNodeBuffer.Length - 1] : default;
+#endif
+
 #if BVH_ITERATIVE
-		NativeArray<SpherePointer> nodeWorkingBuffer;
+		NativeArray<IntPtr> nodeWorkingBuffer;
 		NativeArray<Entity> entityWorkingBuffer;
+#endif
+#if BVH_SIMD
 		NativeArray<float4> vectorWorkingBuffer;
-#endif
-#if QUAD_BVH
-		NativeList<QuadAabbData> quadAabbDataBuffer;
-#endif
-		internal BvhNode World => bvhNodeBuffer.IsCreated ? bvhNodeBuffer[bvhNodeBuffer.Length - 1] : default;
-#else
-		internal NativeArray<Entity> World => entityBuffer;
-#endif
 #endif
 
 		JobHandle? accumulateJobHandle;
@@ -157,13 +152,13 @@ namespace RaytracerInOneWeekend
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
 
-#if MANUAL_SOA || MANUAL_AOSOA || UNITY_SOA
-			sphereBuffer.Dispose();
+#if SOA_SIMD || AOSOA_SIMD
+			sphereBuffer.Dispose(); // this actually isn't a NativeArray<T>!
 #else
 			if (entityBuffer.IsCreated) entityBuffer.Dispose();
 			if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
 #endif
-#if BUFFERED_MATERIALS || UNITY_SOA
+#if BUFFERED_MATERIALS
 			if (materialBuffer.IsCreated) materialBuffer.Dispose();
 #endif
 			if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
@@ -171,21 +166,21 @@ namespace RaytracerInOneWeekend
 			if (rayCountBuffer.IsCreated) rayCountBuffer.Dispose();
 #if BVH
 			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
+#endif
 #if BVH_ITERATIVE
 			if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
 			if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
+#endif
+#if BVH_SIMD
 			if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
-#endif
-#if QUAD_BVH
-			if (quadAabbDataBuffer.IsCreated) quadAabbDataBuffer.Dispose();
-#endif
 #endif
 		}
 
 		void Update()
 		{
+#if UNITY_EDITOR
 			WatchForWorldChanges();
-
+#endif
 			uint2 currentSize = uint2(
 				(uint) ceil(targetCamera.pixelWidth * resolutionScaling),
 				(uint) ceil(targetCamera.pixelHeight * resolutionScaling));
@@ -241,7 +236,9 @@ namespace RaytracerInOneWeekend
 				}
 
 				SwapBuffers();
+#if UNITY_EDITOR
 				ForceUpdateInspector();
+#endif
 				RebuildDirtyComponents();
 
 				if ((!(traceCompleted && stopWhenCompleted) || traceNeedsReset) && !traceAborted)
@@ -254,7 +251,9 @@ namespace RaytracerInOneWeekend
 			if (!combineJobHandle.HasValue && accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
 			{
 				CompleteAccumulate();
+#if UNITY_EDITOR
 				ForceUpdateInspector();
+#endif
 				RebuildDirtyComponents();
 
 				if (!traceAborted)
@@ -305,7 +304,9 @@ namespace RaytracerInOneWeekend
 
 				mraysPerSecResults.Clear();
 				accumulatedSamples = 0;
+#if UNITY_EDITOR
 				ForceUpdateInspector();
+#endif
 			}
 			else
 				Util.Swap(ref accumulationInputBuffer, ref accumulationOutputBuffer);
@@ -323,14 +324,16 @@ namespace RaytracerInOneWeekend
 				World = World,
 				OutputSamples = accumulationOutputBuffer,
 				OutputRayCount = rayCountBuffer,
-#if BUFFERED_MATERIALS || UNITY_SOA
+#if BUFFERED_MATERIALS
 				Material = materialBuffer,
 #endif
 #if BVH_ITERATIVE
 				NodeWorkingBuffer = nodeWorkingBuffer,
 				EntityWorkingBuffer = entityWorkingBuffer,
+				ThreadCount = SystemInfo.processorCount,
+#endif
+#if BVH_SIMD
 				VectorWorkingBuffer = vectorWorkingBuffer,
-				ThreadCount = SystemInfo.processorCount
 #endif
 			};
 
@@ -395,7 +398,7 @@ namespace RaytracerInOneWeekend
 				if (!activeMaterials.Contains(sphere.Material))
 					activeMaterials.Add(sphere.Material);
 
-#if BUFFERED_MATERIALS || UNITY_SOA
+#if BUFFERED_MATERIALS
 			int materialCount = activeMaterials.Count;
 			if (materialBuffer.Length != materialCount)
 			{
@@ -415,12 +418,16 @@ namespace RaytracerInOneWeekend
 			}
 #endif
 
-#if MANUAL_SOA
+#if SOA_SIMD || AOSOA_SIMD
 			int sphereCount = activeSpheres.Count;
-			if (sphereBuffer.Count != sphereCount)
+			if (sphereBuffer.Length != sphereCount)
 			{
 				sphereBuffer.Dispose();
+#if SOA_SIMD
 				sphereBuffer = new SoaSpheres(sphereCount);
+#elif AOSOA_SIMD
+				sphereBuffer = new AosoaSpheres(sphereCount);
+#endif
 			}
 
 			for (var i = 0; i < activeSpheres.Count; i++)
@@ -432,54 +439,22 @@ namespace RaytracerInOneWeekend
 #if BUFFERED_MATERIALS
 				sphereBuffer.MaterialIndex[i] = activeMaterials.IndexOf(material);
 #else
+				TextureData albedo = material.Albedo;
 				sphereBuffer.Material[i] =
-					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);
+					new Material(material.Type,
+						albedo
+							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3())
+							: default,
+						material.Fuzz, material.RefractiveIndex);
 #endif
 			}
 
-#elif MANUAL_AOSOA
-			int sphereCount = activeSpheres.Count;
-			if (sphereBuffer.Length != sphereCount)
-			{
-				sphereBuffer.Dispose();
-				sphereBuffer = new AosoaSpheres(sphereCount);
-			}
-
-			for (int i = 0; i < activeSpheres.Count; i++)
-			{
-				SphereData sphereData = activeSpheres[i];
-				sphereBuffer.SetElement(i, sphereData.Center, sphereData.Radius);
-
-				MaterialData material = sphereData.Material;
-#if BUFFERED_MATERIALS
-				sphereBuffer.MaterialIndex[i] = activeMaterials.IndexOf(material);
-#else
-				sphereBuffer.Material[i] =
-					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex);
-#endif
-			}
-
-#elif UNITY_SOA
-			int sphereCount = activeSpheres.Count;
-			if (sphereBuffer.Length != sphereCount)
-			{
-				if (sphereBuffer.Length > 0) sphereBuffer.Dispose();
-				sphereBuffer = new NativeArrayFullSOA<Sphere>(sphereCount, Allocator.Persistent);
-			}
-
-			for (int i = 0; i < activeSpheres.Count; i++)
-			{
-				SphereData sphereData = activeSpheres[i];
-				MaterialData material = sphereData.Material;
-
-				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius, activeMaterials.IndexOf(material));
-			}
-
-#else
+#else // !SOA_SIMD && !AOSOA_SIMD
 			RebuildEntityBuffer();
+#endif
+
 #if BVH
 			RebuildBvh();
-#endif
 #endif
 
 			worldNeedsRebuild = false;
@@ -487,7 +462,7 @@ namespace RaytracerInOneWeekend
 			Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
 		}
 
-#if !MANUAL_SOA && !MANUAL_AOSOA
+#if !SOA_SIMD && !AOSOA_SIMD
 		void RebuildEntityBuffer()
 		{
 			int entityCount = activeSpheres.Count;
@@ -510,11 +485,17 @@ namespace RaytracerInOneWeekend
 			{
 				SphereData sphereData = activeSpheres[i];
 				MaterialData material = sphereData.Material;
+#if !BUFFERED_MATERIALS
+				TextureData texture = material ? material.Albedo : null;
+#endif
 				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius,
 #if BUFFERED_MATERIALS
 					activeMaterials.IndexOf(material));
 #else
-					new Material(material.Type, material.Albedo.ToFloat3(), material.Fuzz, material.RefractiveIndex));
+					new Material(material.Type, texture
+							? new Texture(texture.Type, texture.MainColor.ToFloat3(), texture.SecondaryColor.ToFloat3())
+							: default,
+						material.Fuzz, material.RefractiveIndex));
 #endif
 				unsafe
 				{
@@ -522,7 +503,7 @@ namespace RaytracerInOneWeekend
 				}
 			}
 		}
-#endif
+#endif // !SOA_SIMD && !AOSOA_SIMD
 
 #if BVH
 		void RebuildBvh()
@@ -531,34 +512,51 @@ namespace RaytracerInOneWeekend
 			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(1024, Allocator.Persistent);
 			bvhNodeBuffer.Clear();
 
-#if QUAD_BVH
-			if (!quadAabbDataBuffer.IsCreated) quadAabbDataBuffer = new NativeList<QuadAabbData>(512, Allocator.Persistent);
-			quadAabbDataBuffer.Clear();
-			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer, quadAabbDataBuffer));
-#else
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
-#endif
 
 #if BVH_ITERATIVE
 			int workingBufferSize = entityBuffer.Length * SystemInfo.processorCount;
 			if (!nodeWorkingBuffer.IsCreated || nodeWorkingBuffer.Length != workingBufferSize)
 			{
 				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
-				nodeWorkingBuffer = new NativeArray<SpherePointer>(workingBufferSize, Allocator.Persistent);
+				nodeWorkingBuffer = new NativeArray<IntPtr>(workingBufferSize, Allocator.Persistent);
 			}
 			if (!entityWorkingBuffer.IsCreated || entityWorkingBuffer.Length != workingBufferSize)
 			{
 				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
 				entityWorkingBuffer = new NativeArray<Entity>(workingBufferSize, Allocator.Persistent);
 			}
+#endif
+#if BVH_SIMD
 			if (!vectorWorkingBuffer.IsCreated || vectorWorkingBuffer.Length != workingBufferSize * Sphere4.StreamCount)
 			{
 				if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
 				vectorWorkingBuffer = new NativeArray<float4>(workingBufferSize * Sphere4.StreamCount, Allocator.Persistent);
 			}
 #endif
-
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
+		}
+#endif // BVH
+
+#if BVH_ITERATIVE
+		public unsafe bool HitWorld(Ray r, out HitRecord hitRec)
+		{
+			var workingArea = new AccumulateJob.WorkingArea
+			{
+				Nodes = (BvhNode**) nodeWorkingBuffer.GetUnsafeReadOnlyPtr(),
+				Entities = (Entity*) entityWorkingBuffer.GetUnsafeReadOnlyPtr(),
+#if BVH_SIMD
+				Vectors = (float4*) vectorWorkingBuffer.GetUnsafeReadOnlyPtr()
+#endif
+			};
+
+			return World.Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+		}
+
+#else // !BVH_ITERATIVE
+		public bool HitWorld(Ray r, out HitRecord hitRec)
+		{
+			return World.Hit(r, 0, float.PositiveInfinity, out hitRec);
 		}
 #endif
 
