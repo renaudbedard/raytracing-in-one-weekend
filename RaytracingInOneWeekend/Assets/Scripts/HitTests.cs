@@ -180,15 +180,28 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_RECURSIVE
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
+#if FULL_DIAGNOSTICS
+			ref AccumulateJob.Diagnostics diagnostics,
+#endif
+			out HitRecord rec)
 		{
 			rec = default;
 
 			if (!n.Bounds.Hit(r, tMin, tMax))
 				return false;
 
+#if FULL_DIAGNOSTICS
+			diagnostics.BoundsHitCount++;
+#endif
+
 			if (n.IsLeaf)
+			{
+#if FULL_DIAGNOSTICS
+				diagnostics.CandidateCount++;
+#endif
 				return n.Content.Hit(r, tMin, tMax, out rec);
+			}
 
 			bool hitLeft = n.Left->Hit(r, tMin, tMax, out HitRecord leftRecord);
 			bool hitRight = n.Right->Hit(r, tMin, tMax, out HitRecord rightRecord);
@@ -214,7 +227,10 @@ namespace RaytracerInOneWeekend
 
 #elif BVH_ITERATIVE
 		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, AccumulateJob.WorkingArea wa,
-			ref AccumulateJob.Diagnostics diagnostics, out HitRecord rec)
+#if FULL_DIAGNOSTICS
+			ref Diagnostics diagnostics,
+#endif
+			out HitRecord rec)
 		{
 			int candidateCount = 0, nodeStackHeight = 1;
 			BvhNode** nodeStackTail = wa.Nodes;
@@ -229,9 +245,9 @@ namespace RaytracerInOneWeekend
 
 				if (!nodePtr->Bounds.Hit(r, tMin, tMax))
 					continue;
-
+#if FULL_DIAGNOSTICS
 				diagnostics.BoundsHitCount++;
-
+#endif
 				if (nodePtr->IsLeaf)
 				{
 					*++candidateListTail = nodePtr->Content;
@@ -244,16 +260,14 @@ namespace RaytracerInOneWeekend
 					nodeStackHeight += 2;
 				}
 			}
-
+#if FULL_DIAGNOSTICS
 			diagnostics.CandidateCount = candidateCount;
-
+#endif
 			if (candidateCount == 0)
 			{
 				rec = default;
 				return false;
 			}
-
-			// TODO: visualization for candidate count per pixel
 
 #if BVH_SIMD
 			// skip SIMD codepath if there's only one

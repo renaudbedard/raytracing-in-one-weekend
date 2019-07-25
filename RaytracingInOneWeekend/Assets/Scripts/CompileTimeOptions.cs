@@ -38,6 +38,12 @@ namespace RaytracerInOneWeekend
 #endif
 		MaterialStorage materialStorage = MaterialStorage.Inline;
 
+		[SerializeField]
+#if ODIN_INSPECTOR
+		[DisableInPlayMode]
+#endif
+		bool fullDiagnostics = false;
+
 #if UNITY_EDITOR
 		void OnValidate()
 		{
@@ -59,6 +65,7 @@ namespace RaytracerInOneWeekend
 			newDefinitions.Remove("BVH_ITERATIVE");
 			newDefinitions.Remove("BVH_SIMD");
 			newDefinitions.Remove("QUAD_BVH");
+			newDefinitions.Remove("FULL_DIAGNOSTICS");
 
 			switch (hitTestingMode)
 			{
@@ -97,6 +104,9 @@ namespace RaytracerInOneWeekend
 					newDefinitions.Add("BUFFERED_MATERIALS");
 					break;
 			}
+
+			if (fullDiagnostics)
+				newDefinitions.Add("FULL_DIAGNOSTICS");
 
 			if (!newDefinitions.SetEquals(originalDefinitions))
 			{

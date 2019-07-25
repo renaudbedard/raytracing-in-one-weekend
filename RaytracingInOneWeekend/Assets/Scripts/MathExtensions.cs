@@ -62,5 +62,11 @@ namespace RaytracerInOneWeekend
             c.a = alpha;
             return c;
         }
+
+        public static float3 LinearToGamma(this float3 value)
+        {
+            value = max(value, 0);
+            return max(1.055f * pow(value, 0.416666667f) - 0.055f, 0);
+        }
     }
 }

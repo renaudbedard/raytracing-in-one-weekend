@@ -1,4 +1,6 @@
 using System;
+using System.Runtime.InteropServices;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -9,17 +11,26 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+	struct Diagnostics
+	{
+		public float RayCount;
+		public float BoundsHitCount;
+		public float CandidateCount;
+#pragma warning disable 649
+		public float Padding;
+#pragma warning restore 649
+	}
+#else
+	struct Diagnostics
+	{
+		public float RayCount;
+	}
+#endif
+
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct AccumulateJob : IJobParallelFor
 	{
-		public struct Diagnostics
-		{
-			public int RayCount, BoundsHitCount, CandidateCount;
-#pragma warning disable 649
-			public int Unused;
-#pragma warning restore 649
-		}
-
 #if BVH_ITERATIVE
 		public unsafe struct WorkingArea
 		{
@@ -33,8 +44,8 @@ namespace RaytracerInOneWeekend
 
 		[ReadOnly] public float2 Size;
 		[ReadOnly] public uint Seed;
-		[ReadOnly] public int ThreadCount;
 #if BVH_ITERATIVE
+		[ReadOnly] public int ThreadCount;
 #pragma warning disable 649
 		[NativeSetThreadIndex] [ReadOnly] int threadIndex;
 #pragma warning restore 649
@@ -116,7 +127,7 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 				if (Color(r, 0, rng, workingArea, out float3 sampleColor, ref diagnostics))
 #else
-				if (Color(r, 0, rng, out float3 sampleColor, ref rayCount))
+				if (Color(r, 0, rng, out float3 sampleColor, ref diagnostics))
 #endif
 				{
 					colorAcc += sampleColor;
@@ -131,13 +142,19 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		bool Color(Ray r, uint depth, Random rng, WorkingArea wa, out float3 color, ref Diagnostics diagnostics)
 #else
-		bool Color(Ray r, uint depth, Random rng, out float3 color, ref uint rayCount)
+		bool Color(Ray r, uint depth, Random rng, out float3 color, ref Diagnostics diagnostics)
 #endif
 		{
 			diagnostics.RayCount++;
 
 #if BVH_ITERATIVE
+#if FULL_DIAGNOSTICS
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, ref diagnostics, out HitRecord rec))
+#else
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, out HitRecord rec))
+#endif
+#elif BVH_RECURSIVE && FULL_DIAGNOSTICS
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, ref diagnostics, out HitRecord rec))
 #else
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
@@ -152,7 +169,7 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref diagnostics))
 #else
-					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref rayCount))
+					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref diagnostics))
 #endif
 					{
 						color = attenuation * scatteredColor;
@@ -176,7 +193,7 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
 
 		[ReadOnly] public NativeArray<float4> Input;
-		[WriteOnly] public NativeArray<BGRA8> Output;
+		[WriteOnly] public NativeArray<RGBA32> Output;
 
 		public void Execute(int index)
 		{
@@ -190,22 +207,14 @@ namespace RaytracerInOneWeekend
 			else
 				finalColor = inputSample.xyz / realSampleCount;
 
-			float3 outputColor = finalColor.zyx * 255;
+			float3 outputColor = finalColor.xyz.LinearToGamma() * 255;
 
-			Output[index] = new BGRA8
+			Output[index] = new RGBA32
 			{
-				b = (short) outputColor.x,
-				g = (short) outputColor.y,
-				r = (short) outputColor.z
+				r = (byte) outputColor.x,
+				g = (byte) outputColor.y,
+				b = (byte) outputColor.z
 			};
 		}
-	}
-
-	struct BGRA8
-	{
-		public short b, g, r;
-#pragma warning disable 649
-		public short a;
-#pragma warning restore 649
 	}
 }

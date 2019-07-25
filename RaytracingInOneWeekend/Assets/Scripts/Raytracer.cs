@@ -66,12 +66,15 @@ namespace RaytracerInOneWeekend
 #endif
 		float millionRaysPerSecond, avgMRaysPerSecond, lastBatchDuration, lastTraceDuration;
 
-		Texture2D frontBufferTexture, rayCountTexture, bvhHitCountTexture, candidateCountTexture;
+		UnityEngine.Material viewRangeMaterial;
+		Texture2D frontBufferTexture, diagnosticsTexture;
+		NativeArray<RGBA32> frontBuffer;
+		NativeArray<Diagnostics> diagnosticsBuffer;
+
+		// TODO: allocation order of all these buffers is probably pretty crucial for cache locality
 
 		CommandBuffer commandBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
-		NativeArray<BGRA8> frontBuffer;
-		NativeArray<AccumulateJob.Diagnostics> diagnosticsBuffer;
 
 #if BUFFERED_MATERIALS
 		NativeArray<Material> materialBuffer;
@@ -131,10 +134,14 @@ namespace RaytracerInOneWeekend
 			commandBuffer = new CommandBuffer { name = "Raytracer" };
 
 			const HideFlags flags = HideFlags.HideAndDontSave;
-			frontBufferTexture = new Texture2D(0, 0, TextureFormat.BGRA32, false) { hideFlags = flags };
-			rayCountTexture = new Texture2D(0, 0, TextureFormat.R8, false) { hideFlags = flags };
-			bvhHitCountTexture = new Texture2D(0, 0, TextureFormat.R8, false) { hideFlags = flags };
-			candidateCountTexture = new Texture2D(0, 0, TextureFormat.R8, false) { hideFlags = flags };
+			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RGBAFloat, false) { hideFlags = flags };
+#else
+			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
+#endif
+
+			viewRangeMaterial = new UnityEngine.Material(Shader.Find("Hidden/ViewRange"));
 
 			ignoreBatchTimings = true;
 		}
@@ -167,7 +174,6 @@ namespace RaytracerInOneWeekend
 #endif
 			if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
 			if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
-			if (diagnosticsBuffer.IsCreated) diagnosticsBuffer.Dispose();
 #if BVH
 			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
 #endif
@@ -275,10 +281,61 @@ namespace RaytracerInOneWeekend
 
 		void SwapBuffers()
 		{
-			frontBufferTexture.Apply(false);
+			float bufferMin = float.MaxValue, bufferMax = float.MinValue;
+
+			switch (bufferView)
+			{
+				case BufferView.RayCount:
+					viewRangeMaterial.SetInt("_Channel", 0);
+					foreach (Diagnostics value in diagnosticsBuffer)
+					{
+						bufferMin = min(bufferMin, value.RayCount);
+						bufferMax = max(bufferMax, value.RayCount);
+					}
+					break;
+
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+				case BufferView.BvhHitCount:
+					viewRangeMaterial.SetInt("_Channel", 1);
+					foreach (Diagnostics value in diagnosticsBuffer)
+					{
+						bufferMin = min(bufferMin, value.BoundsHitCount);
+						bufferMax = max(bufferMax, value.BoundsHitCount);
+					}
+					break;
+
+				case BufferView.CandidateCount:
+					viewRangeMaterial.SetInt("_Channel", 2);
+					foreach (Diagnostics value in diagnosticsBuffer)
+					{
+						bufferMin = min(bufferMin, value.CandidateCount);
+						bufferMax = max(bufferMax, value.CandidateCount);
+					}
+					break;
+#endif
+			}
+
+			switch (bufferView)
+			{
+				case BufferView.Front: frontBufferTexture.Apply(false); break;
+				default:
+					diagnosticsTexture.Apply(false);
+					viewRangeMaterial.SetFloat("_Minimum", bufferMin);
+					viewRangeMaterial.SetFloat("_Range", bufferMax - bufferMin);
+					break;
+			}
 
 			if (!commandBufferHooked)
 			{
+				commandBuffer.Clear();
+
+				var blitTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget);
+				switch (bufferView)
+				{
+					case BufferView.Front: commandBuffer.Blit(frontBufferTexture, blitTarget); break;
+					default: commandBuffer.Blit(diagnosticsTexture, blitTarget, viewRangeMaterial); break;
+				}
+
 				targetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
 				commandBufferHooked = true;
 			}
@@ -297,9 +354,6 @@ namespace RaytracerInOneWeekend
 				bufferSize.x / bufferSize.y, cameraAperture, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
-
-			if (diagnosticsBuffer.IsCreated) diagnosticsBuffer.Dispose();
-			diagnosticsBuffer = new NativeArray<AccumulateJob.Diagnostics>(totalBufferSize, Allocator.Persistent);
 
 			if (firstBatch)
 			{
@@ -367,12 +421,15 @@ namespace RaytracerInOneWeekend
 					commandBufferHooked = false;
 				}
 
-				frontBufferTexture.Resize(width, height);
-				frontBufferTexture.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
-				frontBuffer = frontBufferTexture.GetRawTextureData<BGRA8>();
+				void PrepareTexture<T>(Texture2D texture, out NativeArray<T> buffer) where T : struct
+				{
+					texture.Resize(width, height);
+					texture.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
+					buffer = texture.GetRawTextureData<T>();
+				}
 
-				commandBuffer.Clear();
-				commandBuffer.Blit(frontBufferTexture, new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget));
+				PrepareTexture(frontBufferTexture, out frontBuffer);
+				PrepareTexture(diagnosticsTexture, out diagnosticsBuffer);
 
 				Debug.Log($"Rebuilt front buffer (now {width} x {height})");
 			}
@@ -553,9 +610,12 @@ namespace RaytracerInOneWeekend
 				Vectors = (float4*) vectorWorkingBuffer.GetUnsafeReadOnlyPtr()
 #endif
 			};
-			AccumulateJob.Diagnostics _ = default;
-
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+			Diagnostics _ = default;
 			return World.Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
+#else
+			return World.Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+#endif
 		}
 
 #else // !BVH_ITERATIVE

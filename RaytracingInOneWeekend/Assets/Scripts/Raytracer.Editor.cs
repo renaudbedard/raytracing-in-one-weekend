@@ -20,6 +20,16 @@ namespace RaytracerInOneWeekend
 {
 	partial class Raytracer
 	{
+		enum BufferView
+		{
+			Front,
+			RayCount,
+#if FULL_DIAGNOSTICS
+			BvhHitCount,
+			CandidateCount
+#endif
+		}
+
 		[Title("Tools")]
 #if ODIN_INSPECTOR
 		[Button]
@@ -45,6 +55,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 		[SerializeField] bool previewBvh = false;
 #endif
+		[SerializeField] BufferView bufferView = BufferView.Front;
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
 		bool hookedEditorUpdate;
@@ -71,7 +82,15 @@ namespace RaytracerInOneWeekend
 		void OnValidate()
 		{
 			if (Application.isPlaying)
+			{
 				worldNeedsRebuild = true;
+
+				if (commandBufferHooked)
+				{
+					targetCamera.RemoveCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
+					commandBufferHooked = false;
+				}
+			}
 			else if (!EditorApplication.isPlayingOrWillChangePlaymode)
 				EditorApplication.delayCall += UpdatePreview;
 		}
