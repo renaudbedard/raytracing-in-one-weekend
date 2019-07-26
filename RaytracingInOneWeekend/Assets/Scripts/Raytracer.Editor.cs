@@ -83,8 +83,6 @@ namespace RaytracerInOneWeekend
 		{
 			if (Application.isPlaying)
 			{
-				worldNeedsRebuild = true;
-
 				if (commandBufferHooked)
 				{
 					targetCamera.RemoveCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
