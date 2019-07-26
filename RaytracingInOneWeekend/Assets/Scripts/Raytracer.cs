@@ -664,9 +664,14 @@ namespace RaytracerInOneWeekend
 
 						float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
 
-						for (float i = group.CenterX.x; i <= group.CenterX.y; i += max(group.PeriodX, 1))
-						for (float j = group.CenterY.x; j <= group.CenterY.y; j += max(group.PeriodY, 1))
-						for (float k = group.CenterZ.x; k <= group.CenterZ.y; k += max(group.PeriodZ, 1))
+						// correct the range so that it produces the same result as the book
+						float3 correctedRangeEnd = float3(group.CenterX.y, group.CenterY.y, group.CenterZ.y);
+						float3 period = max(float3(group.PeriodX, group.PeriodY, group.PeriodZ), 1);
+						correctedRangeEnd += (1 - abs(sign(ranges))) * period / 2;
+
+						for (float i = group.CenterX.x; i < correctedRangeEnd.x; i += period.x)
+						for (float j = group.CenterY.x; j < correctedRangeEnd.y; j += period.y)
+						for (float k = group.CenterZ.x; k < correctedRangeEnd.z; k += period.z)
 						{
 							float3 center = float3(i, j, k) + rng.NextFloat3(group.Variation * cellSize);
 							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
