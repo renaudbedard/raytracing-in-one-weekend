@@ -45,6 +45,15 @@ namespace RaytracerInOneWeekend
 		[NativeDisableUnsafePtrRestriction] public readonly BvhNode* Left, Right;
 		public readonly Entity Content;
 
+		public static int GetNodeCount(NativeArray<Entity> entities)
+		{
+			using (var tempNodes = new NativeList<BvhNode>(Allocator.Temp))
+			{
+				tempNodes.Add(new BvhNode(entities, tempNodes));
+				return tempNodes.Length;
+			}
+		}
+
 		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes) : this()
 		{
 			var possiblePartitions = PartitionAxis.All;
@@ -86,7 +95,7 @@ namespace RaytracerInOneWeekend
 
 					nodes.Add(rightNode);
 					Right = nodesPointer + (nodes.Length - 1);
-					
+
 					Bounds = AxisAlignedBoundingBox.Enclose(Left->Bounds, Right->Bounds);
 					break;
 			}

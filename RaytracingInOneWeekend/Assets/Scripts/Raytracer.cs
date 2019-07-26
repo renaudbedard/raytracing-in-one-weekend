@@ -163,23 +163,23 @@ namespace RaytracerInOneWeekend
 #if SOA_SIMD || AOSOA_SIMD
 			sphereBuffer.Dispose(); // this actually isn't a NativeArray<T>!
 #else
-			if (entityBuffer.IsCreated) entityBuffer.Dispose();
-			if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
+			entityBuffer.SafeDispose();
+			sphereBuffer.SafeDispose();
 #endif
 #if BUFFERED_MATERIALS
-			if (materialBuffer.IsCreated) materialBuffer.Dispose();
+			materialBuffer.SafeDispose();
 #endif
-			if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
-			if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
+			accumulationInputBuffer.SafeDispose();
+			accumulationOutputBuffer.SafeDispose();
 #if BVH
-			if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
+			bvhNodeBuffer.SafeDispose();
 #endif
 #if BVH_ITERATIVE
-			if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
-			if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
+			nodeWorkingBuffer.SafeDispose();
+			entityWorkingBuffer.SafeDispose();
 #endif
 #if BVH_SIMD
-			if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
+			vectorWorkingBuffer.SafeDispose();
 #endif
 		}
 
@@ -354,7 +354,7 @@ namespace RaytracerInOneWeekend
 
 			if (firstBatch)
 			{
-				if (accumulationInputBuffer.IsCreated) accumulationInputBuffer.Dispose();
+				accumulationInputBuffer.SafeDispose();
 				accumulationInputBuffer = new NativeArray<float4>(totalBufferSize, Allocator.Persistent);
 
 				mraysPerSecResults.Clear();
@@ -431,15 +431,8 @@ namespace RaytracerInOneWeekend
 				Debug.Log($"Rebuilt front buffer (now {width} x {height})");
 			}
 
-			if (accumulationOutputBuffer.Length != width * height)
-			{
-				if (accumulationOutputBuffer.IsCreated) accumulationOutputBuffer.Dispose();
-				accumulationOutputBuffer = new NativeArray<float4>(width * height,
-					Allocator.Persistent,
-					NativeArrayOptions.UninitializedMemory);
-
+			if (accumulationOutputBuffer.EnsureCapacity(width * height))
 				Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
-			}
 
 			bufferSize = float2(width, height);
 		}
@@ -458,11 +451,7 @@ namespace RaytracerInOneWeekend
 
 #if BUFFERED_MATERIALS
 			int materialCount = activeMaterials.Count;
-			if (materialBuffer.Length != materialCount)
-			{
-				if (materialBuffer.IsCreated) materialBuffer.Dispose();
-				materialBuffer = new NativeArray<Material>(materialCount, Allocator.Persistent);
-			}
+			materialBuffer.EnsureCapacity(materialCount);
 
 			for (var i = 0; i < activeMaterials.Count; i++)
 			{
@@ -525,20 +514,10 @@ namespace RaytracerInOneWeekend
 		{
 			int entityCount = activeSpheres.Count;
 
-			if (!entityBuffer.IsCreated || entityBuffer.Length != entityCount)
-			{
-				if (entityBuffer.IsCreated) entityBuffer.Dispose();
-				entityBuffer = new NativeArray<Entity>(entityCount, Allocator.Persistent);
-			}
-
-			if (!sphereBuffer.IsCreated || sphereBuffer.Length != activeSpheres.Count)
-			{
-				if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
-				sphereBuffer = new NativeArray<Sphere>(activeSpheres.Count, Allocator.Persistent);
-			}
+			entityBuffer.EnsureCapacity(entityCount);
+			sphereBuffer.EnsureCapacity(activeSpheres.Count);
 
 			int entityIndex = 0;
-
 			for (var i = 0; i < activeSpheres.Count; i++)
 			{
 				SphereData sphereData = activeSpheres[i];
@@ -566,31 +545,17 @@ namespace RaytracerInOneWeekend
 #if BVH
 		void RebuildBvh()
 		{
-			// TODO: figure out how many nodes we need for a given entity count
-			if (!bvhNodeBuffer.IsCreated) bvhNodeBuffer = new NativeList<BvhNode>(1024, Allocator.Persistent);
-			bvhNodeBuffer.Clear();
-
+			int nodeCount = BvhNode.GetNodeCount(entityBuffer);
+			bvhNodeBuffer.EnsureCapacity(nodeCount);
 			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
 
 #if BVH_ITERATIVE
 			int workingBufferSize = entityBuffer.Length * SystemInfo.processorCount;
-			if (!nodeWorkingBuffer.IsCreated || nodeWorkingBuffer.Length != workingBufferSize)
-			{
-				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
-				nodeWorkingBuffer = new NativeArray<IntPtr>(workingBufferSize, Allocator.Persistent);
-			}
-			if (!entityWorkingBuffer.IsCreated || entityWorkingBuffer.Length != workingBufferSize)
-			{
-				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
-				entityWorkingBuffer = new NativeArray<Entity>(workingBufferSize, Allocator.Persistent);
-			}
+			nodeWorkingBuffer.EnsureCapacity(workingBufferSize);
+			entityWorkingBuffer.EnsureCapacity(workingBufferSize);
 #endif
 #if BVH_SIMD
-			if (!vectorWorkingBuffer.IsCreated || vectorWorkingBuffer.Length != workingBufferSize * Sphere4.StreamCount)
-			{
-				if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
-				vectorWorkingBuffer = new NativeArray<float4>(workingBufferSize * Sphere4.StreamCount, Allocator.Persistent);
-			}
+			vectorWorkingBuffer.EnsureCapacity(workingBufferSize);
 #endif
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}

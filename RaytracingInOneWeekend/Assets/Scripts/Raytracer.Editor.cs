@@ -127,15 +127,15 @@ namespace RaytracerInOneWeekend
 			}
 			else
 			{
-				if (sphereBuffer.IsCreated) sphereBuffer.Dispose();
-				if (bvhNodeBuffer.IsCreated) bvhNodeBuffer.Dispose();
-				if (entityBuffer.IsCreated) entityBuffer.Dispose();
+				sphereBuffer.SafeDispose();
+				bvhNodeBuffer.SafeDispose();
+				entityBuffer.SafeDispose();
 #if BVH_ITERATIVE
-				if (entityWorkingBuffer.IsCreated) entityWorkingBuffer.Dispose();
-				if (nodeWorkingBuffer.IsCreated) nodeWorkingBuffer.Dispose();
+				entityWorkingBuffer.SafeDispose();
+				nodeWorkingBuffer.SafeDispose();
 #endif
 #if BVH_SIMD
-				if (vectorWorkingBuffer.IsCreated) vectorWorkingBuffer.Dispose();
+				vectorWorkingBuffer.SafeDispose();
 #endif
 				activeSpheres.Clear();
 			}

@@ -64,15 +64,15 @@ namespace RaytracerInOneWeekend
 
 		public void Dispose()
 		{
-			if (CenterX.IsCreated) CenterX.Dispose();
-			if (CenterY.IsCreated) CenterY.Dispose();
-			if (CenterZ.IsCreated) CenterZ.Dispose();
-			if (SquaredRadius.IsCreated) SquaredRadius.Dispose();
-			if (Radius.IsCreated) Radius.Dispose();
+			CenterX.SafeDispose();
+			CenterY.SafeDispose();
+			CenterZ.SafeDispose();
+			SquaredRadius.SafeDispose();
+			Radius.SafeDispose();
 #if BUFFERED_MATERIALS
-			if (MaterialIndex.IsCreated) MaterialIndex.Dispose();
+			MaterialIndex.SafeDispose();
 #else
-			if (Material.IsCreated) Material.Dispose();
+			Material.SafeDispose();
 #endif
 		}
 	}
@@ -141,12 +141,12 @@ namespace RaytracerInOneWeekend
 
 		public void Dispose()
 		{
-			if (dataBuffer.IsCreated) dataBuffer.Dispose();
-			if (Radius.IsCreated) Radius.Dispose();
+			dataBuffer.SafeDispose();
+			Radius.SafeDispose();
 #if BUFFERED_MATERIALS
-			if (MaterialIndex.IsCreated) MaterialIndex.Dispose();
+			MaterialIndex.SafeDispose();
 #else
-			if (Material.IsCreated) Material.Dispose();
+			Material.SafeDispose();
 #endif
 		}
 	}
