@@ -11,6 +11,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
+using float3 = Unity.Mathematics.float3;
 using Random = Unity.Mathematics.Random;
 
 #if ODIN_INSPECTOR
@@ -627,23 +628,94 @@ namespace RaytracerInOneWeekend
 
 			if (!scene) return;
 
-			// TODO
-			//if (scene.RandomSeed)
-			//	BuildRandomScene();
-			//else
+			foreach (SphereData sphere in scene.Spheres)
+				if (sphere.Enabled)
+					activeSpheres.Add(sphere);
+
+			Random rng = new Random(scene.RandomSeed);
+			foreach (RandomSphereGroup group in scene.RandomSphereGroups)
 			{
-				foreach (SphereData sphere in scene.Spheres)
-					if (sphere.Enabled)
-						activeSpheres.Add(sphere);
+				MaterialData GetMaterial()
+				{
+					(float lambertian, float metal, float dielectric) probabilities = (
+						group.LambertianProbability,
+						group.MetalProbability,
+						group.DieletricProbability);
+
+					float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric;
+					probabilities.metal += probabilities.lambertian;
+					probabilities.dielectric += probabilities.metal;
+					probabilities.lambertian /= sum;
+					probabilities.metal /= sum;
+					probabilities.dielectric /= sum;
+
+					MaterialData material = null;
+					float randomValue = rng.NextFloat();
+					if (randomValue < probabilities.lambertian)
+					{
+						Color from = group.AlbedoColor.colorKeys[0].color;
+						Color to = group.AlbedoColor.colorKeys[1].color;
+						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+						material = MaterialData.Lambertian(TextureData.Constant(color));
+					}
+					else if (randomValue < probabilities.metal)
+					{
+						Color from = group.AlbedoColor.colorKeys[0].color;
+						Color to = group.AlbedoColor.colorKeys[1].color;
+						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+						float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
+						material = MaterialData.Metal(TextureData.Constant(color), fuzz);
+					}
+					else if (randomValue < probabilities.dielectric)
+					{
+						material = MaterialData.Dielectric(rng.NextFloat(
+							group.RefractiveIndex.x,
+							group.RefractiveIndex.y));
+					}
+
+					return material;
+				}
+
+				switch (group.Distribution)
+				{
+					case RandomDistribution.WhiteNoise:
+						for (int i = 0; i < group.Count; i++)
+						{
+							float3 center = rng.NextFloat3(
+								float3(group.CenterX.x, group.CenterY.x, group.CenterZ.x),
+								float3(group.CenterX.y, group.CenterY.y, group.CenterZ.y));
+
+							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+
+							activeSpheres.Add(new SphereData(center, radius, GetMaterial()));
+						}
+						break;
+
+					case RandomDistribution.JitteredGrid:
+						float3 ranges = float3(
+							group.CenterX.y - group.CenterX.x,
+							group.CenterY.y - group.CenterY.x,
+							group.CenterZ.y - group.CenterZ.x);
+
+						float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
+
+						for (float i = group.CenterX.x; i <= group.CenterX.y; i += max(group.PeriodX, 1))
+						for (float j = group.CenterY.x; j <= group.CenterY.y; j += max(group.PeriodY, 1))
+						for (float k = group.CenterZ.x; k <= group.CenterZ.y; k += max(group.PeriodZ, 1))
+						{
+							float3 center = float3(i, j, k) + rng.NextFloat3(group.Variation * cellSize);
+							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+
+							activeSpheres.Add(new SphereData(center, radius, GetMaterial()));
+						}
+						break;
+				}
 			}
 		}
 
 		void BuildRandomScene()
 		{
 			activeSpheres.Clear();
-			activeSpheres.Add(new SphereData(new Vector3(0, -1000, 0), 1000,
-				MaterialData.Lambertian(TextureData.CheckerPattern(float3(0.2f, 0.3f, 0.1f),
-					float3(0.9f, 0.9f, 0.9f)))));
 
 			var rng = new Random(scene.RandomSeed);
 
@@ -671,12 +743,6 @@ namespace RaytracerInOneWeekend
 						activeSpheres.Add(new SphereData(center, 0.2f, MaterialData.Dielectric(1.5f)));
 				}
 			}
-
-			activeSpheres.Add(new SphereData(float3(0, 1, 0), 1, MaterialData.Dielectric(1.5f)));
-			activeSpheres.Add(new SphereData(float3(-4, 1, 0), 1,
-				MaterialData.Lambertian(TextureData.Constant(float3(0.4f, 0.2f, 0.1f)))));
-			activeSpheres.Add(new SphereData(float3(4, 1, 0), 1,
-				MaterialData.Metal(TextureData.Constant(float3(0.7f, 0.6f, 0.5f)))));
 		}
 	}
 }
