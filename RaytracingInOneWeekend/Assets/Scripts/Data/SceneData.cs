@@ -24,23 +24,19 @@ namespace RaytracerInOneWeekend
 		[SerializeField] Vector3 cameraTarget = default;
 
 		[Title("World")]
-		[SerializeField] bool randomScene = true;
-
-#if ODIN_INSPECTOR
-		[ShowIf(nameof(randomScene))]
-#endif
-		[SerializeField] uint seed = 45573880;
-
-#if ODIN_INSPECTOR
-		[HideIf(nameof(randomScene))]
-#endif
+		[SerializeField] uint randomSeed = 45573880;
 		[SerializeField] SphereData[] spheres = null;
+
+		[Title("Sky")]
+		[SerializeField] Color skyBottomColor = Color.white;
+		[SerializeField] Color skyTopColor = new Color(0.5f, 0.7f, 1);
 
 		public Vector3 CameraPosition => cameraPosition;
 		public Vector3 CameraTarget => cameraTarget;
-		public bool RandomScene => randomScene;
-		public uint Seed => seed;
+		public uint RandomSeed => randomSeed;
 		public IReadOnlyList<SphereData> Spheres => spheres;
+		public Color SkyBottomColor => skyBottomColor;
+		public Color SkyTopColor => skyTopColor;
 
 #if UNITY_EDITOR
 		bool dirty;

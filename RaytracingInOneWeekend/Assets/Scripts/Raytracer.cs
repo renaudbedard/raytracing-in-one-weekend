@@ -37,10 +37,6 @@ namespace RaytracerInOneWeekend
 		[Title("Camera")]
 		[SerializeField] float cameraAperture = 0.1f;
 
-		[Title("Sky")]
-		[SerializeField] Color skyBottomColor = Color.white;
-		[SerializeField] Color skyTopColor = new Color(0.5f, 0.7f, 1);
-
 		[Title("World")]
 #if ODIN_INSPECTOR
 		[InlineEditor(DrawHeader = false)]
@@ -373,8 +369,8 @@ namespace RaytracerInOneWeekend
 			{
 				Size = bufferSize,
 				Camera = raytracingCamera,
-				SkyBottomColor = skyBottomColor.ToFloat3(),
-				SkyTopColor = skyTopColor.ToFloat3(),
+				SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
+				SkyTopColor = scene.SkyTopColor.ToFloat3(),
 				InputSamples = accumulationInputBuffer,
 				Seed = (uint) Time.frameCount + 1,
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
@@ -631,9 +627,10 @@ namespace RaytracerInOneWeekend
 
 			if (!scene) return;
 
-			if (scene.RandomScene)
-				BuildRandomScene();
-			else
+			// TODO
+			//if (scene.RandomSeed)
+			//	BuildRandomScene();
+			//else
 			{
 				foreach (SphereData sphere in scene.Spheres)
 					if (sphere.Enabled)
@@ -648,7 +645,7 @@ namespace RaytracerInOneWeekend
 				MaterialData.Lambertian(TextureData.CheckerPattern(float3(0.2f, 0.3f, 0.1f),
 					float3(0.9f, 0.9f, 0.9f)))));
 
-			var rng = new Random(scene.Seed);
+			var rng = new Random(scene.RandomSeed);
 
 			for (int a = -11; a < 11; a++)
 			{

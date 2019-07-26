@@ -172,8 +172,8 @@ namespace RaytracerInOneWeekend
 			previewMaterials.Clear();
 
 			var skybox = targetCamera.GetComponent<Skybox>();
-			skybox.material.SetColor("_Color1", skyBottomColor);
-			skybox.material.SetColor("_Color2", skyTopColor);
+			skybox.material.SetColor("_Color1", scene.SkyBottomColor);
+			skybox.material.SetColor("_Color2", scene.SkyTopColor);
 
 			if (previewObject == null)
 				previewObject = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Sphere);
