@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+#else
+using OdinMock;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -10,10 +12,7 @@ namespace RaytracerInOneWeekend
 	[RequireComponent(typeof(Camera))]
 	class CameraControl : MonoBehaviour
 	{
-#if ODIN_INSPECTOR
-		[ReadOnly]
-#endif
-		[SerializeField] new UnityEngine.Camera camera = null;
+		[ReadOnly] [SerializeField] new UnityEngine.Camera camera = null;
 		[SerializeField] Raytracer raytracer = null;
 
 		Vector2 lastMousePosition;

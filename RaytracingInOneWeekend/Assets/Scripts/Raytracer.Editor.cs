@@ -5,15 +5,13 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
-using Unity.Mathematics;
-using Unity.Collections.LowLevel.Unsafe;
 using static Unity.Mathematics.math;
+using System.IO;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
-using System.IO;
 #else
-using Title = UnityEngine.HeaderAttribute;
+using OdinMock;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -31,7 +29,6 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Title("Tools")]
-#if ODIN_INSPECTOR
 		[Button]
 		[DisableInEditorMode]
 		void SaveFrontBuffer()
@@ -51,11 +48,15 @@ namespace RaytracerInOneWeekend
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
 		void AbortTrace() => traceAborted = true;
-#endif
+
 #if BVH
-		[SerializeField] bool previewBvh = false;
+		[SerializeField]
+		[DisableInPlayMode]
+		bool previewBvh = false;
 #endif
-		[SerializeField] BufferView bufferView = BufferView.Front;
+		[SerializeField]
+		[DisableInEditorMode]
+		BufferView bufferView = BufferView.Front;
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
 		bool hookedEditorUpdate;

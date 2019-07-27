@@ -3,6 +3,8 @@ using UnityEngine;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+#else
+using OdinMock;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -13,9 +15,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] TextureType type;
 		[SerializeField] Color mainColor;
 
-#if ODIN_INSPECTOR
 		[ShowIf(nameof(Type), TextureType.CheckerPattern)]
-#endif
 		[SerializeField] Color secondaryColor;
 
 		public TextureType Type => type;

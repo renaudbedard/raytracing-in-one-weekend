@@ -3,6 +3,8 @@ using UnityEngine;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+#else
+using OdinMock;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -27,21 +29,15 @@ namespace RaytracerInOneWeekend
 		}
 
 		[SerializeField]
-#if ODIN_INSPECTOR
 		[DisableInPlayMode]
-#endif
 		HitTestingMode hitTestingMode = HitTestingMode.Basic;
 
 		[SerializeField]
-#if ODIN_INSPECTOR
 		[DisableInPlayMode]
-#endif
 		MaterialStorage materialStorage = MaterialStorage.Inline;
 
 		[SerializeField]
-#if ODIN_INSPECTOR
 		[DisableInPlayMode]
-#endif
 		bool fullDiagnostics = false;
 
 #if UNITY_EDITOR

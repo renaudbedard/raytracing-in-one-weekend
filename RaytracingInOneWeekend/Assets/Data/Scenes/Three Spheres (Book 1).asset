@@ -10,26 +10,33 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
-  m_Name: Three Spheres
+  m_Name: Three Spheres (Book 1)
   m_EditorClassIdentifier: 
   cameraPosition: {x: 0, y: 0, z: -9}
   cameraTarget: {x: 0, y: 0, z: 0}
-  randomScene: 0
-  seed: 45573880
+  cameraAperture: 0.1
+  randomSeed: 45573880
   spheres:
   - enabled: 1
+    excludeFromOverlapTest: 0
     center: {x: 0, y: -100.5, z: -1.25}
     radius: 100
     material: {fileID: 11400000, guid: f24c03b9bb71f4783a7c78310435851e, type: 2}
   - enabled: 1
+    excludeFromOverlapTest: 0
     center: {x: 0, y: 0, z: -1.25}
     radius: 0.5
     material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
   - enabled: 1
+    excludeFromOverlapTest: 0
     center: {x: 1, y: 0, z: -1.25}
     radius: 0.5
     material: {fileID: 11400000, guid: 2b589fea2cde947bb9dd0396429df3b6, type: 2}
   - enabled: 1
+    excludeFromOverlapTest: 0
     center: {x: -1, y: 0, z: -1.25}
     radius: 0.5
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
+  randomSphereGroups: []
+  skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
+  skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}

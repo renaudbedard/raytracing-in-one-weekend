@@ -40,7 +40,9 @@ namespace RaytracerInOneWeekend
 		public float3 Center => Min + (Max - Min) / 2;
 		public float3 Size => Max - Min;
 
-		public static AxisAlignedBoundingBox Enclose(AxisAlignedBoundingBox lhs, AxisAlignedBoundingBox rhs) =>
-			new AxisAlignedBoundingBox(min(lhs.Min, rhs.Min), max(lhs.Max, rhs.Max));
+		public static AxisAlignedBoundingBox Enclose(AxisAlignedBoundingBox lhs, AxisAlignedBoundingBox rhs)
+		{
+			return new AxisAlignedBoundingBox(min(lhs.Min, rhs.Min), max(lhs.Max, rhs.Max));
+		}
 	}
 }

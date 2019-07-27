@@ -1,11 +1,17 @@
 using System;
 using UnityEngine;
 
-#if ODIN_INSPECTOR && UNITY_EDITOR
-using Sirenix.OdinInspector;
+#if UNITY_EDITOR
 using UnityEditor;
 using System.Linq;
 using System.Collections.Generic;
+
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#else
+using Title = UnityEngine.HeaderAttribute;
+using OdinMock;
+#endif
 #endif
 
 namespace RaytracerInOneWeekend
@@ -14,16 +20,15 @@ namespace RaytracerInOneWeekend
 	class SphereData
 	{
 		[SerializeField] bool enabled = true;
+		[SerializeField] [LabelWidth(150)] bool excludeFromOverlapTest = false;
 		[SerializeField] Vector3 center;
 		[SerializeField] float radius;
 
 		[SerializeField]
-#if ODIN_INSPECTOR && UNITY_EDITOR
 		[ValueDropdown(nameof(GetMaterialAssets))]
-#endif
 		MaterialData material;
 
-#if ODIN_INSPECTOR && UNITY_EDITOR
+#if UNITY_EDITOR
 		[ShowInInspector]
 		[InlineEditor(DrawHeader = false)]
 		[ShowIf(nameof(material))]
@@ -42,11 +47,12 @@ namespace RaytracerInOneWeekend
 		}
 
 		public bool Enabled => enabled;
+		public bool ExcludeFromOverlapTest => excludeFromOverlapTest;
 		public Vector3 Center => center;
 		public float Radius => radius;
 		public MaterialData Material => material;
 
-#if ODIN_INSPECTOR && UNITY_EDITOR
+#if UNITY_EDITOR
 		IEnumerable<ValueDropdownItem<MaterialData>> GetMaterialAssets => AssetDatabase.FindAssets("t:MaterialData")
 			.Select(AssetDatabase.GUIDToAssetPath)
 			.Select(AssetDatabase.LoadAssetAtPath<MaterialData>)

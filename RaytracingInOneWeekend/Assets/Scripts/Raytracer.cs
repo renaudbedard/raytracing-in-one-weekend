@@ -16,8 +16,10 @@ using Random = Unity.Mathematics.Random;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
 #else
-using Title = UnityEngine.HeaderAttribute;
+using OdinMock;
+using OdinReadOnly = OdinMock.ReadOnlyAttribute;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -35,33 +37,16 @@ namespace RaytracerInOneWeekend
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
 
-		[Title("Camera")]
-		[SerializeField] float cameraAperture = 0.1f;
-
 		[Title("World")]
-#if ODIN_INSPECTOR
 		[InlineEditor(DrawHeader = false)]
-#endif
 		[SerializeField] SceneData scene = null;
 
 		[Title("Debug")]
-		[UsedImplicitly]
-#if ODIN_INSPECTOR
-		[ShowInInspector]
-		[Sirenix.OdinInspector.ReadOnly]
-#else
-		public
-#endif
-		uint accumulatedSamples;
+		[OdinReadOnly] public uint AccumulatedSamples;
 
 		[UsedImplicitly]
-#if ODIN_INSPECTOR
-		[ShowInInspector]
-		[Sirenix.OdinInspector.ReadOnly]
-#else
-		public
-#endif
-		float millionRaysPerSecond, avgMRaysPerSecond, lastBatchDuration, lastTraceDuration;
+		[OdinReadOnly]
+		public float MillionRaysPerSecond, AvgMRaysPerSecond, LastBatchDuration, LastTraceDuration;
 
 		UnityEngine.Material viewRangeMaterial;
 		Texture2D frontBufferTexture, diagnosticsTexture;
@@ -213,11 +198,11 @@ namespace RaytracerInOneWeekend
 
 				float totalRayCount = diagnosticsBuffer.Sum(x => x.RayCount);
 
-				accumulatedSamples += samplesPerBatch;
-				lastBatchDuration = (float) elapsedTime.TotalMilliseconds;
-				millionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
-				if (!ignoreBatchTimings) mraysPerSecResults.Add(millionRaysPerSecond);
-				avgMRaysPerSecond = mraysPerSecResults.Count == 0 ? 0 : mraysPerSecResults.Average();
+				AccumulatedSamples += samplesPerBatch;
+				LastBatchDuration = (float) elapsedTime.TotalMilliseconds;
+				MillionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
+				if (!ignoreBatchTimings) mraysPerSecResults.Add(MillionRaysPerSecond);
+				AvgMRaysPerSecond = mraysPerSecResults.Count == 0 ? 0 : mraysPerSecResults.Average();
 				ignoreBatchTimings = false;
 			}
 
@@ -236,10 +221,10 @@ namespace RaytracerInOneWeekend
 				combineJobHandle = null;
 
 				bool traceCompleted = false;
-				if (accumulatedSamples >= samplesPerPixel)
+				if (AccumulatedSamples >= samplesPerPixel)
 				{
 					traceCompleted = true;
-					lastTraceDuration = (float) traceTimer.Elapsed.TotalMilliseconds;
+					LastTraceDuration = (float) traceTimer.Elapsed.TotalMilliseconds;
 				}
 
 				SwapBuffers();
@@ -348,7 +333,7 @@ namespace RaytracerInOneWeekend
 				focusDistance = hitRec.Distance;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView,
-				bufferSize.x / bufferSize.y, cameraAperture, focusDistance);
+				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -358,7 +343,7 @@ namespace RaytracerInOneWeekend
 				accumulationInputBuffer = new NativeArray<float4>(totalBufferSize, Allocator.Persistent);
 
 				mraysPerSecResults.Clear();
-				accumulatedSamples = 0;
+				AccumulatedSamples = 0;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
 #endif
@@ -394,7 +379,7 @@ namespace RaytracerInOneWeekend
 
 			accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1);
 
-			if (accumulatedSamples + samplesPerBatch >= samplesPerPixel || previewAfterBatch)
+			if (AccumulatedSamples + samplesPerBatch >= samplesPerPixel || previewAfterBatch)
 			{
 				var combineJob = new CombineJob { Input = accumulationOutputBuffer, Output = frontBuffer };
 				combineJobHandle = combineJob.Schedule(totalBufferSize, 128, accumulateJobHandle.Value);
@@ -597,15 +582,15 @@ namespace RaytracerInOneWeekend
 				if (sphere.Enabled)
 					activeSpheres.Add(sphere);
 
-			Random rng = new Random(scene.RandomSeed);
+			var rng = new Random(scene.RandomSeed);
 			foreach (RandomSphereGroup group in scene.RandomSphereGroups)
 			{
 				MaterialData GetMaterial()
 				{
 					(float lambertian, float metal, float dielectric) probabilities = (
-						group.LambertianProbability,
-						group.MetalProbability,
-						group.DieletricProbability);
+						group.LambertChance,
+						group.MetalChance,
+						group.DieletricChance);
 
 					float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric;
 					probabilities.metal += probabilities.lambertian;
@@ -618,15 +603,17 @@ namespace RaytracerInOneWeekend
 					float randomValue = rng.NextFloat();
 					if (randomValue < probabilities.lambertian)
 					{
-						Color from = group.AlbedoColor.colorKeys[0].color;
-						Color to = group.AlbedoColor.colorKeys[1].color;
+						Color from = group.DiffuseAlbedo.colorKeys[0].color;
+						Color to = group.DiffuseAlbedo.colorKeys[1].color;
 						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+						if (group.DoubleSampleDiffuseAlbedo)
+							color *= rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
 						material = MaterialData.Lambertian(TextureData.Constant(color));
 					}
 					else if (randomValue < probabilities.metal)
 					{
-						Color from = group.AlbedoColor.colorKeys[0].color;
-						Color to = group.AlbedoColor.colorKeys[1].color;
+						Color from = group.MetalAlbedo.colorKeys[0].color;
+						Color to = group.MetalAlbedo.colorKeys[1].color;
 						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
 						float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
 						material = MaterialData.Metal(TextureData.Constant(color), fuzz);
@@ -641,16 +628,23 @@ namespace RaytracerInOneWeekend
 					return material;
 				}
 
+				bool AnyOverlap(float3 center, float radius) => activeSpheres.Any(x =>
+						!x.ExcludeFromOverlapTest &&
+						distance(x.Center, center) < x.Radius + radius + group.MinDistance);
+
 				switch (group.Distribution)
 				{
-					case RandomDistribution.WhiteNoise:
-						for (int i = 0; i < group.Count; i++)
+					case RandomDistribution.DartThrowing:
+						for (int i = 0; i < group.TentativeCount; i++)
 						{
 							float3 center = rng.NextFloat3(
 								float3(group.CenterX.x, group.CenterY.x, group.CenterZ.x),
 								float3(group.CenterX.y, group.CenterY.y, group.CenterZ.y));
 
 							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+
+							if (AnyOverlap(center, radius))
+								continue;
 
 							activeSpheres.Add(new SphereData(center, radius, GetMaterial()));
 						}
@@ -676,41 +670,12 @@ namespace RaytracerInOneWeekend
 							float3 center = float3(i, j, k) + rng.NextFloat3(group.Variation * cellSize);
 							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
 
+							if (AnyOverlap(center, radius))
+								continue;
+
 							activeSpheres.Add(new SphereData(center, radius, GetMaterial()));
 						}
 						break;
-				}
-			}
-		}
-
-		void BuildRandomScene()
-		{
-			activeSpheres.Clear();
-
-			var rng = new Random(scene.RandomSeed);
-
-			for (int a = -11; a < 11; a++)
-			{
-				for (int b = -11; b < 11; b++)
-				{
-					float materialProb = rng.NextFloat();
-					float3 center = float3(a + 0.9f * rng.NextFloat(), 0.2f, b + 0.9f * rng.NextFloat());
-
-					if (distance(center, float3(4, 0.2f, 0)) <= 0.9)
-						continue;
-
-					if (materialProb < 0.8)
-					{
-						activeSpheres.Add(new SphereData(center, 0.2f,
-							MaterialData.Lambertian(TextureData.Constant(rng.NextFloat3() * rng.NextFloat3()))));
-					}
-					else if (materialProb < 0.95)
-					{
-						activeSpheres.Add(new SphereData(center, 0.2f,
-							MaterialData.Metal(TextureData.Constant(rng.NextFloat3(0.5f, 1)), rng.NextFloat(0, 0.5f))));
-					}
-					else
-						activeSpheres.Add(new SphereData(center, 0.2f, MaterialData.Dielectric(1.5f)));
 				}
 			}
 		}

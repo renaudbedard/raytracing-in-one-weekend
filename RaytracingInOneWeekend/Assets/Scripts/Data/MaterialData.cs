@@ -2,6 +2,8 @@ using UnityEngine;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+#else
+using OdinMock;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -12,14 +14,10 @@ namespace RaytracerInOneWeekend
 		[SerializeField] MaterialType type = MaterialType.None;
 		[SerializeField] TextureData albedo = null;
 
-#if ODIN_INSPECTOR
 		[ShowIf(nameof(Type), MaterialType.Metal)]
-#endif
 		[Range(0, 1)] [SerializeField] float fuzz = 0;
 
-#if ODIN_INSPECTOR
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
-#endif
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
 		public MaterialType Type => type;
