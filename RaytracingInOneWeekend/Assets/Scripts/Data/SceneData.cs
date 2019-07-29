@@ -24,8 +24,8 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(0.001f, 180)] float cameraFieldOfView = 20;
 
 		[Title("World")]
-		[SerializeField] [Range(1, 10000)] uint randomSeed = 1;
 		[SerializeField] SphereData[] spheres = null;
+		[SerializeField] [Range(1, 10000)] uint randomSeed = 1;
 		[SerializeField] RandomSphereGroup[] randomSphereGroups = null;
 
 		[Title("Sky")]

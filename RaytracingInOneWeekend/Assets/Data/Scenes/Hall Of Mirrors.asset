@@ -15,6 +15,7 @@ MonoBehaviour:
   cameraPosition: {x: 0, y: 0, z: -76.6}
   cameraTarget: {x: 0, y: 0, z: -75.6}
   cameraAperture: 0
+  cameraFieldOfView: 50
   randomSeed: 3500
   spheres: []
   randomSphereGroups:

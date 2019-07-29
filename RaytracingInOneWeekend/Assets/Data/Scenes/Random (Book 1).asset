@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: Random (Book 1)
   m_EditorClassIdentifier: 
   cameraPosition: {x: 12.3, y: 1.98, z: -2.99}
-  cameraTarget: {x: 11.342338, y: 1.8494737, z: -2.733395}
+  cameraTarget: {x: 11.342338, y: 1.8494737, z: -2.7333953}
   cameraAperture: 0.1
   cameraFieldOfView: 20
   randomSeed: 700
   spheres:
-  - enabled: 0
+  - enabled: 1
     excludeFromOverlapTest: 1
     center: {x: 0, y: -1000, z: 0}
     radius: 1000

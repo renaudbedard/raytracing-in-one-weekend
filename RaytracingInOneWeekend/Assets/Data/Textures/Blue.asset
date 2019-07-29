@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Blue
   m_EditorClassIdentifier: 
   type: 1
-  mainColor: {r: 0, g: 0.11334373, b: 0.6431373, a: 0}
+  mainColor: {r: 0.1, g: 0.2, b: 0.5, a: 0}
   secondaryColor: {r: 0, g: 0, b: 0, a: 0}
