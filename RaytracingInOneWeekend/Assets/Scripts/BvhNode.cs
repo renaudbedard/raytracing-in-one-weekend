@@ -41,8 +41,8 @@ namespace RaytracerInOneWeekend
 	unsafe struct BvhNode
 	{
 		public readonly AxisAlignedBoundingBox Bounds;
-		[NativeDisableUnsafePtrRestriction] public BvhNode* Left, Right;
 		public readonly Entity Content;
+		[NativeDisableUnsafePtrRestriction] public BvhNode* Left, Right;
 		public readonly BvhNodeMetadata* Metadata;
 
 		public bool IsLeaf => Content.Type != EntityType.None;

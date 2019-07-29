@@ -156,7 +156,7 @@ namespace RaytracerInOneWeekend
 #elif BVH_RECURSIVE && FULL_DIAGNOSTICS
 			if (World->Hit(r, 0.001f, float.PositiveInfinity, ref diagnostics, out HitRecord rec))
 #else
-			if (World->Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
+			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
 #if BUFFERED_MATERIALS

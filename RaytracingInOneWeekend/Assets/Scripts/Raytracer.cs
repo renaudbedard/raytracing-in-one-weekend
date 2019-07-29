@@ -98,7 +98,6 @@ namespace RaytracerInOneWeekend
 
 		bool commandBufferHooked;
 		bool worldNeedsRebuild;
-		float lastFieldOfView;
 		bool initialized;
 		float focusDistance;
 		bool traceAborted;
@@ -135,6 +134,10 @@ namespace RaytracerInOneWeekend
 		void Start()
 		{
 			targetCamera.RemoveAllCommandBuffers();
+
+	#if UNITY_EDITOR
+			// TODO: deep-clone scene data
+	#endif
 
 			RebuildWorld();
 			EnsureBuffersBuilt();
@@ -183,8 +186,7 @@ namespace RaytracerInOneWeekend
 				(uint) ceil(targetCamera.pixelHeight * resolutionScaling));
 
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
-			bool cameraDirty = targetCamera.transform.hasChanged ||
-							   !Mathf.Approximately(lastFieldOfView, targetCamera.fieldOfView);
+			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty;
 
 			void RebuildDirtyComponents()
@@ -262,8 +264,8 @@ namespace RaytracerInOneWeekend
 
 		void CleanCamera()
 		{
-			lastFieldOfView = targetCamera.fieldOfView;
 			targetCamera.transform.hasChanged = false;
+			scene.UpdateFromUnityCamera();
 		}
 
 		void SwapBuffers()
@@ -337,7 +339,7 @@ namespace RaytracerInOneWeekend
 			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
 
-			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView,
+			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
 				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
@@ -495,8 +497,6 @@ namespace RaytracerInOneWeekend
 #endif
 
 			worldNeedsRebuild = false;
-
-			Debug.Log($"Rebuilt world ({activeSpheres.Count} spheres, {activeMaterials.Count} materials)");
 		}
 
 #if !SOA_SIMD && !AOSOA_SIMD
@@ -690,6 +690,8 @@ namespace RaytracerInOneWeekend
 						break;
 				}
 			}
+
+			Debug.Log($"Collected {activeSpheres.Count} active spheres");
 		}
 	}
 }

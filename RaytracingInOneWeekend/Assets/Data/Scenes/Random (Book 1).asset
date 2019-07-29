@@ -15,9 +15,10 @@ MonoBehaviour:
   cameraPosition: {x: 12.3, y: 1.98, z: -2.99}
   cameraTarget: {x: 11.342338, y: 1.8494737, z: -2.733395}
   cameraAperture: 0.1
-  randomSeed: 45573880
+  cameraFieldOfView: 20
+  randomSeed: 700
   spheres:
-  - enabled: 1
+  - enabled: 0
     excludeFromOverlapTest: 1
     center: {x: 0, y: -1000, z: 0}
     radius: 1000

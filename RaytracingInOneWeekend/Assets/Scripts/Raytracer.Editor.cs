@@ -77,6 +77,8 @@ namespace RaytracerInOneWeekend
 					worldNeedsRebuild = true;
 				else
 					EditorApplication.delayCall += UpdatePreview;
+
+				scene.ClearDirty();
 			}
 		}
 
@@ -91,7 +93,10 @@ namespace RaytracerInOneWeekend
 				}
 			}
 			else if (!EditorApplication.isPlayingOrWillChangePlaymode)
+			{
 				EditorApplication.delayCall += UpdatePreview;
+				if (scene) scene.ClearDirty();
+			}
 		}
 
 		void OnEditorUpdate()
@@ -142,11 +147,10 @@ namespace RaytracerInOneWeekend
 
 			if (scene)
 			{
-				scene.ClearDirty();
-
 				Transform cameraTransform = targetCamera.transform;
 				cameraTransform.position = scene.CameraPosition;
 				cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
+				targetCamera.fieldOfView = scene.CameraFieldOfView;
 			}
 
 			Action updateDelegate = OnEditorUpdate;
@@ -175,7 +179,7 @@ namespace RaytracerInOneWeekend
 			skybox.material.SetColor("_Color2", scene.SkyTopColor);
 
 			if (previewObject == null)
-				previewObject = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Sphere);
+				previewObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
 			previewObject.hideFlags = HideFlags.HideAndDontSave;
 			previewObject.SetActive(false);
 

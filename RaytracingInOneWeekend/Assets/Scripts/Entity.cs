@@ -18,8 +18,6 @@ namespace RaytracerInOneWeekend
 
 		[NativeDisableUnsafePtrRestriction] readonly Sphere* sphere;
 
-		public readonly int SphereId;
-
 		public Entity(Sphere* sphere) : this()
 		{
 			Type = EntityType.Sphere;

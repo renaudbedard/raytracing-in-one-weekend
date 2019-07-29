@@ -15,12 +15,13 @@ namespace RaytracerInOneWeekend
 	class SceneData : ScriptableObject
 	{
 		[Title("Camera")]
-		[InlineButton(nameof(UpdateFromCameraTransform), "Update")]
+		[InlineButton(nameof(UpdateFromUnityCamera), "Update")]
 		[SerializeField]
 		Vector3 cameraPosition = default;
-		[InlineButton(nameof(UpdateFromCameraTransform), "Update")]
+		[InlineButton(nameof(UpdateFromUnityCamera), "Update")]
 		[SerializeField] Vector3 cameraTarget = default;
 		[SerializeField] float cameraAperture = 0.1f;
+		[SerializeField] [Range(0.001f, 180)] float cameraFieldOfView = 20;
 
 		[Title("World")]
 		[SerializeField] [Range(1, 10000)] uint randomSeed = 1;
@@ -34,6 +35,7 @@ namespace RaytracerInOneWeekend
 		public Vector3 CameraPosition => cameraPosition;
 		public Vector3 CameraTarget => cameraTarget;
 		public float CameraAperture => cameraAperture;
+		public float CameraFieldOfView => cameraFieldOfView;
 		public uint RandomSeed => randomSeed;
 		public IReadOnlyList<SphereData> Spheres => spheres;
 		public IReadOnlyList<RandomSphereGroup> RandomSphereGroups => randomSphereGroups;
@@ -57,11 +59,12 @@ namespace RaytracerInOneWeekend
 		}
 #endif
 
-		void UpdateFromCameraTransform()
+		public void UpdateFromUnityCamera()
 		{
-			Transform cameraTransform = FindObjectOfType<UnityEngine.Camera>().transform;
-			cameraPosition = cameraTransform.position;
-			cameraTarget = cameraPosition + cameraTransform.forward;
+			var unityCamera = FindObjectOfType<UnityEngine.Camera>();
+			cameraPosition = unityCamera.transform.position;
+			cameraTarget = cameraPosition + unityCamera.transform.forward;
+			cameraFieldOfView = unityCamera.fieldOfView;
 		}
 	}
 
@@ -76,6 +79,7 @@ namespace RaytracerInOneWeekend
 	{
 		public RandomDistribution Distribution = default;
 
+		// TODO: this way of setting up the grid is pretty aggravating to work with
 		[ShowIf(nameof(Distribution), RandomDistribution.JitteredGrid)]
 		[Range(0.01f, 10)]
 		public float PeriodX = 1;
