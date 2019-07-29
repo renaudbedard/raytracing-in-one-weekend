@@ -41,29 +41,38 @@ namespace RaytracerInOneWeekend
 	unsafe struct BvhNode
 	{
 		public readonly AxisAlignedBoundingBox Bounds;
-		public readonly bool IsLeaf;
-		[NativeDisableUnsafePtrRestriction] public readonly BvhNode* Left, Right;
+		[NativeDisableUnsafePtrRestriction] public BvhNode* Left, Right;
 		public readonly Entity Content;
+		public readonly BvhNodeMetadata* Metadata;
+
+		public bool IsLeaf => Content.Type != EntityType.None;
 
 		public static int GetNodeCount(NativeArray<Entity> entities)
 		{
 			using (var tempNodes = new NativeList<BvhNode>(Allocator.Temp))
+			using (var tempMetadata = new NativeList<BvhNodeMetadata>(Allocator.Temp))
 			{
-				tempNodes.Add(new BvhNode(entities, tempNodes));
+				tempNodes.Add(new BvhNode(entities, tempNodes, tempMetadata));
 				return tempNodes.Length;
 			}
 		}
 
-		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes) : this()
+		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, NativeList<BvhNodeMetadata> metadata,
+			int depth = 0, int rank = 0, int parentNodeId = 0) : this()
 		{
-			var possiblePartitions = PartitionAxis.All;
+			metadata.Add(default);
+			Metadata = (BvhNodeMetadata*) metadata.GetUnsafePtr() + metadata.Length - 1;
+
+			Metadata->Depth = depth;
+			Metadata->Order = depth * 100 * nodes.Capacity + rank * 10 * nodes.Capacity + parentNodeId;
+
 			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
-			foreach (var entity in entities)
+			foreach (Entity entity in entities)
 				entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, entity.Bounds);
 
 			var biggestPartition = PartitionAxis.None;
 			var biggestPartitionSize = float.MinValue;
-			foreach (PartitionAxis partition in possiblePartitions.Enumerate())
+			foreach (PartitionAxis partition in PartitionAxis.All.Enumerate())
 			{
 				float size = entireBounds.Size[partition.GetAxisId()];
 				if (size > biggestPartitionSize)
@@ -81,41 +90,68 @@ namespace RaytracerInOneWeekend
 				case 1:
 					Content = entities[0];
 					Bounds = Content.Bounds;
-					IsLeaf = true;
 					break;
 
 				default:
-					var nodesPointer = (BvhNode*) nodes.GetUnsafePtr();
-
-					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes);
-					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes);
-
+					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes, metadata,
+						depth + 1, 0, Metadata->Id);
+					Metadata->LeftId = leftNode.Metadata->Id = nodes.Length;
 					nodes.Add(leftNode);
-					Left = nodesPointer + (nodes.Length - 1);
 
+					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes, metadata,
+						depth + 1, 1, Metadata->Id);
+					Metadata->RightId = rightNode.Metadata->Id = nodes.Length;
 					nodes.Add(rightNode);
-					Right = nodesPointer + (nodes.Length - 1);
 
-					Bounds = AxisAlignedBoundingBox.Enclose(Left->Bounds, Right->Bounds);
+					Bounds = AxisAlignedBoundingBox.Enclose(leftNode.Bounds, rightNode.Bounds);
 					break;
 			}
 		}
 
-		public IReadOnlyList<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(int depth = 0,
-			List<ValueTuple<AxisAlignedBoundingBox, int>> workingList = null)
+		public void SetupPointers(NativeList<BvhNode> nodes)
+		{
+			if (IsLeaf) return;
+
+			Left = Right = null;
+
+			for (int i = 0; i < nodes.Length; i++)
+			{
+				if (nodes[i].Metadata->Id == Metadata->LeftId) Left = (BvhNode*) nodes.GetUnsafePtr() + i;
+				if (nodes[i].Metadata->Id == Metadata->RightId) Right = (BvhNode*) nodes.GetUnsafePtr() + i;
+				if (Left != null && Right != null) break;
+			}
+
+			Left->SetupPointers(nodes);
+			Right->SetupPointers(nodes);
+		}
+
+		public IReadOnlyList<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(List<ValueTuple<AxisAlignedBoundingBox, int>> workingList = null)
 		{
 			if (workingList == null)
 				workingList = new List<ValueTuple<AxisAlignedBoundingBox, int>>();
 
-			workingList.Add((Bounds, depth));
+			workingList.Add((Bounds, Metadata->Depth));
 
 			if (!IsLeaf)
 			{
-				Left->GetAllSubBounds(depth + 1, workingList);
-				Right->GetAllSubBounds(depth + 1, workingList);
+				Left->GetAllSubBounds(workingList);
+				Right->GetAllSubBounds(workingList);
 			}
 
 			return workingList;
+		}
+	}
+
+	struct BvhNodeMetadata
+	{
+		public int Id, LeftId, RightId, Depth, Order;
+	}
+
+	struct BvhNodeComparer : IComparer<BvhNode>
+	{
+		public unsafe int Compare(BvhNode lhs, BvhNode rhs)
+		{
+			return lhs.Metadata->Order - rhs.Metadata->Order;
 		}
 	}
 }

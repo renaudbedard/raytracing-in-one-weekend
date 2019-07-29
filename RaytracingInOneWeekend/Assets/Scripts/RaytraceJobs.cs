@@ -27,10 +27,13 @@ namespace RaytracerInOneWeekend
 #endif
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+#if BVH
+	unsafe
+#endif
 	struct AccumulateJob : IJobParallelFor
 	{
 #if BVH_ITERATIVE
-		public unsafe struct WorkingArea
+		public struct WorkingArea
 		{
 			public BvhNode** Nodes;
 			public Entity* Entities;
@@ -63,7 +66,9 @@ namespace RaytracerInOneWeekend
 #elif AOSOA_SIMD
 		[ReadOnly] public AosoaSpheres World;
 #elif BVH
-		[ReadOnly] public BvhNode World;
+		[ReadOnly]
+		[NativeDisableUnsafePtrRestriction]
+		public BvhNode* World;
 #endif
 
 #if BVH_ITERATIVE
@@ -94,27 +99,24 @@ namespace RaytracerInOneWeekend
 			float3 colorAcc = lastValue.xyz;
 			int sampleCount = (int) lastValue.w;
 
+			// big prime stolen from Unity's random class
 			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
 			Diagnostics diagnostics = default;
 
 #if BVH_ITERATIVE
 			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
 			int actualThreadIndex = threadIndex - 1;
-			WorkingArea workingArea;
-			unsafe
+			var workingArea = new WorkingArea
 			{
-				workingArea = new WorkingArea
-				{
-					Nodes = (BvhNode**) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() +
-					        actualThreadIndex * (NodeWorkingBuffer.Length / ThreadCount),
-					Entities = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() +
-					           actualThreadIndex * (EntityWorkingBuffer.Length / ThreadCount),
+				Nodes = (BvhNode**) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() +
+				        actualThreadIndex * (NodeWorkingBuffer.Length / ThreadCount),
+				Entities = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() +
+				           actualThreadIndex * (EntityWorkingBuffer.Length / ThreadCount),
 #if BVH_SIMD
-					Vectors = (float4*) VectorWorkingBuffer.GetUnsafeReadOnlyPtr() +
-					          actualThreadIndex * (VectorWorkingBuffer.Length / ThreadCount)
+				Vectors = (float4*) VectorWorkingBuffer.GetUnsafeReadOnlyPtr() +
+				          actualThreadIndex * (VectorWorkingBuffer.Length / ThreadCount)
 #endif
-				};
-			}
+			};
 #endif
 
 			for (int s = 0; s < SampleCount; s++)
@@ -147,14 +149,14 @@ namespace RaytracerInOneWeekend
 
 #if BVH_ITERATIVE
 #if FULL_DIAGNOSTICS
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, ref diagnostics, out HitRecord rec))
+			if (World->Hit(r, 0.001f, float.PositiveInfinity, wa, ref diagnostics, out HitRecord rec))
 #else
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, wa, out HitRecord rec))
+			if (World->Hit(r, 0.001f, float.PositiveInfinity, wa, out HitRecord rec))
 #endif
 #elif BVH_RECURSIVE && FULL_DIAGNOSTICS
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, ref diagnostics, out HitRecord rec))
+			if (World->Hit(r, 0.001f, float.PositiveInfinity, ref diagnostics, out HitRecord rec))
 #else
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
+			if (World->Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
 #if BUFFERED_MATERIALS

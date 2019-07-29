@@ -225,6 +225,9 @@ namespace RaytracerInOneWeekend
 			EditorUtility.SetDirty(this);
 		}
 
+#if BVH
+		unsafe
+#endif
 		void OnDrawGizmos()
 		{
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
@@ -244,7 +247,7 @@ namespace RaytracerInOneWeekend
 			if (previewBvh && bvhNodeBuffer.IsCreated)
 			{
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
-				(AxisAlignedBoundingBox, int)[] subBounds = World.GetAllSubBounds().ToArray();
+				(AxisAlignedBoundingBox, int)[] subBounds = World->GetAllSubBounds().ToArray();
 				int maxDepth = subBounds.Max(x => x.Item2);
 				int shownLayer = DateTime.Now.Second % (maxDepth + 1);
 				int i = -1;

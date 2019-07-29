@@ -30,7 +30,6 @@ namespace RaytracerInOneWeekend
 			}
 
 			if (list.Length < size) list.Capacity = size;
-			list.Clear();
 		}
 
 		public static void SafeDispose<T>(this ref NativeArray<T> array) where T : struct

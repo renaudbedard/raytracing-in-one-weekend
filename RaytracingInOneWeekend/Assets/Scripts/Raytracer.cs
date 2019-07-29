@@ -24,6 +24,9 @@ using OdinReadOnly = OdinMock.ReadOnlyAttribute;
 
 namespace RaytracerInOneWeekend
 {
+#if BVH
+	unsafe
+#endif
 	partial class Raytracer : MonoBehaviour
 	{
 		[Title("References")]
@@ -78,7 +81,8 @@ namespace RaytracerInOneWeekend
 
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
-		BvhNode World => bvhNodeBuffer.IsCreated ? bvhNodeBuffer[bvhNodeBuffer.Length - 1] : default;
+		NativeList<BvhNodeMetadata> bvhNodeMetadataBuffer;
+		BvhNode* World => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
 #if BVH_ITERATIVE
@@ -158,6 +162,7 @@ namespace RaytracerInOneWeekend
 			accumulationOutputBuffer.SafeDispose();
 #if BVH
 			bvhNodeBuffer.SafeDispose();
+			bvhNodeMetadataBuffer.SafeDispose();
 #endif
 #if BVH_ITERATIVE
 			nodeWorkingBuffer.SafeDispose();
@@ -519,10 +524,7 @@ namespace RaytracerInOneWeekend
 							: default,
 						material.Fuzz, material.RefractiveIndex));
 #endif
-				unsafe
-				{
-					entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
-				}
+				entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
 			}
 		}
 #endif // !SOA_SIMD && !AOSOA_SIMD
@@ -532,7 +534,17 @@ namespace RaytracerInOneWeekend
 		{
 			int nodeCount = BvhNode.GetNodeCount(entityBuffer);
 			bvhNodeBuffer.EnsureCapacity(nodeCount);
-			bvhNodeBuffer.Add(new BvhNode(entityBuffer, bvhNodeBuffer));
+			bvhNodeMetadataBuffer.EnsureCapacity(nodeCount);
+
+			bvhNodeBuffer.Clear();
+			bvhNodeMetadataBuffer.Clear();
+
+			var rootNode = new BvhNode(entityBuffer, bvhNodeBuffer, bvhNodeMetadataBuffer);
+			rootNode.Metadata->Id = bvhNodeBuffer.Length;
+			bvhNodeBuffer.Add(rootNode);
+
+			bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
+			World->SetupPointers(bvhNodeBuffer);
 
 #if BVH_ITERATIVE
 			int workingBufferSize = entityBuffer.Length * SystemInfo.processorCount;
@@ -547,7 +559,7 @@ namespace RaytracerInOneWeekend
 #endif // BVH
 
 #if BVH_ITERATIVE
-		public unsafe bool HitWorld(Ray r, out HitRecord hitRec)
+		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
 			var workingArea = new AccumulateJob.WorkingArea
 			{
@@ -559,9 +571,9 @@ namespace RaytracerInOneWeekend
 			};
 #if FULL_DIAGNOSTICS && BVH_ITERATIVE
 			Diagnostics _ = default;
-			return World.Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
+			return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
 #else
-			return World.Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+			return World->Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
 #endif
 		}
 
