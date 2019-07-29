@@ -10,25 +10,24 @@ namespace RaytracerInOneWeekend
     {
         public static float3 InUnitSphere(this Random rng)
         {
-            // TODO: is this really as fast it gets?
-            float3 p;
-            do
-            {
-                p = 2 * rng.NextFloat3() - 1;
-            } while (lengthsq(p) >= 1);
-
-            return p;
+            // from : https://karthikkaranth.me/blog/generating-random-points-in-a-sphere/#better-choice-of-spherical-coordinates
+            float2 doubleUv = rng.NextFloat2(0, 2);
+            float2 thetaPhi = float2( doubleUv.x * PI, acos(doubleUv.y - 1));
+            float r = pow(rng.NextFloat(), 1 / 3.0f);
+            sincos(thetaPhi, out float2 sinThetaPhi, out float2 cosThetaPhi);
+            return r * float3(
+                sinThetaPhi.y * cosThetaPhi.x,
+                sinThetaPhi.y * sinThetaPhi.x,
+                cosThetaPhi.y);
         }
 
-        public static float3 InUnitDisk(this Random rng)
+        public static float2 InUnitDisk(this Random rng)
         {
-            float3 p;
-            do
-            {
-                p = 2 * float3(rng.NextFloat2(), 0) - float3(1, 1, 0);
-            } while (lengthsq(p) >= 1);
-
-            return p;
+            // from : https://programming.guide/random-point-within-circle.html
+            float theta = rng.NextFloat(0, 2 * PI);
+            float radius = sqrt(rng.NextFloat());
+            sincos(theta, out float sinTheta, out float cosTheta);
+            return radius * float2(cosTheta, sinTheta);
         }
 
         public static float3 UnitVector(this Random rng)
