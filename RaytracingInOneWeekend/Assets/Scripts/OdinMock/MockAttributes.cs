@@ -9,6 +9,11 @@ namespace OdinMock
 		public ShowIfAttribute(string _) { }
 	}
 
+	public class HideIfAttribute : Attribute
+	{
+		public HideIfAttribute(string _, object __) { }
+	}
+
 	public class MinMaxSliderAttribute : Attribute
 	{
 		public MinMaxSliderAttribute(float _, float __, bool ___) { }
