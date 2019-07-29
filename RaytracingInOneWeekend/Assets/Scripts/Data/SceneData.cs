@@ -57,6 +57,51 @@ namespace RaytracerInOneWeekend
 		{
 			dirty = true;
 		}
+
+		public SceneData DeepClone()
+		{
+			SceneData clone = Instantiate(this);
+			clone.hideFlags = HideFlags.HideAndDontSave;
+			clone.name = $"{name} [RUNTIME COPY]";
+
+			for (int i = 0; i < spheres.Length; i++)
+			{
+				SphereData sourceSphere = spheres[i];
+
+				MaterialData clonedMaterial = null;
+				if (sourceSphere.Material)
+				{
+					clonedMaterial = Instantiate(sourceSphere.Material);
+					clonedMaterial.name = $"{sourceSphere.Material.name} [RUNTIME COPY]";
+					clonedMaterial.hideFlags = HideFlags.HideAndDontSave;
+
+					if (sourceSphere.Material.Albedo)
+					{
+						clonedMaterial.Albedo = Instantiate(sourceSphere.Material.Albedo);
+						clonedMaterial.Albedo.name = $"{sourceSphere.Material.Albedo.name} [RUNTIME COPY]";
+						clonedMaterial.Albedo.hideFlags = HideFlags.HideAndDontSave;
+					}
+				}
+
+				var clonedSphere = new SphereData();
+				UnityEditor.EditorUtility.CopySerializedManagedFieldsOnly(sourceSphere, clonedSphere);
+				clonedSphere.Material = clonedMaterial;
+
+				clone.spheres[i] = clonedSphere;
+			}
+
+			for (int i = 0; i < randomSphereGroups.Length; i++)
+			{
+				var sourceGroup = randomSphereGroups[i];
+
+				var clonedGroup = new RandomSphereGroup();
+				UnityEditor.EditorUtility.CopySerializedManagedFieldsOnly(sourceGroup, clonedGroup);
+
+				clone.randomSphereGroups[i] = clonedGroup;
+			}
+
+			return clone;
+		}
 #endif
 
 		public void UpdateFromUnityCamera()

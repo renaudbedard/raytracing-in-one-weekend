@@ -136,7 +136,7 @@ namespace RaytracerInOneWeekend
 			targetCamera.RemoveAllCommandBuffers();
 
 	#if UNITY_EDITOR
-			// TODO: deep-clone scene data
+			scene = scene.DeepClone();
 	#endif
 
 			RebuildWorld();
@@ -173,6 +173,10 @@ namespace RaytracerInOneWeekend
 #endif
 #if BVH_SIMD
 			vectorWorkingBuffer.SafeDispose();
+#endif
+
+#if UNITY_EDITOR
+			Destroy(scene);
 #endif
 		}
 

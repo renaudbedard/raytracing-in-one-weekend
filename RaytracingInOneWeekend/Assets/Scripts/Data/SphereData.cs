@@ -39,6 +39,8 @@ namespace RaytracerInOneWeekend
 		}
 #endif
 
+		public SphereData() { }
+
 		public SphereData(Vector3 center, float radius, MaterialData material)
 		{
 			this.center = center;
@@ -50,7 +52,12 @@ namespace RaytracerInOneWeekend
 		public bool ExcludeFromOverlapTest => excludeFromOverlapTest;
 		public Vector3 Center => center;
 		public float Radius => radius;
-		public MaterialData Material => material;
+
+		public MaterialData Material
+		{
+			get => material;
+			set => material = value;
+		}
 
 #if UNITY_EDITOR
 		IEnumerable<ValueDropdownItem<MaterialData>> GetMaterialAssets => AssetDatabase.FindAssets("t:MaterialData")

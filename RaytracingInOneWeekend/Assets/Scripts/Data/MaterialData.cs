@@ -21,9 +21,14 @@ namespace RaytracerInOneWeekend
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
 		public MaterialType Type => type;
-		public TextureData Albedo => albedo;
 		public float Fuzz => fuzz;
 		public float RefractiveIndex => refractiveIndex;
+
+		public TextureData Albedo
+		{
+			get => albedo;
+			set => albedo = value;
+		}
 
 		public static MaterialData Lambertian(TextureData albedoTexture)
 		{
