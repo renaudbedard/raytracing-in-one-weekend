@@ -213,7 +213,8 @@ namespace RaytracerInOneWeekend
 			{
 				r = (byte) outputColor.x,
 				g = (byte) outputColor.y,
-				b = (byte) outputColor.z
+				b = (byte) outputColor.z,
+				a = 255
 			};
 		}
 	}
