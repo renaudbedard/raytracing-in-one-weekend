@@ -5,13 +5,13 @@ using UnityEngine;
 using UnityEditor;
 using System.Linq;
 using System.Collections.Generic;
+#endif
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #else
 using Title = UnityEngine.HeaderAttribute;
 using OdinMock;
-#endif
 #endif
 
 namespace RaytracerInOneWeekend
@@ -25,7 +25,9 @@ namespace RaytracerInOneWeekend
 		[SerializeField] float radius;
 
 		[SerializeField]
+#if UNITY_EDITOR
 		[ValueDropdown(nameof(GetMaterialAssets))]
+#endif
 		MaterialData material;
 
 #if UNITY_EDITOR

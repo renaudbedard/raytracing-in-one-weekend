@@ -18,16 +18,6 @@ namespace RaytracerInOneWeekend
 {
 	partial class Raytracer
 	{
-		enum BufferView
-		{
-			Front,
-			RayCount,
-#if FULL_DIAGNOSTICS
-			BvhHitCount,
-			CandidateCount
-#endif
-		}
-
 		[Title("Tools")]
 		[Button]
 		[DisableInEditorMode]

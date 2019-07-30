@@ -114,6 +114,20 @@ namespace RaytracerInOneWeekend
 
 		bool TraceActive => accumulateJobHandle.HasValue || combineJobHandle.HasValue;
 
+		enum BufferView
+		{
+			Front,
+			RayCount,
+#if FULL_DIAGNOSTICS
+			BvhHitCount,
+			CandidateCount
+#endif
+		}
+
+#if !UNITY_EDITOR
+		const BufferView bufferView = BufferView.Front;
+#endif
+
 		void Awake()
 		{
 			commandBuffer = new CommandBuffer { name = "Raytracer" };

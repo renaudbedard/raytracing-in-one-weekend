@@ -524,12 +524,12 @@ PlayerSettings:
   webGLThreadsSupport: 0
   webGLWasmStreaming: 0
   scriptingDefineSymbols:
-    1: BVH;BVH_ITERATIVE;BVH_SIMD
+    1: BVH;BVH_ITERATIVE;BVH_SIMD;BUFFERED_MATERIALS
   platformArchitecture: {}
   scriptingBackend:
     Standalone: 1
   il2cppCompilerConfiguration:
-    Standalone: 2
+    Standalone: 1
   managedStrippingLevel:
     Standalone: 3
   incrementalIl2cppBuild: {}
