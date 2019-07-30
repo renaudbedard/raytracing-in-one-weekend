@@ -14,15 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cameraPosition: {x: 12.3, y: 1.98, z: -2.99}
   cameraTarget: {x: 11.342338, y: 1.8494737, z: -2.7333953}
-  cameraAperture: 0.1
+  cameraAperture: 0.05
   cameraFieldOfView: 20
-  randomSeed: 700
   spheres:
   - enabled: 1
     excludeFromOverlapTest: 1
     center: {x: 0, y: -1000, z: 0}
     radius: 1000
-    material: {fileID: 11400000, guid: a8e563d2c7e434caebca66449ac7bb74, type: 2}
+    material: {fileID: 11400000, guid: e2b440160971b4fecbbfadbe5fcdab3a, type: 2}
   - enabled: 1
     excludeFromOverlapTest: 0
     center: {x: 0, y: 1, z: 0}
@@ -38,6 +37,7 @@ MonoBehaviour:
     center: {x: 4, y: 1, z: 0}
     radius: 1
     material: {fileID: 11400000, guid: 67ca2b630403548e990e54f0dda310a6, type: 2}
+  randomSeed: 700
   randomSphereGroups:
   - Distribution: 0
     PeriodX: 1

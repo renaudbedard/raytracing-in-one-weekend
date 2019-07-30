@@ -1,3 +1,4 @@
+using Unity.Mathematics;
 using UnityEngine;
 
 #if ODIN_INSPECTOR
@@ -14,6 +15,8 @@ namespace RaytracerInOneWeekend
 		[SerializeField] MaterialType type = MaterialType.None;
 		[SerializeField] TextureData albedo = null;
 
+		[SerializeField] Vector2 textureScale = Vector2.one;
+
 		[ShowIf(nameof(Type), MaterialType.Metal)]
 		[Range(0, 1)] [SerializeField] float fuzz = 0;
 
@@ -23,6 +26,7 @@ namespace RaytracerInOneWeekend
 		public MaterialType Type => type;
 		public float Fuzz => fuzz;
 		public float RefractiveIndex => refractiveIndex;
+		public Vector2 TextureScale => textureScale;
 
 		public TextureData Albedo
 		{
@@ -30,21 +34,23 @@ namespace RaytracerInOneWeekend
 			set => albedo = value;
 		}
 
-		public static MaterialData Lambertian(TextureData albedoTexture)
+		public static MaterialData Lambertian(TextureData albedoTexture, float2 textureScale)
 		{
 			var data = CreateInstance<MaterialData>();
 			data.hideFlags = HideFlags.HideAndDontSave;
 			data.type = MaterialType.Lambertian;
 			data.albedo = albedoTexture;
+			data.textureScale = textureScale;
 			return data;
 		}
 
-		public static MaterialData Metal(TextureData albedoTexture, float fuzz = 0)
+		public static MaterialData Metal(TextureData albedoTexture, float2 textureScale, float fuzz = 0)
 		{
 			var data = CreateInstance<MaterialData>();
 			data.hideFlags = HideFlags.HideAndDontSave;
 			data.type = MaterialType.Metal;
 			data.albedo = albedoTexture;
+			data.textureScale = textureScale;
 			data.fuzz = fuzz;
 			return data;
 		}

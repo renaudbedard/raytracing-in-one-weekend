@@ -22,19 +22,9 @@ namespace RaytracerInOneWeekend
 			IterativeBvhSimd
 		}
 
-		enum MaterialStorage
-		{
-			Inline,
-			Buffered
-		}
-
 		[SerializeField]
 		[DisableInPlayMode]
 		HitTestingMode hitTestingMode = HitTestingMode.Basic;
-
-		[SerializeField]
-		[DisableInPlayMode]
-		MaterialStorage materialStorage = MaterialStorage.Inline;
 
 		[SerializeField]
 		[DisableInPlayMode]
@@ -91,13 +81,6 @@ namespace RaytracerInOneWeekend
 					newDefinitions.Add("BVH");
 					newDefinitions.Add("BVH_ITERATIVE");
 					newDefinitions.Add("BVH_SIMD");
-					break;
-			}
-
-			switch (materialStorage)
-			{
-				case MaterialStorage.Buffered:
-					newDefinitions.Add("BUFFERED_MATERIALS");
 					break;
 			}
 

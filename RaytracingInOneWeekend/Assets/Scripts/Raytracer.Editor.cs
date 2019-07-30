@@ -62,6 +62,7 @@ namespace RaytracerInOneWeekend
 				Transform cameraTransform = targetCamera.transform;
 				cameraTransform.position = scene.CameraPosition;
 				cameraTransform.rotation = Quaternion.LookRotation(scene.CameraTarget - scene.CameraPosition);
+				targetCamera.fieldOfView = scene.CameraFieldOfView;
 
 				if (Application.isPlaying)
 					worldNeedsRebuild = true;

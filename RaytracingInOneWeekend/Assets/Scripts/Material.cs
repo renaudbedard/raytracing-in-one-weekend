@@ -17,12 +17,14 @@ namespace RaytracerInOneWeekend
 	{
 		public readonly MaterialType Type;
 		public readonly Texture Albedo;
+		public readonly float2 TextureScale;
 		public readonly float Parameter;
 
-		public Material(MaterialType type, Texture albedo = default, float fuzz = 0, float refractiveIndex = 1) : this()
+		public Material(MaterialType type, float2 textureScale, Texture albedo = default, float fuzz = 0, float refractiveIndex = 1) : this()
 		{
 			Type = type;
 			Albedo = albedo;
+			TextureScale = textureScale;
 
 			switch (type)
 			{
@@ -40,7 +42,7 @@ namespace RaytracerInOneWeekend
 				{
 					float3 target = rec.Point + rec.Normal + rng.UnitVector();
 					scattered = new Ray(rec.Point, target - rec.Point);
-					attenuation = Albedo.Value(rec.Point);
+					attenuation = Albedo.Value(rec.Normal, TextureScale);
 					return true;
 				}
 
@@ -49,7 +51,7 @@ namespace RaytracerInOneWeekend
 					float fuzz = Parameter;
 					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
 					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere());
-					attenuation = Albedo.Value(rec.Point);
+					attenuation = Albedo.Value(rec.Normal, TextureScale);
 					return dot(scattered.Direction, rec.Normal) > 0;
 				}
 

@@ -23,11 +23,7 @@ namespace RaytracerInOneWeekend
 
 		public NativeArray<float> CenterX, CenterY, CenterZ;
 		public NativeArray<float> SquaredRadius, Radius;
-#if BUFFERED_MATERIALS
-		public NativeArray<int> MaterialIndex;
-#else
 		public NativeArray<Material> Material;
-#endif
 		public int Length => CenterX.Length;
 
 		public SoaSpheres(int length)
@@ -41,11 +37,8 @@ namespace RaytracerInOneWeekend
 			CenterZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			SquaredRadius = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			Radius = new NativeArray<float>(dataLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-#if BUFFERED_MATERIALS
-			MaterialIndex = new NativeArray<int>(dataLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-#else
 			Material = new NativeArray<Material>(dataLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-#endif
+
 			for (int i = dataLength; i < length; i++)
 			{
 				CenterX[i] = CenterY[i] = CenterZ[i] = float.PositiveInfinity;
@@ -69,11 +62,7 @@ namespace RaytracerInOneWeekend
 			CenterZ.SafeDispose();
 			SquaredRadius.SafeDispose();
 			Radius.SafeDispose();
-#if BUFFERED_MATERIALS
-			MaterialIndex.SafeDispose();
-#else
 			Material.SafeDispose();
-#endif
 		}
 	}
 
@@ -91,11 +80,7 @@ namespace RaytracerInOneWeekend
 
 		// NOTE: radius and material are not stored as a stream since we don't need them during iteration
 		public NativeArray<float> Radius;
-#if BUFFERED_MATERIALS
-		public NativeArray<int> MaterialIndex;
-#else
 		public NativeArray<Material> Material;
-#endif
 
 		public AosoaSpheres(int length)
 		{
@@ -104,12 +89,8 @@ namespace RaytracerInOneWeekend
 
 			dataBuffer = new NativeArray<float4>(BlockCount * StreamCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			Radius = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-
-#if BUFFERED_MATERIALS
-			MaterialIndex = new NativeArray<int>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-#else
 			Material = new NativeArray<Material>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-#endif
+
 			float4* lastBlockPointer = (float4*) dataBuffer.GetUnsafePtr() + (BlockCount - 1) * StreamCount;
 			lastBlockPointer[(int) Streams.CenterX] = float.MaxValue;
 			lastBlockPointer[(int) Streams.CenterY] = float.MaxValue;
@@ -143,11 +124,7 @@ namespace RaytracerInOneWeekend
 		{
 			dataBuffer.SafeDispose();
 			Radius.SafeDispose();
-#if BUFFERED_MATERIALS
-			MaterialIndex.SafeDispose();
-#else
 			Material.SafeDispose();
-#endif
 		}
 	}
 

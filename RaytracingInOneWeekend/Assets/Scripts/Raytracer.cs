@@ -61,10 +61,6 @@ namespace RaytracerInOneWeekend
 		CommandBuffer commandBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
 
-#if BUFFERED_MATERIALS
-		NativeArray<Material> materialBuffer;
-#endif
-
 #if SOA_SIMD
 		SoaSpheres sphereBuffer;
 		internal SoaSpheres World => sphereBuffer;
@@ -171,9 +167,6 @@ namespace RaytracerInOneWeekend
 #else
 			entityBuffer.SafeDispose();
 			sphereBuffer.SafeDispose();
-#endif
-#if BUFFERED_MATERIALS
-			materialBuffer.SafeDispose();
 #endif
 			accumulationInputBuffer.SafeDispose();
 			accumulationOutputBuffer.SafeDispose();
@@ -389,9 +382,6 @@ namespace RaytracerInOneWeekend
 				World = World,
 				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
-#if BUFFERED_MATERIALS
-				Material = materialBuffer,
-#endif
 #if BVH_ITERATIVE
 				ThreadCount = SystemInfo.processorCount,
 				NodeWorkingBuffer = nodeWorkingBuffer,
@@ -459,22 +449,6 @@ namespace RaytracerInOneWeekend
 				if (!activeMaterials.Contains(sphere.Material))
 					activeMaterials.Add(sphere.Material);
 
-#if BUFFERED_MATERIALS
-			int materialCount = activeMaterials.Count;
-			materialBuffer.EnsureCapacity(materialCount);
-
-			for (var i = 0; i < activeMaterials.Count; i++)
-			{
-				MaterialData material = activeMaterials[i];
-				TextureData albedo = material.Albedo;
-				materialBuffer[i] = new Material(material.Type,
-					albedo
-						? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3())
-						: default,
-					material.Fuzz, material.RefractiveIndex);
-			}
-#endif
-
 #if SOA_SIMD || AOSOA_SIMD
 			int sphereCount = activeSpheres.Count;
 			if (sphereBuffer.Length != sphereCount)
@@ -493,17 +467,13 @@ namespace RaytracerInOneWeekend
 				sphereBuffer.SetElement(i, sphereData.Center, sphereData.Radius);
 
 				MaterialData material = sphereData.Material;
-#if BUFFERED_MATERIALS
-				sphereBuffer.MaterialIndex[i] = activeMaterials.IndexOf(material);
-#else
+
 				TextureData albedo = material.Albedo;
 				sphereBuffer.Material[i] =
-					new Material(material.Type,
-						albedo
+					new Material(material.Type, material.TextureScale * sphereData.Radius, albedo
 							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3())
 							: default,
 						material.Fuzz, material.RefractiveIndex);
-#endif
 			}
 
 #else // !SOA_SIMD && !AOSOA_SIMD
@@ -530,18 +500,14 @@ namespace RaytracerInOneWeekend
 			{
 				SphereData sphereData = activeSpheres[i];
 				MaterialData material = sphereData.Material;
-#if !BUFFERED_MATERIALS
-				TextureData texture = material ? material.Albedo : null;
-#endif
-				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius,
-#if BUFFERED_MATERIALS
-					activeMaterials.IndexOf(material));
-#else
-					new Material(material.Type, texture
-							? new Texture(texture.Type, texture.MainColor.ToFloat3(), texture.SecondaryColor.ToFloat3())
+				TextureData albedo = material ? material.Albedo : null;
+				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius, material
+					? new Material(material.Type, material.TextureScale * sphereData.Radius, albedo
+							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3())
 							: default,
-						material.Fuzz, material.RefractiveIndex));
-#endif
+						material.Fuzz, material.RefractiveIndex)
+					: default);
+
 				entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
 			}
 		}
@@ -638,7 +604,7 @@ namespace RaytracerInOneWeekend
 						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
 						if (group.DoubleSampleDiffuseAlbedo)
 							color *= rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-						material = MaterialData.Lambertian(TextureData.Constant(color));
+						material = MaterialData.Lambertian(TextureData.Constant(color), 1);
 					}
 					else if (randomValue < probabilities.metal)
 					{
@@ -646,7 +612,7 @@ namespace RaytracerInOneWeekend
 						Color to = group.MetalAlbedo.colorKeys[1].color;
 						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
 						float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
-						material = MaterialData.Metal(TextureData.Constant(color), fuzz);
+						material = MaterialData.Metal(TextureData.Constant(color), 1, fuzz);
 					}
 					else if (randomValue < probabilities.dielectric)
 					{

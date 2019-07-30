@@ -25,7 +25,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public float3 Value(float3 position)
+		public float3 Value(float3 normal, float2 scale)
 		{
 			switch (Type)
 			{
@@ -33,8 +33,16 @@ namespace RaytracerInOneWeekend
 					return MainColor;
 
 				case TextureType.CheckerPattern:
-					float3 sines = sin(10 * position);
-					return sines.x * sines.y * sines.z < 0 ? MainColor : SecondaryColor;
+					// from iq : https://www.shadertoy.com/view/ltl3D8
+					float3 n = abs(normal);
+					float3 v = n.x > n.y && n.x > n.z ? normal.xyz :
+						n.y > n.x && n.y > n.z ? normal.yzx :
+						normal.zxy;
+					float2 q = v.yz / v.x;
+					float2 uv = 0.5f + 0.5f * q;
+
+					float2 sines = sin(PI * scale * uv);
+					return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
 			}
 
 			return default;

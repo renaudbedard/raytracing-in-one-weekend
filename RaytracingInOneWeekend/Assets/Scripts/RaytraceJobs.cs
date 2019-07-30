@@ -79,10 +79,6 @@ namespace RaytracerInOneWeekend
 #endif
 #endif
 
-#if BUFFERED_MATERIALS
-		[ReadOnly] public NativeArray<Material> Material;
-#endif
-
 		[WriteOnly] public NativeArray<float4> OutputSamples;
 		[WriteOnly] public NativeArray<Diagnostics> OutputDiagnostics;
 
@@ -159,12 +155,7 @@ namespace RaytracerInOneWeekend
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
-#if BUFFERED_MATERIALS
-				if (depth < TraceDepth &&
-				    Material[rec.MaterialIndex].Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
-#else
 				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
-#endif
 				{
 #if BVH_ITERATIVE
 					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref diagnostics))

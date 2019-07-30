@@ -22,11 +22,8 @@ namespace RaytracerInOneWeekend
 			float3 center = s.Center;
 			float squaredRadius = s.SquaredRadius;
 			float radius = s.Radius;
-#if BUFFERED_MATERIALS
-			int material = s.MaterialIndex;
-#else
 			Material material = s.Material;
-#endif
+
 			float3 oc = r.Origin - center;
 			float a = dot(r.Direction, r.Direction);
 			float b = dot(oc, r.Direction);
@@ -168,11 +165,7 @@ namespace RaytracerInOneWeekend
 			float closestRadius = spheres.Radius[closestId];
 #endif
 
-#if BUFFERED_MATERIALS
-			int closestMaterial = spheres.MaterialIndex[closestId];
-#else
 			Material closestMaterial = spheres.Material[closestId];
-#endif
 
 			float3 point = r.GetPoint(minDistance);
 			rec = new HitRecord(minDistance, point, (point - closestCenter) / closestRadius, closestMaterial);
@@ -349,11 +342,8 @@ namespace RaytracerInOneWeekend
 			float3 point = r.GetPoint(minDistance);
 
 			rec = new HitRecord(minDistance, point, (point - closestSphere->Center) / closestSphere->Radius,
-#if BUFFERED_MATERIALS
-				closestSphere->MaterialIndex);
-#else
 				closestSphere->Material);
-#endif
+
 			return true;
 
 #else
