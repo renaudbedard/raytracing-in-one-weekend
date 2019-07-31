@@ -86,6 +86,8 @@ namespace RaytracerInOneWeekend
 		NativeArray<float4> vectorWorkingBuffer;
 #endif
 
+		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
+
 		JobHandle? accumulateJobHandle;
 		JobHandle? combineJobHandle;
 
@@ -178,6 +180,8 @@ namespace RaytracerInOneWeekend
 #if BVH_SIMD
 			vectorWorkingBuffer.SafeDispose();
 #endif
+
+			perlinData.Dispose();
 
 #if UNITY_EDITOR
 			Destroy(scene);
@@ -377,6 +381,7 @@ namespace RaytracerInOneWeekend
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
 				TraceDepth = traceDepth,
 				World = World,
+				PerlinData = perlinData.GetRuntimeData(),
 				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
 #if BVH_ITERATIVE
@@ -480,6 +485,8 @@ namespace RaytracerInOneWeekend
 #if BVH
 			RebuildBvh();
 #endif
+
+			perlinData.Generate(scene.RandomSeed);
 
 			worldNeedsRebuild = false;
 		}

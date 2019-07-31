@@ -34,7 +34,8 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Scatter(Ray r, HitRecord rec, Random rng, out float3 attenuation, out Ray scattered)
+		public unsafe bool Scatter(Ray r, HitRecord rec, Random rng, PerlinData perlinData,
+			out float3 attenuation, out Ray scattered)
 		{
 			switch (Type)
 			{
@@ -42,7 +43,7 @@ namespace RaytracerInOneWeekend
 				{
 					float3 target = rec.Point + rec.Normal + rng.UnitVector();
 					scattered = new Ray(rec.Point, target - rec.Point);
-					attenuation = Albedo.Value(rec.Normal, TextureScale);
+					attenuation = Albedo.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return true;
 				}
 
@@ -51,7 +52,7 @@ namespace RaytracerInOneWeekend
 					float fuzz = Parameter;
 					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
 					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere());
-					attenuation = Albedo.Value(rec.Normal, TextureScale);
+					attenuation = Albedo.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return dot(scattered.Direction, rec.Normal) > 0;
 				}
 

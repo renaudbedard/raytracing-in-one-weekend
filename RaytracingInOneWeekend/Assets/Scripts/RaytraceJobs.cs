@@ -71,6 +71,8 @@ namespace RaytracerInOneWeekend
 		public BvhNode* World;
 #endif
 
+		[ReadOnly] public PerlinData PerlinData;
+
 #if BVH_ITERATIVE
 		public NativeArray<IntPtr> NodeWorkingBuffer;
 		public NativeArray<Entity> EntityWorkingBuffer;
@@ -157,7 +159,8 @@ namespace RaytracerInOneWeekend
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
-				if (depth < TraceDepth && rec.Material.Scatter(r, rec, rng, out float3 attenuation, out Ray scattered))
+				if (depth < TraceDepth &&
+				    rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out Ray scattered))
 				{
 #if BVH_ITERATIVE
 					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref diagnostics))
