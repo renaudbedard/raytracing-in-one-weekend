@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-
+using UnityEngine.UIElements;
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #else
@@ -15,22 +15,43 @@ namespace RaytracerInOneWeekend
 	class SceneData : ScriptableObject
 	{
 		[Title("Camera")]
-		[InlineButton(nameof(UpdateFromUnityCamera), "Update")]
+		[InlineButton(nameof(UpdateFromUnityCamera), "      Update      ")]
 		[SerializeField]
+		[LabelText("Position")]
 		Vector3 cameraPosition = default;
-		[InlineButton(nameof(UpdateFromUnityCamera), "Update")]
-		[SerializeField] Vector3 cameraTarget = default;
-		[SerializeField] float cameraAperture = 0.1f;
-		[SerializeField] [Range(0.001f, 180)] float cameraFieldOfView = 20;
+
+		[InlineButton(nameof(UpdateFromUnityCamera), "      Update      ")]
+		[SerializeField]
+		[LabelText("Target Position")]
+		Vector3 cameraTarget = default;
+
+		[SerializeField]
+		[LabelText("Aperture Size")]
+		float cameraAperture = 0.1f;
+
+		[SerializeField]
+		[LabelText("Field Of View (°)")]
+		[Range(0.001f, 180)]
+		float cameraFieldOfView = 20;
 
 		[Title("World")]
 		[SerializeField] SphereData[] spheres = null;
-		[SerializeField] [Range(1, 10000)] uint randomSeed = 1;
+
+		[SerializeField]
+		[Range(1, 10000)]
+		[HideIf("NoRandomEntityGroup")]
+		uint randomSeed = 1;
+
 		[SerializeField] RandomSphereGroup[] randomSphereGroups = null;
 
 		[Title("Sky")]
-		[SerializeField] Color skyBottomColor = Color.white;
-		[SerializeField] Color skyTopColor = new Color(0.5f, 0.7f, 1);
+		[SerializeField]
+		[LabelText("Bottom Color")]
+		Color skyBottomColor = Color.white;
+
+		[SerializeField]
+		[LabelText("Top Color")]
+		Color skyTopColor = new Color(0.5f, 0.7f, 1);
 
 		public Vector3 CameraPosition => cameraPosition;
 		public Vector3 CameraTarget => cameraTarget;
@@ -41,6 +62,8 @@ namespace RaytracerInOneWeekend
 		public IReadOnlyList<RandomSphereGroup> RandomSphereGroups => randomSphereGroups;
 		public Color SkyBottomColor => skyBottomColor;
 		public Color SkyTopColor => skyTopColor;
+
+		bool NoRandomEntityGroup => (randomSphereGroups?.Length ?? 0) == 0;
 
 #if UNITY_EDITOR
 		bool dirty;
@@ -62,7 +85,7 @@ namespace RaytracerInOneWeekend
 		{
 			SceneData clone = Instantiate(this);
 			clone.hideFlags = HideFlags.HideAndDontSave;
-			clone.name = $"{name} [RUNTIME COPY]";
+			clone.name = $"{name} [COPY]";
 
 			for (int i = 0; i < spheres.Length; i++)
 			{
@@ -72,13 +95,13 @@ namespace RaytracerInOneWeekend
 				if (sourceSphere.Material)
 				{
 					clonedMaterial = Instantiate(sourceSphere.Material);
-					clonedMaterial.name = $"{sourceSphere.Material.name} [RUNTIME COPY]";
+					clonedMaterial.name = $"{sourceSphere.Material.name} [COPY]";
 					clonedMaterial.hideFlags = HideFlags.HideAndDontSave;
 
 					if (sourceSphere.Material.Albedo)
 					{
 						clonedMaterial.Albedo = Instantiate(sourceSphere.Material.Albedo);
-						clonedMaterial.Albedo.name = $"{sourceSphere.Material.Albedo.name} [RUNTIME COPY]";
+						clonedMaterial.Albedo.name = $"{sourceSphere.Material.Albedo.name} [COPY]";
 						clonedMaterial.Albedo.hideFlags = HideFlags.HideAndDontSave;
 					}
 				}

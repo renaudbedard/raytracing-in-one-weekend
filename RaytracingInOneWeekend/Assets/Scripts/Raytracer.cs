@@ -24,10 +24,7 @@ using OdinReadOnly = OdinMock.ReadOnlyAttribute;
 
 namespace RaytracerInOneWeekend
 {
-#if BVH
-	unsafe
-#endif
-	partial class Raytracer : MonoBehaviour
+	unsafe partial class Raytracer : MonoBehaviour
 	{
 		[Title("References")]
 		[SerializeField] UnityEngine.Camera targetCamera = null;
@@ -531,12 +528,15 @@ namespace RaytracerInOneWeekend
 			World->SetupPointers(bvhNodeBuffer);
 
 #if BVH_ITERATIVE
-			int workingBufferSize = entityBuffer.Length * SystemInfo.processorCount;
-			nodeWorkingBuffer.EnsureCapacity(workingBufferSize);
-			entityWorkingBuffer.EnsureCapacity(workingBufferSize);
+			int workerCount = SystemInfo.processorCount;
+
+			nodeWorkingBuffer.EnsureCapacity(bvhNodeBuffer.Length * workerCount);
+			entityWorkingBuffer.EnsureCapacity(entityBuffer.Length * workerCount);
 #endif
 #if BVH_SIMD
-			vectorWorkingBuffer.EnsureCapacity(workingBufferSize);
+			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
+			var entityGroupCount = (int) ceil(entityBuffer.Length / 4.0f);
+			vectorWorkingBuffer.EnsureCapacity(entityGroupCount * maxVectorWorkingSizePerEntity * workerCount);
 #endif
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
@@ -545,26 +545,43 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			var workingArea = new AccumulateJob.WorkingArea
-			{
-				Nodes = (BvhNode**) nodeWorkingBuffer.GetUnsafeReadOnlyPtr(),
-				Entities = (Entity*) entityWorkingBuffer.GetUnsafeReadOnlyPtr(),
+			int workerCount = SystemInfo.processorCount;
 #if BVH_SIMD
-				Vectors = (float4*) vectorWorkingBuffer.GetUnsafeReadOnlyPtr()
+			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
+			var entityGroupCount = (int) ceil(entityBuffer.Length / 4.0f);
 #endif
-			};
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
-			Diagnostics _ = default;
-			return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
+			using (var tempNodeWorkingBuffer = new NativeArray<IntPtr>(bvhNodeBuffer.Length * workerCount, Allocator.Temp))
+			using (var tempEntityWorkingBuffer = new NativeArray<Entity>(entityBuffer.Length * workerCount, Allocator.Temp))
+#if BVH_SIMD
+			using (var tempVectorWorkingBuffer = new NativeArray<float4>(entityGroupCount * maxVectorWorkingSizePerEntity * workerCount, Allocator.Temp))
+#endif
+			{
+				var workingArea = new AccumulateJob.WorkingArea
+				{
+					Nodes = (BvhNode**) tempNodeWorkingBuffer.GetUnsafeReadOnlyPtr(),
+					Entities = (Entity*) tempEntityWorkingBuffer.GetUnsafeReadOnlyPtr(),
+#if BVH_SIMD
+					Vectors = (float4*) tempVectorWorkingBuffer.GetUnsafeReadOnlyPtr()
+#endif
+				};
+
+#if FULL_DIAGNOSTICS
+				Diagnostics _ = default;
+				return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
 #else
-			return World->Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+				return World->Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
 #endif
+			}
 		}
 
 #else // !BVH_ITERATIVE
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
+#if BVH_RECURSIVE
+			return World->Hit(r, 0, float.PositiveInfinity, out hitRec);
+#else
 			return World.Hit(r, 0, float.PositiveInfinity, out hitRec);
+#endif
 		}
 #endif
 

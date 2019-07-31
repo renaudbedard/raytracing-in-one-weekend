@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   type: 1
   albedo: {fileID: 11400000, guid: 80ab2fc9f45654b8a9d5d53bb31def9e, type: 2}
-  textureScale: {x: 8, y: 8}
+  textureScale: {x: 5, y: 5}
   fuzz: 0.3
   refractiveIndex: 1

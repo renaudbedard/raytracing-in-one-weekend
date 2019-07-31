@@ -19,8 +19,16 @@ namespace RaytracerInOneWeekend
 	[Serializable]
 	class SphereData
 	{
-		[SerializeField] bool enabled = true;
-		[SerializeField] [LabelWidth(150)] bool excludeFromOverlapTest = false;
+		[HorizontalGroup("Bools")]
+		[SerializeField]
+		[LabelWidth(52)]
+		bool enabled = true;
+
+		[HorizontalGroup("Bools")]
+		[SerializeField]
+		[LabelWidth(162)]
+		bool excludeFromOverlapTest = false;
+
 		[SerializeField] Vector3 center;
 		[SerializeField] float radius;
 
