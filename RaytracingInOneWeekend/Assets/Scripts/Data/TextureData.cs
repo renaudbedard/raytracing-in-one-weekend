@@ -18,9 +18,13 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(Type), TextureType.CheckerPattern)]
 		[SerializeField] Color secondaryColor;
 
+		[ShowIf(nameof(Type), TextureType.PerlinNoise)]
+		[SerializeField] float noiseFrequency;
+
 		public TextureType Type => type;
 		public Color MainColor => mainColor;
 		public Color SecondaryColor => secondaryColor;
+		public float NoiseFrequency => noiseFrequency;
 
 		public static TextureData Constant(float3 color)
 		{
@@ -40,6 +44,8 @@ namespace RaytracerInOneWeekend
 			data.secondaryColor = evenColor.ToColor();
 			return data;
 		}
+
+		// TODO: factory method for perlin noise
 
 #if UNITY_EDITOR
 		public bool Dirty { get; private set; }

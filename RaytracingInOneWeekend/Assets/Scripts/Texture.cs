@@ -21,16 +21,18 @@ namespace RaytracerInOneWeekend
 		public readonly TextureType Type;
 		public readonly float3 MainColor;
 		public readonly float3 SecondaryColor;
+		public readonly float NoiseFrequency;
 
-		public Texture(TextureType type, float3 mainColor, float3 secondaryColor)
+		public Texture(TextureType type, float3 mainColor, float3 secondaryColor, float noiseFrequency)
 		{
 			Type = type;
 			MainColor = mainColor;
 			SecondaryColor = secondaryColor;
+			NoiseFrequency = noiseFrequency;
 		}
 
 		[Pure]
-		public unsafe float3 Value(float3 position, float3 normal, float2 scale, PerlinData perlinData)
+		public float3 Value(float3 position, float3 normal, float2 scale, PerlinData perlinData)
 		{
 			switch (Type)
 			{
@@ -50,7 +52,7 @@ namespace RaytracerInOneWeekend
 					return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
 
 				case TextureType.PerlinNoise:
-					return perlinData.Sample(position);
+					return perlinData.Sample(position * NoiseFrequency);
 			}
 
 			return default;
@@ -127,8 +129,21 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public float Sample(float3 position)
 		{
-			int3 ijk = int3(4 * position) & 255;
-			return randomFloats[permX[ijk.x] ^ permY[ijk.y] ^ permZ[ijk.z]];
+			float3 uvw = smoothstep(0, 1, frac(position));
+			var ijk = (int3) floor(position);
+
+			float2x2* slices = stackalloc float2x2[2];
+
+			for (int di = 0; di < 2; di++)
+			for (int dj = 0; dj < 2; dj++)
+			for (int dk = 0; dk < 2; dk++)
+			{
+				slices[di][dj][dk] = randomFloats[permX[(ijk.x + di) & 255] ^ permY[(ijk.y + dj) & 255] ^ permZ[(ijk.z + dk) & 255]];
+			}
+
+			float2x2 alongX = Util.Lerp(slices[0], slices[1], uvw.x);
+			float2 alongY = lerp(alongX[0], alongX[1], uvw.y);
+			return lerp(alongY[0], alongY[1], uvw.z);
 		}
 	}
 }

@@ -507,7 +507,7 @@ namespace RaytracerInOneWeekend
 				TextureData albedo = material ? material.Albedo : null;
 				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius, material
 					? new Material(material.Type, material.TextureScale * sphereData.Radius, albedo
-							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3())
+							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency)
 							: default,
 						material.Fuzz, material.RefractiveIndex)
 					: default);

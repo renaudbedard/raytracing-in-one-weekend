@@ -1,4 +1,6 @@
 using Unity.Collections;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
@@ -40,6 +42,11 @@ namespace RaytracerInOneWeekend
 		public static void SafeDispose<T>(this ref NativeList<T> list) where T : struct
 		{
 			if (list.IsCreated) list.Dispose();
+		}
+
+		public static float2x2 Lerp(float2x2 lhs, float2x2 rhs, float s)
+		{
+			return float2x2(lerp(lhs[0], rhs[0], s), lerp(lhs[1], rhs[1], s));
 		}
 	}
 }
