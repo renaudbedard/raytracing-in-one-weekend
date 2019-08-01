@@ -45,12 +45,6 @@ namespace RaytracerInOneWeekend
 
 		[ReadOnly] public float2 Size;
 		[ReadOnly] public uint Seed;
-#if BVH_ITERATIVE
-		[ReadOnly] public int ThreadCount;
-#pragma warning disable 649
-		[NativeSetThreadIndex] [ReadOnly] int threadIndex;
-#pragma warning restore 649
-#endif
 		[ReadOnly] public Camera Camera;
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public uint TraceDepth;
@@ -74,11 +68,8 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public PerlinData PerlinData;
 
 #if BVH_ITERATIVE
-		public NativeArray<IntPtr> NodeWorkingBuffer;
-		public NativeArray<Entity> EntityWorkingBuffer;
-#if BVH_SIMD
-		public NativeArray<float4> VectorWorkingBuffer;
-#endif
+		[ReadOnly] public int NodeCount;
+		[ReadOnly] public int EntityCount;
 #endif
 
 		[WriteOnly] public NativeArray<float4> OutputSamples;
@@ -102,21 +93,22 @@ namespace RaytracerInOneWeekend
 			Diagnostics diagnostics = default;
 
 #if BVH_ITERATIVE
-			// for some reason, thread indices are [1, ProcessorCount] instead of [0, ProcessorCount[
-			int actualThreadIndex = threadIndex - 1;
+			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
+			Entity* entities = stackalloc Entity[EntityCount];
+#if BVH_SIMD
+			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
+			var entityGroupCount = (int) ceil(EntityCount / 4.0f);
+			float4* vectors = stackalloc float4[maxVectorWorkingSizePerEntity * entityGroupCount];
+#endif
 			var workingArea = new WorkingArea
 			{
-				Nodes = (BvhNode**) NodeWorkingBuffer.GetUnsafeReadOnlyPtr() +
-				        actualThreadIndex * (NodeWorkingBuffer.Length / ThreadCount),
-				Entities = (Entity*) EntityWorkingBuffer.GetUnsafeReadOnlyPtr() +
-				           actualThreadIndex * (EntityWorkingBuffer.Length / ThreadCount),
+				Nodes = nodes,
+				Entities = entities,
 #if BVH_SIMD
-				Vectors = (float4*) VectorWorkingBuffer.GetUnsafeReadOnlyPtr() +
-				          actualThreadIndex * (VectorWorkingBuffer.Length / ThreadCount)
+				Vectors = vectors
 #endif
 			};
 #endif
-
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + rng.NextFloat2()) / Size; // (u, v)

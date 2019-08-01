@@ -78,14 +78,6 @@ namespace RaytracerInOneWeekend
 		BvhNode* World => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
-#if BVH_ITERATIVE
-		NativeArray<IntPtr> nodeWorkingBuffer;
-		NativeArray<Entity> entityWorkingBuffer;
-#endif
-#if BVH_SIMD
-		NativeArray<float4> vectorWorkingBuffer;
-#endif
-
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
 
 		JobHandle? accumulateJobHandle;
@@ -173,14 +165,6 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.SafeDispose();
 			bvhNodeMetadataBuffer.SafeDispose();
 #endif
-#if BVH_ITERATIVE
-			nodeWorkingBuffer.SafeDispose();
-			entityWorkingBuffer.SafeDispose();
-#endif
-#if BVH_SIMD
-			vectorWorkingBuffer.SafeDispose();
-#endif
-
 			perlinData.Dispose();
 
 #if UNITY_EDITOR
@@ -386,12 +370,14 @@ namespace RaytracerInOneWeekend
 				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
 #if BVH_ITERATIVE
-				ThreadCount = SystemInfo.processorCount,
-				NodeWorkingBuffer = nodeWorkingBuffer,
-				EntityWorkingBuffer = entityWorkingBuffer,
+				NodeCount = bvhNodeBuffer.Length,
+				EntityCount = entityBuffer.Length,
+				// ThreadCount = SystemInfo.processorCount,
+				// NodeWorkingBuffer = nodeWorkingBuffer,
+				// EntityWorkingBuffer = entityWorkingBuffer,
 #endif
 #if BVH_SIMD
-				VectorWorkingBuffer = vectorWorkingBuffer,
+				// VectorWorkingBuffer = vectorWorkingBuffer,
 #endif
 			};
 
@@ -535,17 +521,6 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
 			World->SetupPointers(bvhNodeBuffer);
 
-#if BVH_ITERATIVE
-			int workerCount = SystemInfo.processorCount;
-
-			nodeWorkingBuffer.EnsureCapacity(bvhNodeBuffer.Length * workerCount);
-			entityWorkingBuffer.EnsureCapacity(entityBuffer.Length * workerCount);
-#endif
-#if BVH_SIMD
-			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
-			var entityGroupCount = (int) ceil(entityBuffer.Length / 4.0f);
-			vectorWorkingBuffer.EnsureCapacity(entityGroupCount * maxVectorWorkingSizePerEntity * workerCount);
-#endif
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
 #endif // BVH
@@ -553,33 +528,28 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			int workerCount = SystemInfo.processorCount;
+			BvhNode** nodes = stackalloc BvhNode*[bvhNodeBuffer.Length];
+			Entity* entities = stackalloc Entity[entityBuffer.Length];
 #if BVH_SIMD
 			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
 			var entityGroupCount = (int) ceil(entityBuffer.Length / 4.0f);
+			float4* vectors = stackalloc float4[maxVectorWorkingSizePerEntity * entityGroupCount];
 #endif
-			using (var tempNodeWorkingBuffer = new NativeArray<IntPtr>(bvhNodeBuffer.Length * workerCount, Allocator.Temp))
-			using (var tempEntityWorkingBuffer = new NativeArray<Entity>(entityBuffer.Length * workerCount, Allocator.Temp))
-#if BVH_SIMD
-			using (var tempVectorWorkingBuffer = new NativeArray<float4>(entityGroupCount * maxVectorWorkingSizePerEntity * workerCount, Allocator.Temp))
-#endif
+			var workingArea = new AccumulateJob.WorkingArea
 			{
-				var workingArea = new AccumulateJob.WorkingArea
-				{
-					Nodes = (BvhNode**) tempNodeWorkingBuffer.GetUnsafeReadOnlyPtr(),
-					Entities = (Entity*) tempEntityWorkingBuffer.GetUnsafeReadOnlyPtr(),
+				Nodes = nodes,
+				Entities = entities,
 #if BVH_SIMD
-					Vectors = (float4*) tempVectorWorkingBuffer.GetUnsafeReadOnlyPtr()
+				Vectors = vectors
 #endif
-				};
+			};
 
 #if FULL_DIAGNOSTICS
-				Diagnostics _ = default;
-				return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
+			Diagnostics _ = default;
+			return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
 #else
-				return World->Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+			return World->Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
 #endif
-			}
 		}
 
 #else // !BVH_ITERATIVE
