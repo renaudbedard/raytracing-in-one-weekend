@@ -115,6 +115,8 @@ namespace RaytracerInOneWeekend
 
 	unsafe struct PerlinData
 	{
+		// based on : http://www.eastfarthing.com/blog/2015-04-21-noise/
+
 		[NativeDisableUnsafePtrRestriction] readonly int* permX, permY, permZ;
 		[NativeDisableUnsafePtrRestriction] readonly float3* randomVectors;
 
@@ -126,28 +128,35 @@ namespace RaytracerInOneWeekend
 			this.randomVectors = randomVectors;
 		}
 
+		static float3 Falloff(float3 t)
+		{
+			t = abs(t);
+			return select(1 - (3 - 2 * t) * t * t, 0, t >= 1);
+		}
+
+		static float Surflet(float3 fp, float3 grad)
+		{
+			float3 ffp = Falloff(fp);
+			return ffp.x * ffp.y * ffp.z * dot(fp, grad);
+		}
+
 		[Pure]
 		public float Sample(float3 position)
 		{
-			float3 uvw = smoothstep(0, 1, frac(position));
-			var ijk = (int3) floor(position);
+			var cellPos = (int3) floor(position);
+			float result = 0;
 
-			float3* samples = stackalloc float3[2 * 2 * 2];
-			float3* sampleCursor = samples;
-
-			for (int di = 0; di < 2; di++)
-			for (int dj = 0; dj < 2; dj++)
-			for (int dk = 0; dk < 2; dk++)
+			for (int k = cellPos.z; k <= cellPos.z + 1; k++)
+			for (int j = cellPos.y; j <= cellPos.y + 1; j++)
+			for (int i = cellPos.x; i <= cellPos.x + 1; i++)
 			{
-				*sampleCursor++ = randomVectors[permX[(ijk.x + di) & 255] ^ permY[(ijk.y + dj) & 255] ^ permZ[(ijk.z + dk) & 255]];
+				int hash = permX[i & 255] ^ permY[j & 255] ^ permZ[k & 255];
+				float3 fractionalPos = position - float3(i, j, k);
+				result += Surflet(fractionalPos, randomVectors[hash]);
 			}
 
-			// TODO
-			// float2x2 alongX = Util.Lerp(slices[0], slices[1], uvw.x);
-			// float2 alongY = lerp(alongX[0], alongX[1], uvw.y);
-			// return lerp(alongY[0], alongY[1], uvw.z);
-
-			return 0;
+			// result of this algorithm appears to be [-1, 1]
+			return result * 0.5f + 0.5f;
 		}
 	}
 }
