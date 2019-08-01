@@ -15,4 +15,4 @@ MonoBehaviour:
   type: 3
   mainColor: {r: 0, g: 0, b: 0, a: 0}
   secondaryColor: {r: 0, g: 0, b: 0, a: 0}
-  noiseFrequency: 5
+  noiseFrequency: 3

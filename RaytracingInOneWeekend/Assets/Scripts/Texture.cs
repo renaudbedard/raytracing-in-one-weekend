@@ -52,7 +52,7 @@ namespace RaytracerInOneWeekend
 					return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
 
 				case TextureType.PerlinNoise:
-					return perlinData.Sample(position * NoiseFrequency);
+					return 0.5f * (1 + sin(NoiseFrequency * position.z + 10 * perlinData.Turbulence(position)));
 			}
 
 			return default;
@@ -141,7 +141,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public float Sample(float3 position)
+		public float Noise(float3 position)
 		{
 			var cellPos = (int3) floor(position);
 			float result = 0;
@@ -156,7 +156,25 @@ namespace RaytracerInOneWeekend
 			}
 
 			// result of this algorithm appears to be [-1, 1]
-			return result * 0.5f + 0.5f;
+			//return result * 0.5f + 0.5f;
+			return saturate(result);
+		}
+
+		[Pure]
+		public float Turbulence(float3 position, int depth = 7)
+		{
+			float accumulator = 0;
+			float3 p = position;
+			float weight = 1;
+
+			for (int i = 0; i < depth; i++)
+			{
+				accumulator += weight * Noise(p);
+				weight *= 0.5f;
+				p *= 2;
+			}
+
+			return saturate(accumulator);
 		}
 	}
 }
