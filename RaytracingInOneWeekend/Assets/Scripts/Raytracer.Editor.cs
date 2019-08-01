@@ -125,13 +125,7 @@ namespace RaytracerInOneWeekend
 				sphereBuffer.SafeDispose();
 				bvhNodeBuffer.SafeDispose();
 				entityBuffer.SafeDispose();
-#if BVH_ITERATIVE
-				entityWorkingBuffer.SafeDispose();
-				nodeWorkingBuffer.SafeDispose();
-#endif
-#if BVH_SIMD
-				vectorWorkingBuffer.SafeDispose();
-#endif
+
 				activeSpheres.Clear();
 			}
 #endif // BVH
