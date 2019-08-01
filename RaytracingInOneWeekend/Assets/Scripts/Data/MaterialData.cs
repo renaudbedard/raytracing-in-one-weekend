@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using System.Linq;
 using Unity.Mathematics;
+using UnityEditor;
 using UnityEngine;
 
 #if ODIN_INSPECTOR
@@ -13,7 +16,6 @@ namespace RaytracerInOneWeekend
 	class MaterialData : ScriptableObject
 	{
 		[SerializeField] MaterialType type = MaterialType.None;
-		[SerializeField] TextureData albedo = null;
 
 		[SerializeField] Vector2 textureScale = Vector2.one;
 
@@ -22,6 +24,21 @@ namespace RaytracerInOneWeekend
 
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
+
+#if UNITY_EDITOR
+		[ValueDropdown(nameof(GetMaterialAssets))]
+#endif
+		[SerializeField] TextureData albedo = null;
+#if UNITY_EDITOR
+		[ShowInInspector]
+		[InlineEditor(DrawHeader = false)]
+		[ShowIf(nameof(albedo))]
+		TextureData AlbedoTexture
+		{
+			get => albedo;
+			set => albedo = value;
+		}
+#endif
 
 		public MaterialType Type => type;
 		public float Fuzz => fuzz;
@@ -78,6 +95,13 @@ namespace RaytracerInOneWeekend
 		{
 			dirty = true;
 		}
+
+		IEnumerable<ValueDropdownItem<TextureData>> GetMaterialAssets => AssetDatabase.FindAssets("t:TextureData")
+			.Select(AssetDatabase.GUIDToAssetPath)
+			.Select(AssetDatabase.LoadAssetAtPath<TextureData>)
+			.Select(asset => new ValueDropdownItem<TextureData>(asset.name, asset))
+			.Concat(new[] { new ValueDropdownItem<TextureData>("Null", null) })
+			.OrderBy(x => x.Value != null).ThenBy(x => x.Text);
 #endif
 	}
 }

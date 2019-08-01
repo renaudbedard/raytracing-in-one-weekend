@@ -19,7 +19,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] Color secondaryColor;
 
 		[ShowIf(nameof(Type), TextureType.PerlinNoise)]
-		[SerializeField] float noiseFrequency;
+		[SerializeField] float noiseFrequency = 1;
 
 		public TextureType Type => type;
 		public Color MainColor => mainColor;
