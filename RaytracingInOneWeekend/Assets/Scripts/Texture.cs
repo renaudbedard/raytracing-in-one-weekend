@@ -64,7 +64,7 @@ namespace RaytracerInOneWeekend
 		const int BufferSize = 256;
 
 		NativeArray<int> xPermBuffer, yPermBuffer, zPermBuffer;
-		NativeArray<float> randomFloatBuffer;
+		NativeArray<float3> randomVectorBuffer;
 
 		public void Generate(uint seed)
 		{
@@ -90,9 +90,9 @@ namespace RaytracerInOneWeekend
 			GeneratePermutationBuffer(ref yPermBuffer);
 			GeneratePermutationBuffer(ref zPermBuffer);
 
-			randomFloatBuffer.EnsureCapacity(BufferSize);
+			randomVectorBuffer.EnsureCapacity(BufferSize);
 			for (int i = 0; i < BufferSize; i++)
-				randomFloatBuffer[i] = rng.NextFloat();
+				randomVectorBuffer[i] = rng.NextFloat3Direction();
 		}
 
 		public void Dispose()
@@ -100,7 +100,7 @@ namespace RaytracerInOneWeekend
 			xPermBuffer.SafeDispose();
 			yPermBuffer.SafeDispose();
 			zPermBuffer.SafeDispose();
-			randomFloatBuffer.SafeDispose();
+			randomVectorBuffer.SafeDispose();
 		}
 
 		public unsafe PerlinData GetRuntimeData()
@@ -109,21 +109,21 @@ namespace RaytracerInOneWeekend
 				(int*) xPermBuffer.GetUnsafeReadOnlyPtr(),
 				(int*) yPermBuffer.GetUnsafeReadOnlyPtr(),
 				(int*) zPermBuffer.GetUnsafeReadOnlyPtr(),
-				(float*) randomFloatBuffer.GetUnsafeReadOnlyPtr());
+				(float3*) randomVectorBuffer.GetUnsafeReadOnlyPtr());
 		}
 	}
 
 	unsafe struct PerlinData
 	{
 		[NativeDisableUnsafePtrRestriction] readonly int* permX, permY, permZ;
-		[NativeDisableUnsafePtrRestriction] readonly float* randomFloats;
+		[NativeDisableUnsafePtrRestriction] readonly float3* randomVectors;
 
-		public PerlinData(int* permX, int* permY, int* permZ, float* randomFloats)
+		public PerlinData(int* permX, int* permY, int* permZ, float3* randomVectors)
 		{
 			this.permX = permX;
 			this.permY = permY;
 			this.permZ = permZ;
-			this.randomFloats = randomFloats;
+			this.randomVectors = randomVectors;
 		}
 
 		[Pure]
@@ -132,18 +132,22 @@ namespace RaytracerInOneWeekend
 			float3 uvw = smoothstep(0, 1, frac(position));
 			var ijk = (int3) floor(position);
 
-			float2x2* slices = stackalloc float2x2[2];
+			float3* samples = stackalloc float3[2 * 2 * 2];
+			float3* sampleCursor = samples;
 
 			for (int di = 0; di < 2; di++)
 			for (int dj = 0; dj < 2; dj++)
 			for (int dk = 0; dk < 2; dk++)
 			{
-				slices[di][dj][dk] = randomFloats[permX[(ijk.x + di) & 255] ^ permY[(ijk.y + dj) & 255] ^ permZ[(ijk.z + dk) & 255]];
+				*sampleCursor++ = randomVectors[permX[(ijk.x + di) & 255] ^ permY[(ijk.y + dj) & 255] ^ permZ[(ijk.z + dk) & 255]];
 			}
 
-			float2x2 alongX = Util.Lerp(slices[0], slices[1], uvw.x);
-			float2 alongY = lerp(alongX[0], alongX[1], uvw.y);
-			return lerp(alongY[0], alongY[1], uvw.z);
+			// TODO
+			// float2x2 alongX = Util.Lerp(slices[0], slices[1], uvw.x);
+			// float2 alongY = lerp(alongX[0], alongX[1], uvw.y);
+			// return lerp(alongY[0], alongY[1], uvw.z);
+
+			return 0;
 		}
 	}
 }
