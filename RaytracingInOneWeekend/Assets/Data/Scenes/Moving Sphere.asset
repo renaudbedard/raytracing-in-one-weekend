@@ -10,34 +10,23 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
-  m_Name: Perlin Noise (Book 2)
+  m_Name: Moving Sphere
   m_EditorClassIdentifier: 
-  cameraPosition: {x: -13, y: 2, z: 3}
+  cameraPosition: {x: 0.001, y: 0, z: -10}
   cameraTarget: {x: 0, y: 0, z: 0}
   cameraAperture: 0
   cameraFieldOfView: 20
   spheres:
   - enabled: 1
-    moving: 0
+    moving: 1
     excludeFromOverlapTest: 0
-    center: {x: 0, y: -1000, z: -1}
-    centerFrom: {x: 0, y: 0, z: 0}
-    fromTime: 0
-    centerTo: {x: 0, y: 0, z: 0}
-    toTime: 0
-    radius: 1000
-    material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
-  - enabled: 1
-    moving: 0
-    excludeFromOverlapTest: 0
-    center: {x: 0, y: 2, z: 0}
-    centerFrom: {x: 0, y: 0, z: 0}
-    fromTime: 0
-    centerTo: {x: 0, y: 0, z: 0}
-    toTime: 0
-    radius: 2
-    material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
-  randomSeed: 10000
+    center: {x: 0, y: 0, z: 0}
+    centerFrom: {x: -0.5, y: 0, z: 0}
+    centerTo: {x: 0.5, y: 0, z: 0}
+    timeRange: {x: 0, y: 1}
+    radius: 1
+    material: {fileID: 11400000, guid: 2b589fea2cde947bb9dd0396429df3b6, type: 2}
+  randomSeed: 1
   randomSphereGroups: []
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}

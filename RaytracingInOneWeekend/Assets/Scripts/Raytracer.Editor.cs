@@ -204,7 +204,7 @@ namespace RaytracerInOneWeekend
 					transparent ? transparentPreviewCommandBuffer : opaquePreviewCommandBuffer;
 
 				previewCommandBuffer.DrawMesh(meshFilter.sharedMesh,
-					Matrix4x4.TRS(sphere.Center, Quaternion.identity, sphere.Radius * 2 * Vector3.one), material, 0,
+					Matrix4x4.TRS(sphere.Center(sphere.MidTime), Quaternion.identity, sphere.Radius * 2 * Vector3.one), material, 0,
 					material.FindPass("FORWARD"));
 			}
 		}
@@ -222,14 +222,14 @@ namespace RaytracerInOneWeekend
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
 			foreach (SphereData sphere in activeSpheres
 				.Where(x => x.Material)
-				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center, sceneCameraTransform.forward)))
+				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center(x.MidTime), sceneCameraTransform.forward)))
 			{
 				Color albedo = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
 				Gizmos.color = sphere.Material.Type == MaterialType.Dielectric
 					? albedo.GetAlphaReplaced(0.5f)
 					: albedo.GetAlphaReplaced(1);
 
-				Gizmos.DrawSphere(sphere.Center, sphere.Radius);
+				Gizmos.DrawSphere(sphere.Center(sphere.MidTime), sphere.Radius);
 			}
 
 #if BVH

@@ -19,7 +19,7 @@ namespace RaytracerInOneWeekend
 		// single sphere hit test
 		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
-			float3 center = s.Center;
+			float3 center = s.Center(r.Time);
 			float squaredRadius = s.SquaredRadius;
 			float radius = s.Radius;
 			Material material = s.Material;
@@ -284,9 +284,10 @@ namespace RaytracerInOneWeekend
 					if (candidateIndex < candidateCount)
 					{
 						Sphere* sphereData = candidateCursor->AsSphere;
-						blockCursor->CenterX[j] = sphereData->Center.x;
-						blockCursor->CenterY[j] = sphereData->Center.y;
-						blockCursor->CenterZ[j] = sphereData->Center.z;
+						float3 center = sphereData->Center(r.Time);
+						blockCursor->CenterX[j] = center.x;
+						blockCursor->CenterY[j] = center.y;
+						blockCursor->CenterZ[j] = center.z;
 						blockCursor->SquaredRadius[j] = sphereData->SquaredRadius;
 						++candidateCursor;
 						++candidateIndex;
@@ -341,7 +342,8 @@ namespace RaytracerInOneWeekend
 			Sphere* closestSphere = candidateListHead[closestId].AsSphere;
 			float3 point = r.GetPoint(minDistance);
 
-			rec = new HitRecord(minDistance, point, (point - closestSphere->Center) / closestSphere->Radius,
+			rec = new HitRecord(minDistance, point,
+				(point - closestSphere->Center(r.Time)) / closestSphere->Radius,
 				closestSphere->Material);
 
 			return true;

@@ -20,7 +20,8 @@ namespace RaytracerInOneWeekend
 		public readonly float2 TextureScale;
 		public readonly float Parameter;
 
-		public Material(MaterialType type, float2 textureScale, Texture albedo = default, float fuzz = 0, float refractiveIndex = 1) : this()
+		public Material(MaterialType type, float2 textureScale, Texture albedo = default, float fuzz = 0,
+			float refractiveIndex = 1) : this()
 		{
 			Type = type;
 			Albedo = albedo;
@@ -34,7 +35,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public unsafe bool Scatter(Ray r, HitRecord rec, Random rng, PerlinData perlinData,
+		public bool Scatter(Ray r, HitRecord rec, Random rng, PerlinData perlinData,
 			out float3 attenuation, out Ray scattered)
 		{
 			switch (Type)
@@ -42,7 +43,7 @@ namespace RaytracerInOneWeekend
 				case MaterialType.Lambertian:
 				{
 					float3 target = rec.Point + rec.Normal + rng.UnitVector();
-					scattered = new Ray(rec.Point, target - rec.Point);
+					scattered = new Ray(rec.Point, target - rec.Point, r.Time);
 					attenuation = Albedo.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return true;
 				}
@@ -51,7 +52,7 @@ namespace RaytracerInOneWeekend
 				{
 					float fuzz = Parameter;
 					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
-					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere());
+					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere(), r.Time);
 					attenuation = Albedo.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return dot(scattered.Direction, rec.Normal) > 0;
 				}
@@ -81,10 +82,10 @@ namespace RaytracerInOneWeekend
 					if (Refract(r.Direction, outwardNormal, niOverNt, out float3 refracted))
 					{
 						float reflectProb = Schlick(cosine, refractiveIndex);
-						scattered = new Ray(rec.Point, rng.NextFloat() < reflectProb ? reflected : refracted);
+						scattered = new Ray(rec.Point, rng.NextFloat() < reflectProb ? reflected : refracted, r.Time);
 					}
 					else
-						scattered = new Ray(rec.Point, reflected);
+						scattered = new Ray(rec.Point, reflected, r.Time);
 
 					return true;
 				}

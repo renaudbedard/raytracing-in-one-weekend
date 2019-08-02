@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using static Unity.Mathematics.math;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -21,15 +22,26 @@ namespace RaytracerInOneWeekend
 	{
 		[HorizontalGroup("Bools")]
 		[SerializeField]
-		[LabelWidth(52)]
+		[LabelWidth(48)]
 		bool enabled = true;
 
 		[HorizontalGroup("Bools")]
 		[SerializeField]
-		[LabelWidth(162)]
+		[LabelWidth(44)]
+		bool moving = false;
+
+		[HorizontalGroup("Bools")]
+		[SerializeField]
+		[LabelWidth(147)]
 		bool excludeFromOverlapTest = false;
 
-		[SerializeField] Vector3 center;
+		[HideIf(nameof(moving))]
+		[SerializeField]
+		Vector3 center;
+
+		[ShowIf(nameof(moving))] [SerializeField] Vector3 centerFrom, centerTo;
+		[ShowIf(nameof(moving))] [SerializeField] Vector2 timeRange;
+
 		[SerializeField] float radius;
 
 		[SerializeField]
@@ -58,9 +70,25 @@ namespace RaytracerInOneWeekend
 			this.material = material;
 		}
 
+		public SphereData(Vector3 center, Vector3 offset, float t0, float t1, float radius, MaterialData material)
+		{
+			centerFrom = center;
+			centerTo = center + offset;
+			moving = true;
+			timeRange = float2(t0, t1);
+			this.radius = radius;
+			this.material = material;
+		}
+
 		public bool Enabled => enabled;
 		public bool ExcludeFromOverlapTest => excludeFromOverlapTest;
-		public Vector3 Center => center;
+		public bool Moving => moving;
+		public Vector3 CenterFrom => !moving ? center : centerFrom;
+		public Vector3 CenterTo => !moving ? center : centerTo;
+		public Vector3 Center(float t) => lerp(CenterFrom, CenterTo, saturate(unlerp(FromTime, ToTime, t)));
+		public float FromTime => timeRange.x;
+		public float ToTime => timeRange.y;
+		public float MidTime => (timeRange.x + timeRange.y) / 2;
 		public float Radius => radius;
 
 		public MaterialData Material

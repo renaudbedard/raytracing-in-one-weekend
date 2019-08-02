@@ -165,9 +165,14 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(Distribution), RandomDistribution.DartThrowing)]
 		[Range(0, 1000)] public float TentativeCount = 1;
 
-		[MinMaxSlider(-50, 50, true)] public Vector2 CenterX = default;
-		[MinMaxSlider(-50, 50, true)] public Vector2 CenterY = default;
-		[MinMaxSlider(-50, 50, true)] public Vector2 CenterZ = default;
+		[MinMaxSlider(-50, 50, true)]
+		public Vector2 CenterX = default, CenterY = default, CenterZ = default;
+
+		[Range(0, 1)] public float MovementChance = 0;
+
+		[HideIf(nameof(MovementChance), 0.0f)]
+		[MinMaxSlider(-1, 1, true)]
+		public Vector2 MovementXOffset = default, MovementYOffset = default, MovementZOffset = default;
 
 		[MinMaxSlider(0, 100, true)] public Vector2 Radius = default;
 

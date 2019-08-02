@@ -8,6 +8,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Assertions.Must;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
@@ -349,7 +350,7 @@ namespace RaytracerInOneWeekend
 				focusDistance = hitRec.Distance;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
-				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
+				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance, 0, 1);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -495,15 +496,17 @@ namespace RaytracerInOneWeekend
 			int entityIndex = 0;
 			for (var i = 0; i < activeSpheres.Count; i++)
 			{
-				SphereData sphereData = activeSpheres[i];
-				MaterialData material = sphereData.Material;
+				SphereData s = activeSpheres[i];
+				MaterialData material = s.Material;
 				TextureData albedo = material ? material.Albedo : null;
-				sphereBuffer[i] = new Sphere(sphereData.Center, sphereData.Radius, material
-					? new Material(material.Type, material.TextureScale * sphereData.Radius, albedo
-							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency)
-							: default,
-						material.Fuzz, material.RefractiveIndex)
-					: default);
+				sphereBuffer[i] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
+					material
+						? new Material(material.Type, material.TextureScale * s.Radius,
+							albedo
+								? new Texture(albedo.Type, albedo.MainColor.ToFloat3(),
+									albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency)
+								: default, material.Fuzz, material.RefractiveIndex)
+						: default);
 
 				entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
 			}
@@ -627,7 +630,21 @@ namespace RaytracerInOneWeekend
 
 				bool AnyOverlap(float3 center, float radius) => activeSpheres.Any(x =>
 						!x.ExcludeFromOverlapTest &&
-						distance(x.Center, center) < x.Radius + radius + group.MinDistance);
+						distance(x.Center(x.MidTime), center) < x.Radius + radius + group.MinDistance);
+
+				SphereData GetSphere(float3 center, float radius)
+				{
+					bool moving = rng.NextFloat() < group.MovementChance;
+					if (moving)
+					{
+						float3 offset = rng.NextFloat3(
+							float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
+							float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
+
+						return new SphereData(center, offset, 0, 1, radius, GetMaterial());
+					}
+					return new SphereData(center, radius, GetMaterial());
+				}
 
 				switch (group.Distribution)
 				{
@@ -643,7 +660,7 @@ namespace RaytracerInOneWeekend
 							if (AnyOverlap(center, radius))
 								continue;
 
-							activeSpheres.Add(new SphereData(center, radius, GetMaterial()));
+							activeSpheres.Add(GetSphere(center, radius));
 						}
 						break;
 
@@ -670,7 +687,7 @@ namespace RaytracerInOneWeekend
 							if (AnyOverlap(center, radius))
 								continue;
 
-							activeSpheres.Add(new SphereData(center, radius, GetMaterial()));
+							activeSpheres.Add(GetSphere(center, radius));
 						}
 						break;
 				}
