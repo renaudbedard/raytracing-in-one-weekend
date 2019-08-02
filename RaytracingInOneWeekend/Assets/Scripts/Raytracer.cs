@@ -42,20 +42,25 @@ namespace RaytracerInOneWeekend
 		[SerializeField] SceneData scene = null;
 
 		[Title("Debug")]
+		[SerializeField] Shader viewRangeShader = null;
 		[OdinReadOnly] public uint AccumulatedSamples;
 
 		[UsedImplicitly]
 		[OdinReadOnly]
 		public float MillionRaysPerSecond, AvgMRaysPerSecond, LastBatchDuration, LastTraceDuration;
 
+		[UsedImplicitly]
+		[OdinReadOnly]
+		public float BufferMinValue, BufferMaxValue;
+
 		UnityEngine.Material viewRangeMaterial;
 		Texture2D frontBufferTexture, diagnosticsTexture;
-		NativeArray<RGBA32> frontBuffer;
-		NativeArray<Diagnostics> diagnosticsBuffer;
+		CommandBuffer commandBuffer;
 
 		// TODO: allocation order of all these buffers is probably pretty crucial for cache locality
 
-		CommandBuffer commandBuffer;
+		NativeArray<RGBA32> frontBuffer;
+		NativeArray<Diagnostics> diagnosticsBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
 
 #if SOA_SIMD
@@ -114,6 +119,7 @@ namespace RaytracerInOneWeekend
 #if !UNITY_EDITOR
 		const BufferView bufferView = BufferView.Front;
 #endif
+		int channelPropertyId, minimumRangePropertyId;
 
 		void Awake()
 		{
@@ -127,7 +133,9 @@ namespace RaytracerInOneWeekend
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
 #endif
 
-			viewRangeMaterial = new UnityEngine.Material(Shader.Find("Hidden/ViewRange"));
+			viewRangeMaterial = new UnityEngine.Material(viewRangeShader);
+			channelPropertyId = Shader.PropertyToID("_Channel");
+			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
 
 			ignoreBatchTimings = true;
 		}
@@ -272,7 +280,6 @@ namespace RaytracerInOneWeekend
 			switch (bufferView)
 			{
 				case BufferView.RayCount:
-					viewRangeMaterial.SetInt("_Channel", 0);
 					foreach (Diagnostics value in diagnosticsBuffer)
 					{
 						bufferMin = min(bufferMin, value.RayCount);
@@ -282,7 +289,6 @@ namespace RaytracerInOneWeekend
 
 #if FULL_DIAGNOSTICS && BVH_ITERATIVE
 				case BufferView.BvhHitCount:
-					viewRangeMaterial.SetInt("_Channel", 1);
 					foreach (Diagnostics value in diagnosticsBuffer)
 					{
 						bufferMin = min(bufferMin, value.BoundsHitCount);
@@ -291,7 +297,6 @@ namespace RaytracerInOneWeekend
 					break;
 
 				case BufferView.CandidateCount:
-					viewRangeMaterial.SetInt("_Channel", 2);
 					foreach (Diagnostics value in diagnosticsBuffer)
 					{
 						bufferMin = min(bufferMin, value.CandidateCount);
@@ -305,9 +310,10 @@ namespace RaytracerInOneWeekend
 			{
 				case BufferView.Front: frontBufferTexture.Apply(false); break;
 				default:
+					BufferMinValue = bufferMin;
+					BufferMaxValue = bufferMax;
 					diagnosticsTexture.Apply(false);
-					viewRangeMaterial.SetFloat("_Minimum", bufferMin);
-					viewRangeMaterial.SetFloat("_Range", bufferMax - bufferMin);
+					viewRangeMaterial.SetVector(minimumRangePropertyId, new Vector4(bufferMin, bufferMax - bufferMin));
 					break;
 			}
 
@@ -318,8 +324,14 @@ namespace RaytracerInOneWeekend
 				var blitTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget);
 				switch (bufferView)
 				{
-					case BufferView.Front: commandBuffer.Blit(frontBufferTexture, blitTarget); break;
-					default: commandBuffer.Blit(diagnosticsTexture, blitTarget, viewRangeMaterial); break;
+					case BufferView.Front:
+						commandBuffer.Blit(frontBufferTexture, blitTarget);
+						break;
+
+					default:
+						viewRangeMaterial.SetInt(channelPropertyId, (int) bufferView - 1);
+						commandBuffer.Blit(diagnosticsTexture, blitTarget, viewRangeMaterial);
+						break;
 				}
 
 				targetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);

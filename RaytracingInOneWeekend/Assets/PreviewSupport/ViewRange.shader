@@ -17,8 +17,8 @@ Shader "Hidden/ViewRange"
 
             #include "UnityCG.cginc"
 
-            uniform float _Minimum, _Range;
             uniform int _Channel;
+            uniform float2 _Minimum_Range;
 
             struct appdata
             {
@@ -60,7 +60,7 @@ Shader "Hidden/ViewRange"
             float4 frag (v2f i) : SV_Target
             {
                 fixed4 col = tex2D(_MainTex, i.uv);
-                return float4(inferno(saturate((col[_Channel] - _Minimum) / _Range)), 1);
+                return float4(inferno(saturate((col[_Channel] - _Minimum_Range.x) / _Minimum_Range.y)), 1);
             }
             ENDCG
         }
