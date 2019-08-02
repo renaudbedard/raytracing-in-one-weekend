@@ -60,10 +60,10 @@ namespace RaytracerInOneWeekend
 
 #if SOA_SIMD
 		SoaSpheres sphereBuffer;
-		internal SoaSpheres World => sphereBuffer;
+		SoaSpheres World => sphereBuffer;
 #elif AOSOA_SIMD
 		AosoaSpheres sphereBuffer;
-		internal AosoaSpheres World => sphereBuffer;
+		AosoaSpheres World => sphereBuffer;
 #else // !SOA_SIMD && !AOSOA_SIMD
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Entity> entityBuffer;
@@ -372,12 +372,6 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 				NodeCount = bvhNodeBuffer.Length,
 				EntityCount = entityBuffer.Length,
-				// ThreadCount = SystemInfo.processorCount,
-				// NodeWorkingBuffer = nodeWorkingBuffer,
-				// EntityWorkingBuffer = entityWorkingBuffer,
-#endif
-#if BVH_SIMD
-				// VectorWorkingBuffer = vectorWorkingBuffer,
 #endif
 			};
 

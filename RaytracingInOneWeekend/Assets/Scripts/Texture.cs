@@ -155,8 +155,6 @@ namespace RaytracerInOneWeekend
 				result += Surflet(fractionalPos, randomVectors[hash]);
 			}
 
-			// result of this algorithm appears to be [-1, 1]
-			//return result * 0.5f + 0.5f;
 			return saturate(result);
 		}
 
