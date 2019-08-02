@@ -459,14 +459,14 @@ namespace RaytracerInOneWeekend
 
 			for (var i = 0; i < activeSpheres.Count; i++)
 			{
-				SphereData sphereData = activeSpheres[i];
-				sphereBuffer.SetElement(i, sphereData.Center, sphereData.Radius);
+				SphereData s = activeSpheres[i];
+				sphereBuffer.SetElement(i, s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius);
 
-				MaterialData material = sphereData.Material;
+				MaterialData material = s.Material;
 
 				TextureData albedo = material.Albedo;
 				sphereBuffer.Material[i] =
-					new Material(material.Type, material.TextureScale * sphereData.Radius, albedo
+					new Material(material.Type, material.TextureScale * s.Radius, albedo
 							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency)
 							: default,
 						material.Fuzz, material.RefractiveIndex);

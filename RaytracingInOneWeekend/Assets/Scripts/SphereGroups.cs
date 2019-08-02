@@ -17,14 +17,23 @@ using JetBrains.Annotations;
 namespace RaytracerInOneWeekend
 {
 #if SOA_SIMD
-	struct SoaSpheres : IDisposable
+	unsafe struct SoaSpheres : IDisposable
 	{
 		public readonly int BlockCount;
 
-		public NativeArray<float> CenterX, CenterY, CenterZ;
+		public NativeArray<float> CenterFromX, CenterFromY, CenterFromZ;
+		public NativeArray<float> CenterToX, CenterToY, CenterToZ;
+		public NativeArray<float> FromTime, ToTime;
 		public NativeArray<float> SquaredRadius, Radius;
 		public NativeArray<Material> Material;
-		public int Length => CenterX.Length;
+
+		[NativeDisableUnsafePtrRestriction]
+		public readonly float4* PtrCenterFromX, PtrCenterFromY, PtrCenterFromZ,
+			PtrCenterToX, PtrCenterToY, PtrCenterToZ,
+			PtrFromTime, PtrToTime,
+			PtrSqRadius;
+
+		public int Length => CenterFromX.Length;
 
 		public SoaSpheres(int length)
 		{
@@ -32,34 +41,53 @@ namespace RaytracerInOneWeekend
 			BlockCount = (int) ceil(length / 4.0);
 			length = BlockCount * 4;
 
-			CenterX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterFromX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterFromY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterFromZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterToX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterToY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterToZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			FromTime = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			ToTime = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			SquaredRadius = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
 			Radius = new NativeArray<float>(dataLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			Material = new NativeArray<Material>(dataLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
 			for (int i = dataLength; i < length; i++)
 			{
-				CenterX[i] = CenterY[i] = CenterZ[i] = float.PositiveInfinity;
+				CenterFromX[i] = CenterFromY[i] = CenterFromZ[i] = float.PositiveInfinity;
+				CenterToX[i] = CenterToY[i] = CenterToZ[i] = float.PositiveInfinity;
+				FromTime[i] = ToTime[i] = 0;
 				SquaredRadius[i] = 0;
 			}
+
+			// precache pointers
+			PtrCenterFromX = (float4*) CenterFromX.GetUnsafeReadOnlyPtr();
+			PtrCenterFromY = (float4*) CenterFromY.GetUnsafeReadOnlyPtr();
+			PtrCenterFromZ = (float4*) CenterFromZ.GetUnsafeReadOnlyPtr();
+			PtrCenterToX = (float4*) CenterToX.GetUnsafeReadOnlyPtr();
+			PtrCenterToY = (float4*) CenterToY.GetUnsafeReadOnlyPtr();
+			PtrCenterToZ = (float4*) CenterToZ.GetUnsafeReadOnlyPtr();
+			PtrFromTime = (float4*) FromTime.GetUnsafeReadOnlyPtr();
+			PtrToTime = (float4*) ToTime.GetUnsafeReadOnlyPtr();
+			PtrSqRadius = (float4*) SquaredRadius.GetUnsafeReadOnlyPtr();
 		}
 
-		public void SetElement(int i, float3 center, float radius)
+		public void SetElement(int i, float3 fromCenter, float3 toCenter, float t0, float t1, float radius)
 		{
-			CenterX[i] = center.x;
-			CenterY[i] = center.y;
-			CenterZ[i] = center.z;
+			CenterFromX[i] = fromCenter.x; CenterFromY[i] = fromCenter.y; CenterFromZ[i] = fromCenter.z;
+			CenterToX[i] = toCenter.x; CenterToY[i] = toCenter.y; CenterToZ[i] = toCenter.z;
+			FromTime[i] = t0; ToTime[i] = t1;
 			Radius[i] = radius;
 			SquaredRadius[i] = radius * radius;
 		}
 
 		public void Dispose()
 		{
-			CenterX.SafeDispose();
-			CenterY.SafeDispose();
-			CenterZ.SafeDispose();
+			CenterFromX.SafeDispose(); CenterFromY.SafeDispose(); CenterFromZ.SafeDispose();
+			CenterToX.SafeDispose(); CenterToY.SafeDispose(); CenterToZ.SafeDispose();
+			FromTime.SafeDispose(); ToTime.SafeDispose();
 			SquaredRadius.SafeDispose();
 			Radius.SafeDispose();
 			Material.SafeDispose();

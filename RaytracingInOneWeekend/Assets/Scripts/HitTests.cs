@@ -76,43 +76,45 @@ namespace RaytracerInOneWeekend
 
 #elif AOSOA_SIMD || SOA_SIMD
 #if SOA_SIMD
-		public static unsafe bool Hit(this SoaSpheres spheres, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static unsafe bool Hit(this SoaSpheres s, Ray r, float tMin, float tMax, out HitRecord rec)
 #elif AOSOA_SIMD
 		public static unsafe bool Hit(this AosoaSpheres spheres, Ray r, float tMin, float tMax, out HitRecord rec)
 #endif
 		{
 #if SOA_SIMD
-			float4* pCenterX = (float4*) spheres.CenterX.GetUnsafeReadOnlyPtr(),
-				pCenterY = (float4*) spheres.CenterY.GetUnsafeReadOnlyPtr(),
-				pCenterZ = (float4*) spheres.CenterZ.GetUnsafeReadOnlyPtr(),
-				pSqRadius = (float4*) spheres.SquaredRadius.GetUnsafeReadOnlyPtr();
+			float4* centerFromX = s.PtrCenterFromX, centerFromY = s.PtrCenterFromY, centerFromZ = s.PtrCenterFromZ;
+			float4* centerToX = s.PtrCenterToX, centerToY = s.PtrCenterToY, centerToZ = s.PtrCenterToZ;
+			float4* fromTime = s.PtrFromTime, toTime = s.PtrToTime;
+			float4* sqRadius = s.PtrSqRadius;
 #elif AOSOA_SIMD
 			float4* blockCursor = spheres.ReadOnlyDataPointer;
 #endif
-
 			rec = new HitRecord(tMax, 0, 0, default);
 			float4 a = dot(r.Direction, r.Direction);
 			int4 curId = int4(0, 1, 2, 3), hitId = -1;
 			float4 hitT = tMax;
-			int count = spheres.BlockCount;
+			int count = s.BlockCount;
 
 			for (int i = 0; i < count; i++)
 			{
-#if SOA_SIMD
-				float4 centerX = *pCenterX, centerY = *pCenterY, centerZ = *pCenterZ, sqRadius = *pSqRadius;
-#elif AOSOA_SIMD
+#if AOSOA_SIMD
 				float4 centerX = *(blockCursor + (int) AosoaSpheres.Streams.CenterX),
 					centerY = *(blockCursor + (int) AosoaSpheres.Streams.CenterY),
 					centerZ = *(blockCursor + (int) AosoaSpheres.Streams.CenterZ),
 					sqRadius = *(blockCursor + (int) AosoaSpheres.Streams.SquaredRadius);
 #endif
+				float4 timeStep = saturate(unlerp(*fromTime, *toTime, r.Time));
+
+				float4 centerX = lerp(*centerFromX, *centerToX, timeStep),
+					centerY = lerp(*centerFromY, *centerToY, timeStep),
+					centerZ = lerp(*centerFromZ, *centerToZ, timeStep);
 
 				float4 ocX = r.Origin.x - centerX,
 					ocY = r.Origin.y - centerY,
 					ocZ = r.Origin.z - centerZ;
 
 				float4 b = ocX * r.Direction.x + ocY * r.Direction.y + ocZ * r.Direction.z;
-				float4 c = ocX * ocX + ocY * ocY + ocZ * ocZ - sqRadius;
+				float4 c = ocX * ocX + ocY * ocY + ocZ * ocZ - *sqRadius;
 				float4 discriminant = b * b - a * c;
 
 				bool4 discriminantTest = discriminant > 0;
@@ -134,8 +136,10 @@ namespace RaytracerInOneWeekend
 				curId += 4;
 
 #if SOA_SIMD
-				pCenterX++; pCenterY++; pCenterZ++;
-				pSqRadius++;
+				++centerFromX; ++centerFromY; ++centerFromZ;
+				++centerToX; ++centerToY; ++centerToZ;
+				++fromTime; ++toTime;
+				++sqRadius;
 #elif AOSOA_SIMD
 				blockCursor += AosoaSpheres.StreamCount;
 #endif
@@ -150,10 +154,11 @@ namespace RaytracerInOneWeekend
 			int closestId = hitId[firstLane];
 
 #if SOA_SIMD
-			float3 closestCenter = float3(spheres.CenterX[closestId],
-				spheres.CenterY[closestId],
-				spheres.CenterZ[closestId]);
-			float closestRadius = spheres.Radius[closestId];
+			float3 closestCenterFrom = float3(s.CenterFromX[closestId], s.CenterFromY[closestId], s.CenterFromZ[closestId]);
+			float3 closestCenterTo = float3(s.CenterToX[closestId], s.CenterToY[closestId], s.CenterToZ[closestId]);
+			float closestTimeStep = saturate(unlerp(s.FromTime[closestId], s.ToTime[closestId], r.Time));
+			float3 closestCenter = lerp(closestCenterFrom, closestCenterTo, closestTimeStep);
+			float closestRadius = s.Radius[closestId];
 #elif AOSOA_SIMD
 			spheres.GetOffsets(closestId, out int blockIndex, out int lane);
 			blockCursor = spheres.GetReadOnlyBlockPointer(blockIndex);
@@ -165,7 +170,7 @@ namespace RaytracerInOneWeekend
 			float closestRadius = spheres.Radius[closestId];
 #endif
 
-			Material closestMaterial = spheres.Material[closestId];
+			Material closestMaterial = s.Material[closestId];
 
 			float3 point = r.GetPoint(minDistance);
 			rec = new HitRecord(minDistance, point, (point - closestCenter) / closestRadius, closestMaterial);

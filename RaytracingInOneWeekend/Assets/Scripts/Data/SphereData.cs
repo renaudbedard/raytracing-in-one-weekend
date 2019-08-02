@@ -22,7 +22,7 @@ namespace RaytracerInOneWeekend
 	{
 		[HorizontalGroup("Bools")]
 		[SerializeField]
-		[LabelWidth(48)]
+		[LabelWidth(49)]
 		bool enabled = true;
 
 		[HorizontalGroup("Bools")]
@@ -32,7 +32,7 @@ namespace RaytracerInOneWeekend
 
 		[HorizontalGroup("Bools")]
 		[SerializeField]
-		[LabelWidth(147)]
+		[LabelWidth(158)]
 		bool excludeFromOverlapTest = false;
 
 		[HideIf(nameof(moving))]
@@ -82,7 +82,6 @@ namespace RaytracerInOneWeekend
 
 		public bool Enabled => enabled;
 		public bool ExcludeFromOverlapTest => excludeFromOverlapTest;
-		public bool Moving => moving;
 		public Vector3 CenterFrom => !moving ? center : centerFrom;
 		public Vector3 CenterTo => !moving ? center : centerTo;
 		public Vector3 Center(float t) => lerp(CenterFrom, CenterTo, saturate(unlerp(FromTime, ToTime, t)));
