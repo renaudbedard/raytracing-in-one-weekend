@@ -28,9 +28,10 @@ namespace RaytracerInOneWeekend
 		public NativeArray<Material> Material;
 
 		[NativeDisableUnsafePtrRestriction]
-		public readonly float4* PtrCenterFromX, PtrCenterFromY, PtrCenterFromZ,
-			PtrCenterToX, PtrCenterToY, PtrCenterToZ,
-			PtrFromTime, PtrToTime,
+		public readonly float4* PtrFromTime, PtrToTime,
+			PtrCenterFromX, PtrCenterToX,
+			PtrCenterFromY, PtrCenterToY,
+			PtrCenterFromZ, PtrCenterToZ,
 			PtrSqRadius;
 
 		public int Length => CenterFromX.Length;
@@ -41,14 +42,14 @@ namespace RaytracerInOneWeekend
 			BlockCount = (int) ceil(length / 4.0);
 			length = BlockCount * 4;
 
-			CenterFromX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterFromY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterFromZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterToX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterToY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-			CenterToZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			FromTime = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			ToTime = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterFromX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterToX = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterFromY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterToY = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterFromZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+			CenterToZ = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			SquaredRadius = new NativeArray<float>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
 			Radius = new NativeArray<float>(dataLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
@@ -97,11 +98,17 @@ namespace RaytracerInOneWeekend
 #elif AOSOA_SIMD
 	unsafe struct AosoaSpheres : IDisposable
 	{
-		public enum Streams { CenterX, CenterY, CenterZ, SquaredRadius }
-		public const int StreamCount = 4;
+		public enum Streams
+		{
+			FromTime, ToTime,
+			CenterFromX, CenterToX,
+			CenterFromY, CenterToY,
+			CenterFromZ, CenterToZ,
+			SquaredRadius
+		}
+		public const int StreamCount = 9;
 
 		static readonly int SimdLength = sizeof(float4) / sizeof(float);
-
 		public readonly int Length, BlockCount;
 
 		NativeArray<float4> dataBuffer;
@@ -120,23 +127,37 @@ namespace RaytracerInOneWeekend
 			Material = new NativeArray<Material>(length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
 			float4* lastBlockPointer = (float4*) dataBuffer.GetUnsafePtr() + (BlockCount - 1) * StreamCount;
-			lastBlockPointer[(int) Streams.CenterX] = float.MaxValue;
-			lastBlockPointer[(int) Streams.CenterY] = float.MaxValue;
-			lastBlockPointer[(int) Streams.CenterZ] = float.MaxValue;
+
+			lastBlockPointer[(int) Streams.CenterFromX] = float.MaxValue;
+			lastBlockPointer[(int) Streams.CenterFromY] = float.MaxValue;
+			lastBlockPointer[(int) Streams.CenterFromZ] = float.MaxValue;
+
+			lastBlockPointer[(int) Streams.CenterToX] = float.MaxValue;
+			lastBlockPointer[(int) Streams.CenterToY] = float.MaxValue;
+			lastBlockPointer[(int) Streams.CenterToZ] = float.MaxValue;
+
+			lastBlockPointer[(int) Streams.FromTime] = 0;
+			lastBlockPointer[(int) Streams.ToTime] = 0;
+
 			lastBlockPointer[(int) Streams.SquaredRadius] = 0;
 		}
 
 		public float4* ReadOnlyDataPointer => (float4*) dataBuffer.GetUnsafeReadOnlyPtr();
 		public float4* GetReadOnlyBlockPointer(int blockIndex) => ReadOnlyDataPointer + blockIndex * StreamCount;
 
-		public void SetElement(int i, float3 center, float radius)
+		public void SetElement(int i, float3 centerFrom, float3 centerTo, float t0, float t1, float radius)
 		{
 			GetOffsets(i, out int blockIndex, out int lane);
 
 			float4* blockPointer = (float4*) dataBuffer.GetUnsafePtr() + blockIndex * StreamCount;
-			blockPointer[(int) Streams.CenterX][lane] = center.x;
-			blockPointer[(int) Streams.CenterY][lane] = center.y;
-			blockPointer[(int) Streams.CenterZ][lane] = center.z;
+			blockPointer[(int) Streams.CenterFromX][lane] = centerFrom.x;
+			blockPointer[(int) Streams.CenterFromY][lane] = centerFrom.y;
+			blockPointer[(int) Streams.CenterFromZ][lane] = centerFrom.z;
+			blockPointer[(int) Streams.CenterToX][lane] = centerTo.x;
+			blockPointer[(int) Streams.CenterToY][lane] = centerTo.y;
+			blockPointer[(int) Streams.CenterToZ][lane] = centerTo.z;
+			blockPointer[(int) Streams.FromTime][lane] = t0;
+			blockPointer[(int) Streams.ToTime][lane] = t1;
 			blockPointer[(int) Streams.SquaredRadius][lane] = radius * radius;
 
 			Radius[i] = radius;

@@ -78,7 +78,7 @@ namespace RaytracerInOneWeekend
 #if SOA_SIMD
 		public static unsafe bool Hit(this SoaSpheres s, Ray r, float tMin, float tMax, out HitRecord rec)
 #elif AOSOA_SIMD
-		public static unsafe bool Hit(this AosoaSpheres spheres, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static unsafe bool Hit(this AosoaSpheres s, Ray r, float tMin, float tMax, out HitRecord rec)
 #endif
 		{
 #if SOA_SIMD
@@ -87,7 +87,7 @@ namespace RaytracerInOneWeekend
 			float4* fromTime = s.PtrFromTime, toTime = s.PtrToTime;
 			float4* sqRadius = s.PtrSqRadius;
 #elif AOSOA_SIMD
-			float4* blockCursor = spheres.ReadOnlyDataPointer;
+			float4* blockCursor = s.ReadOnlyDataPointer;
 #endif
 			rec = new HitRecord(tMax, 0, 0, default);
 			float4 a = dot(r.Direction, r.Direction);
@@ -98,10 +98,15 @@ namespace RaytracerInOneWeekend
 			for (int i = 0; i < count; i++)
 			{
 #if AOSOA_SIMD
-				float4 centerX = *(blockCursor + (int) AosoaSpheres.Streams.CenterX),
-					centerY = *(blockCursor + (int) AosoaSpheres.Streams.CenterY),
-					centerZ = *(blockCursor + (int) AosoaSpheres.Streams.CenterZ),
-					sqRadius = *(blockCursor + (int) AosoaSpheres.Streams.SquaredRadius);
+				float4* fromTime = blockCursor + (int) AosoaSpheres.Streams.FromTime,
+					toTime = blockCursor + (int) AosoaSpheres.Streams.ToTime,
+					centerFromX = blockCursor + (int) AosoaSpheres.Streams.CenterFromX,
+					centerToX = blockCursor + (int) AosoaSpheres.Streams.CenterToX,
+					centerFromY = blockCursor + (int) AosoaSpheres.Streams.CenterFromY,
+					centerToY = blockCursor + (int) AosoaSpheres.Streams.CenterToY,
+					centerFromZ = blockCursor + (int) AosoaSpheres.Streams.CenterFromZ,
+					centerToZ = blockCursor + (int) AosoaSpheres.Streams.CenterToZ,
+					sqRadius = blockCursor + (int) AosoaSpheres.Streams.SquaredRadius;
 #endif
 				float4 timeStep = saturate(unlerp(*fromTime, *toTime, r.Time));
 
@@ -157,18 +162,25 @@ namespace RaytracerInOneWeekend
 			float3 closestCenterFrom = float3(s.CenterFromX[closestId], s.CenterFromY[closestId], s.CenterFromZ[closestId]);
 			float3 closestCenterTo = float3(s.CenterToX[closestId], s.CenterToY[closestId], s.CenterToZ[closestId]);
 			float closestTimeStep = saturate(unlerp(s.FromTime[closestId], s.ToTime[closestId], r.Time));
-			float3 closestCenter = lerp(closestCenterFrom, closestCenterTo, closestTimeStep);
 			float closestRadius = s.Radius[closestId];
 #elif AOSOA_SIMD
-			spheres.GetOffsets(closestId, out int blockIndex, out int lane);
-			blockCursor = spheres.GetReadOnlyBlockPointer(blockIndex);
+			s.GetOffsets(closestId, out int blockIndex, out int lane);
+			blockCursor = s.GetReadOnlyBlockPointer(blockIndex);
 
-			float3 closestCenter = float3(
-				blockCursor[(int)AosoaSpheres.Streams.CenterX][lane],
-				blockCursor[(int)AosoaSpheres.Streams.CenterY][lane],
-				blockCursor[(int)AosoaSpheres.Streams.CenterZ][lane]);
-			float closestRadius = spheres.Radius[closestId];
+			float3 closestCenterFrom = float3(
+				blockCursor[(int)AosoaSpheres.Streams.CenterFromX][lane],
+				blockCursor[(int)AosoaSpheres.Streams.CenterFromY][lane],
+				blockCursor[(int)AosoaSpheres.Streams.CenterFromZ][lane]);
+			float3 closestCenterTo = float3(
+				blockCursor[(int)AosoaSpheres.Streams.CenterToX][lane],
+				blockCursor[(int)AosoaSpheres.Streams.CenterToY][lane],
+				blockCursor[(int)AosoaSpheres.Streams.CenterToZ][lane]);
+			float closestTimeStep = saturate(unlerp(
+				blockCursor[(int)AosoaSpheres.Streams.FromTime][lane],
+				blockCursor[(int)AosoaSpheres.Streams.ToTime][lane], r.Time));
+			float closestRadius = s.Radius[closestId];
 #endif
+			float3 closestCenter = lerp(closestCenterFrom, closestCenterTo, closestTimeStep);
 
 			Material closestMaterial = s.Material[closestId];
 
