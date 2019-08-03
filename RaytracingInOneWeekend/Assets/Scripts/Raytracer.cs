@@ -499,12 +499,19 @@ namespace RaytracerInOneWeekend
 				SphereData s = activeSpheres[i];
 				MaterialData material = s.Material;
 				TextureData albedo = material ? material.Albedo : null;
+				byte* imagePointer = albedo == null || albedo.Image == null
+					? null
+					: (byte*) albedo.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr();
+				bool hasImage = albedo != null && albedo.Image;
+
 				sphereBuffer[i] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
 					material
 						? new Material(material.Type, material.TextureScale * s.Radius,
 							albedo
 								? new Texture(albedo.Type, albedo.MainColor.ToFloat3(),
-									albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency)
+									albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency, imagePointer,
+									hasImage ? albedo.Image.width : -1,
+									hasImage ? albedo.Image.height : -1)
 								: default, material.Fuzz, material.RefractiveIndex)
 						: default);
 

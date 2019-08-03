@@ -3,6 +3,8 @@ using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.UI;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -13,22 +15,28 @@ namespace RaytracerInOneWeekend
 		None,
 		Constant,
 		CheckerPattern,
-		PerlinNoise
+		PerlinNoise,
+		Image,
 	}
 
-	struct Texture
+	unsafe struct Texture
 	{
 		public readonly TextureType Type;
 		public readonly float3 MainColor;
 		public readonly float3 SecondaryColor;
 		public readonly float NoiseFrequency;
+		public readonly int2 ImageSize;
+		public readonly byte* ImagePointer;
 
-		public Texture(TextureType type, float3 mainColor, float3 secondaryColor, float noiseFrequency)
+		public Texture(TextureType type, float3 mainColor, float3 secondaryColor, float noiseFrequency, byte* pImage,
+			int imageWidth, int imageHeight)
 		{
 			Type = type;
 			MainColor = mainColor;
 			SecondaryColor = secondaryColor;
 			NoiseFrequency = noiseFrequency;
+			ImagePointer = pImage;
+			ImageSize = int2(imageWidth, imageHeight);
 		}
 
 		[Pure]
@@ -40,6 +48,7 @@ namespace RaytracerInOneWeekend
 					return MainColor;
 
 				case TextureType.CheckerPattern:
+				{
 					// from iq : https://www.shadertoy.com/view/ltl3D8
 					float3 n = abs(normal);
 					float3 v = n.x > n.y && n.x > n.z ? normal.xyz :
@@ -50,9 +59,22 @@ namespace RaytracerInOneWeekend
 
 					float2 sines = sin(PI * scale * uv);
 					return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
+				}
 
 				case TextureType.PerlinNoise:
-					return 0.5f * (1 + sin(NoiseFrequency * position.z + 10 * perlinData.Turbulence(position)));
+					return 0.5f * (1 + sin(NoiseFrequency * position.z + 10 * perlinData.Turbulence(position))) *
+					       MainColor;
+
+				case TextureType.Image:
+				{
+					float phi = atan2(normal.z, normal.x);
+					float theta = asin(normal.y);
+					float2 uv = float2((phi + PI) / (2 * PI), (theta + PI / 2) / PI);
+					int2 coords = (int2) (uv * ImageSize);
+
+					byte* pPixelData = ImagePointer + (coords.y * ImageSize.x + coords.x) * 3;
+					return float3(pPixelData[0], pPixelData[1], pPixelData[2]) / 255 * MainColor;
+				}
 			}
 
 			return default;

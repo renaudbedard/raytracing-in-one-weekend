@@ -190,6 +190,7 @@ namespace RaytracerInOneWeekend
 				material.SetFloat("_Metallic", sphere.Material.Type == MaterialType.Metal ? 1 : 0);
 				material.SetFloat("_Glossiness",
 					sphere.Material.Type == MaterialType.Metal ? 1 - sphere.Material.Fuzz : transparent ? 1 : 0);
+				material.SetTexture("_MainTex", sphere.Material.Albedo ? sphere.Material.Albedo.Image : null);
 
 				if (transparent)
 				{
