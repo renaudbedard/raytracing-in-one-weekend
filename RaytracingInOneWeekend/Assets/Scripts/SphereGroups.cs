@@ -180,7 +180,6 @@ namespace RaytracerInOneWeekend
 #elif BVH_SIMD
 	struct Sphere4
 	{
-		public const int StreamCount = 4;
 #pragma warning disable 649
 		public float4 CenterX, CenterY, CenterZ, SquaredRadius;
 #pragma warning restore 649
