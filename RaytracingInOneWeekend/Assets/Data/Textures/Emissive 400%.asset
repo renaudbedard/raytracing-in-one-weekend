@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Emissive 400%
   m_EditorClassIdentifier: 
   type: 1
-  mainColor: {r: 5.656854, g: 5.656854, b: 5.656854, a: 0}
+  mainColor: {r: 4, g: 4, b: 4, a: 0}
   secondaryColor: {r: 0, g: 0, b: 0, a: 0}
   noiseFrequency: 1
   image: {fileID: 0}
