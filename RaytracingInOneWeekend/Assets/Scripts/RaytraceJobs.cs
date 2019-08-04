@@ -151,6 +151,8 @@ namespace RaytracerInOneWeekend
 			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
 #endif
 			{
+				float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
+
 				if (depth < TraceDepth &&
 				    rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out Ray scattered))
 				{
@@ -160,12 +162,13 @@ namespace RaytracerInOneWeekend
 					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref diagnostics))
 #endif
 					{
-						color = attenuation * scatteredColor;
+						color = emission + attenuation * scatteredColor;
 						return true;
 					}
 				}
-				color = default;
-				return false;
+
+				color = emission;
+				return true;
 			}
 
 			float3 unitDirection = normalize(r.Direction);
@@ -195,7 +198,7 @@ namespace RaytracerInOneWeekend
 			else
 				finalColor = inputSample.xyz / realSampleCount;
 
-			float3 outputColor = finalColor.xyz.LinearToGamma() * 255;
+			float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
 
 			Output[index] = new RGBA32
 			{

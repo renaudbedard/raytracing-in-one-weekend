@@ -10,27 +10,29 @@ namespace RaytracerInOneWeekend
 		None,
 		Lambertian,
 		Metal,
-		Dielectric
+		Dielectric,
+		DiffuseLight
 	}
 
 	struct Material
 	{
 		public readonly MaterialType Type;
-		public readonly Texture Albedo;
+		public readonly Texture Texture;
 		public readonly float2 TextureScale;
 		public readonly float Parameter;
 
-		public Material(MaterialType type, float2 textureScale, Texture albedo = default, float fuzz = 0,
-			float refractiveIndex = 1) : this()
+		public Material(MaterialType type, float2 textureScale, Texture albedo = default,
+			Texture emission = default, float fuzz = 0, float refractiveIndex = 1) : this()
 		{
 			Type = type;
-			Albedo = albedo;
 			TextureScale = textureScale;
 
 			switch (type)
 			{
-				case MaterialType.Metal: Parameter = saturate(fuzz); break;
+				case MaterialType.Lambertian: Texture = albedo; break;
+				case MaterialType.Metal: Parameter = saturate(fuzz); Texture = albedo; break;
 				case MaterialType.Dielectric: Parameter = refractiveIndex; break;
+				case MaterialType.DiffuseLight: Texture = emission; break;
 			}
 		}
 
@@ -44,7 +46,7 @@ namespace RaytracerInOneWeekend
 				{
 					float3 target = rec.Point + rec.Normal + rng.UnitVector();
 					scattered = new Ray(rec.Point, target - rec.Point, r.Time);
-					attenuation = Albedo.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return true;
 				}
 
@@ -53,7 +55,7 @@ namespace RaytracerInOneWeekend
 					float fuzz = Parameter;
 					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
 					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere(), r.Time);
-					attenuation = Albedo.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return dot(scattered.Direction, rec.Normal) > 0;
 				}
 
@@ -94,6 +96,19 @@ namespace RaytracerInOneWeekend
 					attenuation = default;
 					scattered = default;
 					return false;
+			}
+		}
+
+		[Pure]
+		public float3 Emit(float3 position, float3 normal, PerlinData perlinData)
+		{
+			switch (Type)
+			{
+				case MaterialType.DiffuseLight:
+					return Texture.Value(position, normal, TextureScale, perlinData);
+
+				default:
+					return 0;
 			}
 		}
 

@@ -32,7 +32,7 @@ namespace RaytracerInOneWeekend
 
 		[Title("Settings")]
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
-		[SerializeField] [Range(1, 2000)] uint samplesPerPixel = 2000;
+		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
 		[SerializeField] [Range(1, 100)] uint traceDepth = 35;
 		[SerializeField] bool previewAfterBatch = true;
@@ -499,20 +499,22 @@ namespace RaytracerInOneWeekend
 				SphereData s = activeSpheres[i];
 				MaterialData material = s.Material;
 				TextureData albedo = material ? material.Albedo : null;
-				byte* imagePointer = albedo == null || albedo.Image == null
-					? null
-					: (byte*) albedo.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr();
-				bool hasImage = albedo != null && albedo.Image;
+				TextureData emission = material ? material.Emission : null;
+
+				Texture GetTexture(TextureData t)
+				{
+					bool hasImage = t != null && t.Image;
+					return t
+						? new Texture(t.Type, t.MainColor.ToFloat3(), t.SecondaryColor.ToFloat3(), t.NoiseFrequency,
+							hasImage ? (byte*) t.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
+							hasImage ? t.Image.width : -1, hasImage ? t.Image.height : -1)
+						: default;
+				}
 
 				sphereBuffer[i] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
 					material
-						? new Material(material.Type, material.TextureScale * s.Radius,
-							albedo
-								? new Texture(albedo.Type, albedo.MainColor.ToFloat3(),
-									albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency, imagePointer,
-									hasImage ? albedo.Image.width : -1,
-									hasImage ? albedo.Image.height : -1)
-								: default, material.Fuzz, material.RefractiveIndex)
+						? new Material(material.Type, material.TextureScale * s.Radius, GetTexture(albedo),
+							GetTexture(emission), material.Fuzz, material.RefractiveIndex)
 						: default);
 
 				entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);

@@ -13,8 +13,11 @@ namespace RaytracerInOneWeekend
 	class TextureData : ScriptableObject
 	{
 		[SerializeField] TextureType type;
+
+		[ColorUsage(false, true)]
 		[SerializeField] Color mainColor;
 
+		[ColorUsage(false, true)]
 		[ShowIf(nameof(Type), TextureType.CheckerPattern)]
 		[SerializeField] Color secondaryColor;
 

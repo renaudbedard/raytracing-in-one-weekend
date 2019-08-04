@@ -27,6 +27,7 @@ namespace RaytracerInOneWeekend
 
 #if UNITY_EDITOR
 		[ValueDropdown(nameof(GetMaterialAssets))]
+		[ShowIf(nameof(AlbedoSupported))]
 #endif
 		[SerializeField] TextureData albedo = null;
 #if UNITY_EDITOR
@@ -37,6 +38,23 @@ namespace RaytracerInOneWeekend
 		{
 			get => albedo;
 			set => albedo = value;
+		}
+		bool AlbedoSupported => type == MaterialType.Lambertian || type == MaterialType.Metal;
+#endif
+
+#if UNITY_EDITOR
+		[ValueDropdown(nameof(GetMaterialAssets))]
+		[ShowIf(nameof(type), MaterialType.DiffuseLight)]
+#endif
+		[SerializeField] TextureData emission = null;
+#if UNITY_EDITOR
+		[ShowInInspector]
+		[InlineEditor(DrawHeader = false)]
+		[ShowIf(nameof(emission))]
+		TextureData EmissiveTexture
+		{
+			get => emission;
+			set => emission = value;
 		}
 #endif
 
@@ -49,6 +67,12 @@ namespace RaytracerInOneWeekend
 		{
 			get => albedo;
 			set => albedo = value;
+		}
+
+		public TextureData Emission
+		{
+			get => emission;
+			set => emission = value;
 		}
 
 		public static MaterialData Lambertian(TextureData albedoTexture, float2 textureScale)
@@ -83,12 +107,13 @@ namespace RaytracerInOneWeekend
 
 #if UNITY_EDITOR
 		bool dirty;
-		public bool Dirty => dirty || (albedo && albedo.Dirty);
+		public bool Dirty => dirty || (albedo && albedo.Dirty) || (emission && emission.Dirty);
 
 		public void ClearDirty()
 		{
 			dirty = false;
 			if (albedo) albedo.ClearDirty();
+			if (emission) emission.ClearDirty();
 		}
 
 		void OnValidate()

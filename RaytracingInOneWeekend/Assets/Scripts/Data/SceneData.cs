@@ -39,17 +39,18 @@ namespace RaytracerInOneWeekend
 
 		[SerializeField]
 		[Range(1, 10000)]
-		[HideIf("NoRandomEntityGroup")]
 		uint randomSeed = 1;
 
 		[SerializeField] RandomSphereGroup[] randomSphereGroups = null;
 
 		[Title("Sky")]
 		[SerializeField]
+		[ColorUsage(false, true)]
 		[LabelText("Bottom Color")]
 		Color skyBottomColor = Color.white;
 
 		[SerializeField]
+		[ColorUsage(false, true)]
 		[LabelText("Top Color")]
 		Color skyTopColor = new Color(0.5f, 0.7f, 1);
 
@@ -62,8 +63,6 @@ namespace RaytracerInOneWeekend
 		public IReadOnlyList<RandomSphereGroup> RandomSphereGroups => randomSphereGroups;
 		public Color SkyBottomColor => skyBottomColor;
 		public Color SkyTopColor => skyTopColor;
-
-		bool NoRandomEntityGroup => (randomSphereGroups?.Length ?? 0) == 0;
 
 #if UNITY_EDITOR
 		bool dirty;
