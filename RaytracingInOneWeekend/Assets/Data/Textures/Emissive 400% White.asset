@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c2b8e2f3256a44a7a01951131f79a6e6, type: 3}
-  m_Name: Emissive 400%
+  m_Name: Emissive 400% White
   m_EditorClassIdentifier: 
   type: 1
   mainColor: {r: 4, g: 4, b: 4, a: 0}

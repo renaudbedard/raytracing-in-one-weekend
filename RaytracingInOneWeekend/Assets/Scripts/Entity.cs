@@ -9,7 +9,8 @@ namespace RaytracerInOneWeekend
 	enum EntityType
 	{
 		None,
-		Sphere
+		Sphere,
+		Rect
 	}
 
 	unsafe struct Entity
@@ -17,14 +18,21 @@ namespace RaytracerInOneWeekend
 		public readonly EntityType Type;
 
 		[NativeDisableUnsafePtrRestriction] readonly Sphere* sphere;
+		[NativeDisableUnsafePtrRestriction] readonly Rect* rect;
 
 		public Entity(Sphere* sphere) : this()
 		{
 			Type = EntityType.Sphere;
 			this.sphere = sphere;
 		}
+		public Entity(Rect* rect) : this()
+		{
+			Type = EntityType.Rect;
+			this.rect = rect;
+		}
 
 		public Sphere* AsSphere => sphere;
+		public Rect* AsRect => rect;
 
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax, out HitRecord rec)
@@ -32,6 +40,7 @@ namespace RaytracerInOneWeekend
 			switch (Type)
 			{
 				case EntityType.Sphere: return sphere->Hit(r, tMin, tMax, out rec);
+				case EntityType.Rect: return rect->Hit(r, tMin, tMax, out rec);
 				default:
 					rec = default;
 					return false;
@@ -45,6 +54,7 @@ namespace RaytracerInOneWeekend
 				switch (Type)
 				{
 					case EntityType.Sphere: return sphere->Bounds;
+					case EntityType.Rect: return rect->Bounds;
 					default: return default;
 				}
 			}

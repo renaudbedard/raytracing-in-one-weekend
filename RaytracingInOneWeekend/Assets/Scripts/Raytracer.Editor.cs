@@ -5,11 +5,11 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static Unity.Mathematics.math;
 using System.IO;
-
+using static Unity.Mathematics.math;
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+
 #else
 using OdinMock;
 #endif
@@ -44,15 +44,15 @@ namespace RaytracerInOneWeekend
 		[DisableInPlayMode]
 		bool previewBvh = false;
 #endif
-		[SerializeField]
-		[DisableInEditorMode]
-		BufferView bufferView = BufferView.Front;
+		[SerializeField] [DisableInEditorMode] BufferView bufferView = BufferView.Front;
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
 		bool hookedEditorUpdate;
 
-		[SerializeField] [HideInInspector] GameObject previewObject;
-		[SerializeField] [HideInInspector] List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
+		[SerializeField] [HideInInspector] GameObject previewSphere, previewRect;
+
+		[SerializeField] [HideInInspector]
+		List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
 
 		void WatchForWorldChanges()
 		{
@@ -163,34 +163,42 @@ namespace RaytracerInOneWeekend
 			skybox.material.SetColor("_Color1", scene.SkyBottomColor);
 			skybox.material.SetColor("_Color2", scene.SkyTopColor);
 
-			if (previewObject == null)
-				previewObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-			previewObject.hideFlags = HideFlags.HideAndDontSave;
-			previewObject.SetActive(false);
+			if (previewSphere == null)
+				previewSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+			previewSphere.hideFlags = HideFlags.HideAndDontSave;
+			previewSphere.SetActive(false);
 
-			var meshRenderer = previewObject.GetComponent<MeshRenderer>();
-			var meshFilter = previewObject.GetComponent<MeshFilter>();
+			if (previewRect == null)
+				previewRect = GameObject.CreatePrimitive(PrimitiveType.Quad);
+			previewRect.hideFlags = HideFlags.HideAndDontSave;
+			previewRect.SetActive(false);
 
-			CollectActiveSpheres();
+			var previewMeshRenderer = previewSphere.GetComponent<MeshRenderer>();
+
+			var sphereMeshFilter = previewSphere.GetComponent<MeshFilter>();
+			var rectMeshFilter = previewRect.GetComponent<MeshFilter>();
+
+			CollectActiveEntities();
 
 			opaquePreviewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 			transparentPreviewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 
-			foreach (SphereData sphere in activeSpheres)
+			foreach (EntityData entity in activeEntities)
 			{
-				if (!sphere.Material) continue;
+				if (!entity.Material) continue;
 
-				bool transparent = sphere.Material.Type == MaterialType.Dielectric;
+				bool transparent = entity.Material.Type == MaterialType.Dielectric;
+				bool emissive = entity.Material.Type == MaterialType.DiffuseLight;
 
-				Color albedoMainColor = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
+				Color albedoMainColor = entity.Material.Albedo ? entity.Material.Albedo.MainColor : Color.white;
 				Color color = transparent ? albedoMainColor.GetAlphaReplaced(0.5f) : albedoMainColor;
-				var material = new UnityEngine.Material(meshRenderer.sharedMaterial) { color = color };
+				var material = new UnityEngine.Material(previewMeshRenderer.sharedMaterial) { color = color };
 				previewMaterials.Add(material);
 
-				material.SetFloat("_Metallic", sphere.Material.Type == MaterialType.Metal ? 1 : 0);
+				material.SetFloat("_Metallic", entity.Material.Type == MaterialType.Metal ? 1 : 0);
 				material.SetFloat("_Glossiness",
-					sphere.Material.Type == MaterialType.Metal ? 1 - sphere.Material.Fuzz : transparent ? 1 : 0);
-				material.SetTexture("_MainTex", sphere.Material.Albedo ? sphere.Material.Albedo.Image : null);
+					entity.Material.Type == MaterialType.Metal ? 1 - entity.Material.Fuzz : transparent ? 1 : 0);
+				material.SetTexture("_MainTex", entity.Material.Albedo ? entity.Material.Albedo.Image : null);
 
 				if (transparent)
 				{
@@ -201,12 +209,38 @@ namespace RaytracerInOneWeekend
 					material.renderQueue = 3000;
 				}
 
+				if (emissive)
+				{
+					material.EnableKeyword("_EMISSION");
+					material.SetColor("_EmissionColor",
+						entity.Material.Emission ? entity.Material.Emission.MainColor : Color.black);
+				}
+
 				CommandBuffer previewCommandBuffer =
 					transparent ? transparentPreviewCommandBuffer : opaquePreviewCommandBuffer;
 
-				previewCommandBuffer.DrawMesh(meshFilter.sharedMesh,
-					Matrix4x4.TRS(sphere.Center(sphere.MidTime), Quaternion.identity, sphere.Radius * 2 * Vector3.one), material, 0,
-					material.FindPass("FORWARD"));
+				switch (entity.Type)
+				{
+					case EntityType.Sphere:
+						SphereData s = entity.SphereData;
+						previewCommandBuffer.DrawMesh(sphereMeshFilter.sharedMesh,
+							Matrix4x4.TRS(s.Center(s.MidTime), Quaternion.identity, s.Radius * 2 * Vector3.one),
+							material, 0,
+							material.FindPass("FORWARD"));
+						break;
+
+					case EntityType.Rect:
+						RectData r = entity.RectData;
+						previewCommandBuffer.DrawMesh(rectMeshFilter.sharedMesh,
+							Matrix4x4.TRS(entity.Center, Quaternion.LookRotation(Vector3.forward), float3(r.Size, 1)),
+							material, 0,
+							material.FindPass("FORWARD"));
+						previewCommandBuffer.DrawMesh(rectMeshFilter.sharedMesh,
+							Matrix4x4.TRS(entity.Center, Quaternion.LookRotation(-Vector3.forward), float3(r.Size, 1)),
+							material, 0,
+							material.FindPass("FORWARD"));
+						break;
+				}
 			}
 		}
 
@@ -221,16 +255,29 @@ namespace RaytracerInOneWeekend
 		void OnDrawGizmos()
 		{
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
-			foreach (SphereData sphere in activeSpheres
-				.Where(x => x.Material)
-				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center(x.MidTime), sceneCameraTransform.forward)))
-			{
-				Color albedo = sphere.Material.Albedo ? sphere.Material.Albedo.MainColor : Color.white;
-				Gizmos.color = sphere.Material.Type == MaterialType.Dielectric
-					? albedo.GetAlphaReplaced(0.5f)
-					: albedo.GetAlphaReplaced(1);
 
-				Gizmos.DrawSphere(sphere.Center(sphere.MidTime), sphere.Radius);
+			foreach (EntityData e in activeEntities
+				.Where(x => x.Material)
+				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center, sceneCameraTransform.forward)))
+			{
+				Color color = e.Material.Albedo ? e.Material.Albedo.MainColor : Color.white;
+				if (e.Material.Emission)
+					color += e.Material.Emission.MainColor;
+
+				Gizmos.color = e.Material.Type == MaterialType.Dielectric
+					? color.GetAlphaReplaced(0.5f)
+					: color.GetAlphaReplaced(1);
+
+				switch (e.Type)
+				{
+					case EntityType.Rect:
+						Gizmos.DrawCube(e.Center, float3(e.RectData.Size, 0.001f));
+						break;
+
+					case EntityType.Sphere:
+						Gizmos.DrawSphere(e.Center, e.SphereData.Radius);
+						break;
+				}
 			}
 
 #if BVH

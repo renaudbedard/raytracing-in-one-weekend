@@ -16,5 +16,5 @@ MonoBehaviour:
   textureScale: {x: 1, y: 1}
   fuzz: 0
   refractiveIndex: 1
-  albedo: {fileID: 11400000, guid: 525851a917ef8400ca1da458ac357df8, type: 2}
+  albedo: {fileID: 11400000, guid: cab726489408344e59e866610bd2795f, type: 2}
   emission: {fileID: 0}

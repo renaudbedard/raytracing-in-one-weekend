@@ -121,7 +121,7 @@ namespace RaytracerInOneWeekend
 			dirty = true;
 		}
 
-		IEnumerable<ValueDropdownItem<TextureData>> GetMaterialAssets => AssetDatabase.FindAssets("t:TextureData")
+		static IEnumerable<ValueDropdownItem<TextureData>> GetMaterialAssets => AssetDatabase.FindAssets("t:TextureData")
 			.Select(AssetDatabase.GUIDToAssetPath)
 			.Select(AssetDatabase.LoadAssetAtPath<TextureData>)
 			.Select(asset => new ValueDropdownItem<TextureData>(asset.name, asset))

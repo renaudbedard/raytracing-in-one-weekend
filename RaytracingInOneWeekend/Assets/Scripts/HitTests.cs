@@ -33,6 +33,8 @@ namespace RaytracerInOneWeekend
 			if (discriminant > 0)
 			{
 				float sqrtDiscriminant = sqrt(discriminant);
+
+				// TODO: this breaks when a == 0
 				float t = (-b - sqrtDiscriminant) / a;
 				if (t < tMax && t > tMin)
 				{
@@ -41,6 +43,7 @@ namespace RaytracerInOneWeekend
 					return true;
 				}
 
+				// TODO: this breaks when a == 0
 				t = (-b + sqrtDiscriminant) / a;
 				if (t < tMax && t > tMin)
 				{
@@ -52,6 +55,22 @@ namespace RaytracerInOneWeekend
 
 			rec = default;
 			return false;
+		}
+
+		public static bool Hit(this Rect rect, Ray r, float tMin, float tMax, out HitRecord rec)
+		{
+			rec = default;
+
+			// TODO: this breaks when ray direction Z is 0
+			float t = (rect.Distance - r.Origin.z) / r.Direction.z;
+			if (t < tMin || t > tMax) return false;
+
+			float2 xy = r.Origin.xy + t * r.Direction.xy;
+			bool4 test = bool4(xy < rect.From, xy > rect.To);
+			if (any(test)) return false;
+
+			rec = new HitRecord(t, r.GetPoint(t), float3(0, 0, 1), rect.Material);
+			return true;
 		}
 #endif
 

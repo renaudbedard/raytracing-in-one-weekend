@@ -198,6 +198,7 @@ namespace RaytracerInOneWeekend
 			else
 				finalColor = inputSample.xyz / realSampleCount;
 
+			// TODO: tone-mapping
 			float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
 
 			Output[index] = new RGBA32

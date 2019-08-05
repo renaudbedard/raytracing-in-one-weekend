@@ -42,6 +42,8 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public float3 Value(float3 position, float3 normal, float2 scale, PerlinData perlinData)
 		{
+			// TODO: make this use UVW coordinates instead
+			
 			switch (Type)
 			{
 				case TextureType.Constant:

@@ -35,7 +35,7 @@ namespace RaytracerInOneWeekend
 		float cameraFieldOfView = 20;
 
 		[Title("World")]
-		[SerializeField] SphereData[] spheres = null;
+		[SerializeField] EntityData[] entities = null;
 
 		[SerializeField]
 		[Range(1, 10000)]
@@ -59,20 +59,20 @@ namespace RaytracerInOneWeekend
 		public float CameraAperture => cameraAperture;
 		public float CameraFieldOfView => cameraFieldOfView;
 		public uint RandomSeed => randomSeed;
-		public IReadOnlyList<SphereData> Spheres => spheres;
+		public IReadOnlyList<EntityData> Entities => entities;
 		public IReadOnlyList<RandomSphereGroup> RandomSphereGroups => randomSphereGroups;
 		public Color SkyBottomColor => skyBottomColor;
 		public Color SkyTopColor => skyTopColor;
 
 #if UNITY_EDITOR
 		bool dirty;
-		public bool Dirty => dirty || Spheres.Any(x => x.Dirty);
+		public bool Dirty => dirty || Entities.Any(x => x.Dirty);
 
 		public void ClearDirty()
 		{
 			dirty = false;
-			foreach (SphereData sphere in Spheres)
-				sphere.ClearDirty();
+			foreach (EntityData entity in Entities)
+				entity.ClearDirty();
 		}
 
 		void OnValidate()
@@ -86,30 +86,30 @@ namespace RaytracerInOneWeekend
 			clone.hideFlags = HideFlags.HideAndDontSave;
 			clone.name = $"{name} [COPY]";
 
-			for (int i = 0; i < spheres.Length; i++)
+			for (int i = 0; i < entities.Length; i++)
 			{
-				SphereData sourceSphere = spheres[i];
+				EntityData sourceEntity = entities[i];
 
 				MaterialData clonedMaterial = null;
-				if (sourceSphere.Material)
+				if (sourceEntity.Material)
 				{
-					clonedMaterial = Instantiate(sourceSphere.Material);
-					clonedMaterial.name = $"{sourceSphere.Material.name} [COPY]";
+					clonedMaterial = Instantiate(sourceEntity.Material);
+					clonedMaterial.name = $"{sourceEntity.Material.name} [COPY]";
 					clonedMaterial.hideFlags = HideFlags.HideAndDontSave;
 
-					if (sourceSphere.Material.Albedo)
+					if (sourceEntity.Material.Albedo)
 					{
-						clonedMaterial.Albedo = Instantiate(sourceSphere.Material.Albedo);
-						clonedMaterial.Albedo.name = $"{sourceSphere.Material.Albedo.name} [COPY]";
+						clonedMaterial.Albedo = Instantiate(sourceEntity.Material.Albedo);
+						clonedMaterial.Albedo.name = $"{sourceEntity.Material.Albedo.name} [COPY]";
 						clonedMaterial.Albedo.hideFlags = HideFlags.HideAndDontSave;
 					}
 				}
 
-				var clonedSphere = new SphereData();
-				UnityEditor.EditorUtility.CopySerializedManagedFieldsOnly(sourceSphere, clonedSphere);
-				clonedSphere.Material = clonedMaterial;
+				var clonedEntity = (EntityData) Activator.CreateInstance(sourceEntity.GetType());
+				UnityEditor.EditorUtility.CopySerializedManagedFieldsOnly(sourceEntity, clonedEntity);
+				clonedEntity.Material = clonedMaterial;
 
-				clone.spheres[i] = clonedSphere;
+				clone.entities[i] = clonedEntity;
 			}
 
 			for (int i = 0; i < randomSphereGroups.Length; i++)

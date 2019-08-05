@@ -72,6 +72,7 @@ namespace RaytracerInOneWeekend
 		AosoaSpheres World => sphereBuffer;
 #else // !SOA_SIMD && !AOSOA_SIMD
 		NativeArray<Sphere> sphereBuffer;
+		NativeArray<Rect> rectBuffer;
 		NativeArray<Entity> entityBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
@@ -100,7 +101,7 @@ namespace RaytracerInOneWeekend
 		readonly Stopwatch traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
 
-		readonly List<SphereData> activeSpheres = new List<SphereData>();
+		readonly List<EntityData> activeEntities = new List<EntityData>();
 		readonly List<MaterialData> activeMaterials = new List<MaterialData>();
 
 		float2 bufferSize;
@@ -167,6 +168,7 @@ namespace RaytracerInOneWeekend
 #else
 			entityBuffer.SafeDispose();
 			sphereBuffer.SafeDispose();
+			rectBuffer.SafeDispose();
 #endif
 			accumulationInputBuffer.SafeDispose();
 			accumulationOutputBuffer.SafeDispose();
@@ -438,12 +440,12 @@ namespace RaytracerInOneWeekend
 #if UNITY_EDITOR
 			if (scene) scene.ClearDirty();
 #endif
-			CollectActiveSpheres();
+			CollectActiveEntities();
 
 			activeMaterials.Clear();
-			foreach (SphereData sphere in activeSpheres)
-				if (!activeMaterials.Contains(sphere.Material))
-					activeMaterials.Add(sphere.Material);
+			foreach (EntityData entity in activeEntities)
+				if (!activeMaterials.Contains(entity.Material))
+					activeMaterials.Add(entity.Material);
 
 #if SOA_SIMD || AOSOA_SIMD
 			int sphereCount = activeSpheres.Count;
@@ -473,7 +475,7 @@ namespace RaytracerInOneWeekend
 			}
 
 #else // !SOA_SIMD && !AOSOA_SIMD
-			RebuildEntityBuffer();
+			RebuildEntityBuffers();
 #endif
 
 #if BVH
@@ -486,18 +488,19 @@ namespace RaytracerInOneWeekend
 		}
 
 #if !SOA_SIMD && !AOSOA_SIMD
-		void RebuildEntityBuffer()
+		void RebuildEntityBuffers()
 		{
-			int entityCount = activeSpheres.Count;
+			int entityCount = activeEntities.Count;
 
 			entityBuffer.EnsureCapacity(entityCount);
-			sphereBuffer.EnsureCapacity(activeSpheres.Count);
 
-			int entityIndex = 0;
-			for (var i = 0; i < activeSpheres.Count; i++)
+			sphereBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Sphere));
+			rectBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Rect));
+
+			int entityIndex = 0, sphereIndex = 0, rectIndex = 0;
+			foreach (EntityData e in activeEntities)
 			{
-				SphereData s = activeSpheres[i];
-				MaterialData material = s.Material;
+				MaterialData material = e.Material;
 				TextureData albedo = material ? material.Albedo : null;
 				TextureData emission = material ? material.Emission : null;
 
@@ -511,13 +514,32 @@ namespace RaytracerInOneWeekend
 						: default;
 				}
 
-				sphereBuffer[i] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
-					material
-						? new Material(material.Type, material.TextureScale * s.Radius, GetTexture(albedo),
-							GetTexture(emission), material.Fuzz, material.RefractiveIndex)
-						: default);
+				Entity entity = default;
+				switch (e.Type)
+				{
+					case EntityType.Sphere:
+						SphereData s = e.SphereData;
+						sphereBuffer[sphereIndex] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
+							material
+								? new Material(material.Type, material.TextureScale * s.Radius, GetTexture(albedo),
+									GetTexture(emission), material.Fuzz, material.RefractiveIndex)
+								: default);
 
-				entityBuffer[entityIndex++] = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + i);
+						entity = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++);
+						break;
+
+					case EntityType.Rect:
+						RectData r = e.RectData;
+						rectBuffer[rectIndex] = new Rect(r.Distance, r.Center, r.Size, material
+							? new Material(material.Type, material.TextureScale * r.Size, GetTexture(albedo),
+								GetTexture(emission), material.Fuzz, material.RefractiveIndex)
+							: default);
+
+						entity = new Entity((Rect*) rectBuffer.GetUnsafePtr() + rectIndex++);
+						break;
+				}
+
+				entityBuffer[entityIndex++] = entity;
 			}
 		}
 #endif // !SOA_SIMD && !AOSOA_SIMD
@@ -581,15 +603,15 @@ namespace RaytracerInOneWeekend
 		}
 #endif
 
-		void CollectActiveSpheres()
+		void CollectActiveEntities()
 		{
-			activeSpheres.Clear();
+			activeEntities.Clear();
 
 			if (!scene) return;
 
-			foreach (SphereData sphere in scene.Spheres)
-				if (sphere.Enabled)
-					activeSpheres.Add(sphere);
+			foreach (EntityData entity in scene.Entities)
+				if (entity.Enabled)
+					activeEntities.Add(entity);
 
 			var rng = new Random(scene.RandomSeed);
 			foreach (RandomSphereGroup group in scene.RandomSphereGroups)
@@ -637,11 +659,12 @@ namespace RaytracerInOneWeekend
 					return material;
 				}
 
-				bool AnyOverlap(float3 center, float radius) => activeSpheres.Any(x =>
-						!x.ExcludeFromOverlapTest &&
-						distance(x.Center(x.MidTime), center) < x.Radius + radius + group.MinDistance);
+				bool AnyOverlap(float3 center, float radius) => activeEntities.Where(x => x.Type == EntityType.Sphere)
+					.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
+					          distance(x.SphereData.Center(x.SphereData.MidTime), center) <
+					          x.SphereData.Radius + radius + group.MinDistance);
 
-				SphereData GetSphere(float3 center, float radius)
+				EntityData GetSphere(float3 center, float radius)
 				{
 					bool moving = rng.NextFloat() < group.MovementChance;
 					if (moving)
@@ -650,9 +673,9 @@ namespace RaytracerInOneWeekend
 							float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
 							float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
 
-						return new SphereData(center, offset, 0, 1, radius, GetMaterial());
+						return EntityData.Sphere(new SphereData(center, offset, 0, 1, radius), GetMaterial());
 					}
-					return new SphereData(center, radius, GetMaterial());
+					return EntityData.Sphere(new SphereData(center, radius), GetMaterial());
 				}
 
 				switch (group.Distribution)
@@ -669,7 +692,7 @@ namespace RaytracerInOneWeekend
 							if (AnyOverlap(center, radius))
 								continue;
 
-							activeSpheres.Add(GetSphere(center, radius));
+							activeEntities.Add(GetSphere(center, radius));
 						}
 						break;
 
@@ -696,13 +719,13 @@ namespace RaytracerInOneWeekend
 							if (AnyOverlap(center, radius))
 								continue;
 
-							activeSpheres.Add(GetSphere(center, radius));
+							activeEntities.Add(GetSphere(center, radius));
 						}
 						break;
 				}
 			}
 
-			Debug.Log($"Collected {activeSpheres.Count} active spheres");
+			Debug.Log($"Collected {activeEntities.Count} active entities");
 		}
 	}
 }
