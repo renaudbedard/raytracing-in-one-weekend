@@ -30,13 +30,24 @@ namespace RaytracerInOneWeekend
             return radius * float2(cosTheta, sinTheta);
         }
 
-        public static float3 UnitVector(this Random rng)
+        public static float3 CosineWeightedHemisphereDirection(this Random rng, float3 normal)
         {
-            float z = rng.NextFloat(-1, 1);
-            float a = rng.NextFloat(2 * PI);
-            float r = sqrt(1.0f - z * z);
-            sincos(a, out float y, out float x);
-            return float3(x * r, y * r, z);
+            // from : http://www.rorydriscoll.com/2009/01/07/better-sampling/
+            float2 uv = rng.NextFloat2();
+
+            float r = sqrt(uv.x);
+            float theta = 2 * PI * uv.y;
+
+            sincos(theta, out float sinTheta, out float cosTheta);
+            float2 xy = r * float2(cosTheta, sinTheta);
+
+            float3 tangentSpaceDirection = float3(xy, sqrt(max(0, 1 - uv.x)));
+
+            float3 right = abs(normal.y) > 0.5 ? float3(1, 0, 0) : float3(0, 1, 0);
+            float3 up = cross(right, normal);
+            //float3x3 rotatonMatrix = float3x3();
+            // TODO
+            return default;
         }
 
         public static float3 ToFloat3(this Color c)
@@ -47,13 +58,6 @@ namespace RaytracerInOneWeekend
         public static Color ToColor(this float3 c)
         {
             return new Color(c.x, c.y, c.z);
-        }
-
-        public static uint Sum(this NativeArray<uint> values)
-        {
-            uint total = 0;
-            foreach (uint value in values) total += value;
-            return total;
         }
 
         public static Color GetAlphaReplaced(this Color c, float alpha)
