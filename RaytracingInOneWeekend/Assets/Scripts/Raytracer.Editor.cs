@@ -160,6 +160,9 @@ namespace RaytracerInOneWeekend
 			previewMaterials.Clear();
 
 			var skybox = targetCamera.GetComponent<Skybox>();
+			if (AssetDatabase.IsMainAsset(skybox.material))
+				RenderSettings.skybox = skybox.material = new UnityEngine.Material(skybox.material);
+
 			skybox.material.SetColor("_Color1", scene.SkyBottomColor);
 			skybox.material.SetColor("_Color2", scene.SkyTopColor);
 
