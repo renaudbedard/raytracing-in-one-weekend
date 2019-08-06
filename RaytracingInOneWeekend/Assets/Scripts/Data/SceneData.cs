@@ -66,13 +66,15 @@ namespace RaytracerInOneWeekend
 
 #if UNITY_EDITOR
 		bool dirty;
-		public bool Dirty => dirty || Entities.Any(x => x.Dirty);
+		public bool Dirty => dirty || (entities != null && entities.Any(x => x.Dirty));
 
 		public void ClearDirty()
 		{
 			dirty = false;
-			foreach (EntityData entity in Entities)
-				entity.ClearDirty();
+
+			if (entities != null)
+				foreach (EntityData entity in entities)
+					entity.ClearDirty();
 		}
 
 		void OnValidate()

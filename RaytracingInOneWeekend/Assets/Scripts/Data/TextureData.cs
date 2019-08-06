@@ -1,3 +1,4 @@
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -67,5 +68,19 @@ namespace RaytracerInOneWeekend
 			Dirty = true;
 		}
 #endif
+	}
+
+	static class TextureDataExtensions
+	{
+		// this could be an instance method but it's kinda nice to be able to null-check
+		public static unsafe Texture GetRuntimeData(this TextureData t)
+		{
+			bool hasImage = t != null && t.Image;
+			return t
+				? new Texture(t.Type, t.MainColor.ToFloat3(), t.SecondaryColor.ToFloat3(), t.NoiseFrequency,
+					hasImage ? (byte*) t.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
+					hasImage ? t.Image.width : -1, hasImage ? t.Image.height : -1)
+				: default;
+		}
 	}
 }

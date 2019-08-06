@@ -2,17 +2,9 @@
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
-using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-	enum EntityType
-	{
-		None,
-		Sphere,
-		Rect
-	}
-
 	unsafe struct Entity
 	{
 		public readonly EntityType Type;

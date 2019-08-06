@@ -448,7 +448,7 @@ namespace RaytracerInOneWeekend
 					activeMaterials.Add(entity.Material);
 
 #if SOA_SIMD || AOSOA_SIMD
-			int sphereCount = activeSpheres.Count;
+			int sphereCount = activeEntities.Count(x => x.Type == EntityType.Sphere);
 			if (sphereBuffer.Length != sphereCount)
 			{
 				sphereBuffer.Dispose();
@@ -459,19 +459,21 @@ namespace RaytracerInOneWeekend
 #endif
 			}
 
-			for (var i = 0; i < activeSpheres.Count; i++)
+			int i = 0;
+			foreach (var e in activeEntities.Where(x => x.Type == EntityType.Sphere))
 			{
-				SphereData s = activeSpheres[i];
+				var s = e.SphereData;
 				sphereBuffer.SetElement(i, s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius);
 
-				MaterialData material = s.Material;
+				MaterialData material = e.Material;
+				TextureData albedo = material ? material.Albedo : null;
+				TextureData emission = material ? material.Emission : null;
 
-				TextureData albedo = material.Albedo;
 				sphereBuffer.Material[i] =
-					new Material(material.Type, material.TextureScale * s.Radius, albedo
-							? new Texture(albedo.Type, albedo.MainColor.ToFloat3(), albedo.SecondaryColor.ToFloat3(), albedo.NoiseFrequency)
-							: default,
-						material.Fuzz, material.RefractiveIndex);
+					new Material(material.Type, material.TextureScale * s.Radius, albedo.GetRuntimeData(),
+						emission.GetRuntimeData(), material.Fuzz, material.RefractiveIndex);
+
+				i++;
 			}
 
 #else // !SOA_SIMD && !AOSOA_SIMD
@@ -504,16 +506,6 @@ namespace RaytracerInOneWeekend
 				TextureData albedo = material ? material.Albedo : null;
 				TextureData emission = material ? material.Emission : null;
 
-				Texture GetTexture(TextureData t)
-				{
-					bool hasImage = t != null && t.Image;
-					return t
-						? new Texture(t.Type, t.MainColor.ToFloat3(), t.SecondaryColor.ToFloat3(), t.NoiseFrequency,
-							hasImage ? (byte*) t.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
-							hasImage ? t.Image.width : -1, hasImage ? t.Image.height : -1)
-						: default;
-				}
-
 				Entity entity = default;
 				switch (e.Type)
 				{
@@ -521,8 +513,8 @@ namespace RaytracerInOneWeekend
 						SphereData s = e.SphereData;
 						sphereBuffer[sphereIndex] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
 							material
-								? new Material(material.Type, material.TextureScale * s.Radius, GetTexture(albedo),
-									GetTexture(emission), material.Fuzz, material.RefractiveIndex)
+								? new Material(material.Type, material.TextureScale * s.Radius, albedo.GetRuntimeData(),
+									emission.GetRuntimeData(), material.Fuzz, material.RefractiveIndex)
 								: default);
 
 						entity = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++);
@@ -531,8 +523,8 @@ namespace RaytracerInOneWeekend
 					case EntityType.Rect:
 						RectData r = e.RectData;
 						rectBuffer[rectIndex] = new Rect(r.Distance, r.Center, r.Size, material
-							? new Material(material.Type, material.TextureScale * r.Size, GetTexture(albedo),
-								GetTexture(emission), material.Fuzz, material.RefractiveIndex)
+							? new Material(material.Type, material.TextureScale * r.Size, albedo.GetRuntimeData(),
+								emission.GetRuntimeData(), material.Fuzz, material.RefractiveIndex)
 							: default);
 
 						entity = new Entity((Rect*) rectBuffer.GetUnsafePtr() + rectIndex++);
@@ -607,7 +599,7 @@ namespace RaytracerInOneWeekend
 		{
 			activeEntities.Clear();
 
-			if (!scene) return;
+			if (!scene || scene.Entities == null) return;
 
 			foreach (EntityData entity in scene.Entities)
 				if (entity.Enabled)
