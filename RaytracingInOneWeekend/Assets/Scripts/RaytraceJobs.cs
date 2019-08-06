@@ -167,8 +167,8 @@ namespace RaytracerInOneWeekend
 					}
 				}
 
-				color = emission;
-				return true;
+				color = default;
+				return false;
 			}
 
 			float3 unitDirection = normalize(r.Direction);
