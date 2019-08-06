@@ -16,26 +16,66 @@ MonoBehaviour:
   cameraTarget: {x: 11.342338, y: 1.8494737, z: -2.7333953}
   cameraAperture: 0.05
   cameraFieldOfView: 20
-  spheres:
-  - enabled: 1
-    excludeFromOverlapTest: 1
-    center: {x: 0, y: -1000, z: 0}
-    radius: 1000
-    material: {fileID: 11400000, guid: e2b440160971b4fecbbfadbe5fcdab3a, type: 2}
-  - enabled: 1
-    excludeFromOverlapTest: 0
-    center: {x: 0, y: 1, z: 0}
-    radius: 1
+  entities:
+  - type: 1
+    enabled: 1
+    sphereData:
+      moving: 0
+      excludeFromOverlapTest: 1
+      center: {x: 0, y: -1000, z: 0}
+      centerFrom: {x: 0, y: 0, z: 0}
+      centerTo: {x: 0, y: 0, z: 0}
+      timeRange: {x: 0, y: 0}
+      radius: 1000
+    rectData:
+      distance: 0
+      center: {x: 0, y: 0}
+      size: {x: 1, y: 1}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+  - type: 1
+    enabled: 1
+    sphereData:
+      moving: 0
+      excludeFromOverlapTest: 0
+      center: {x: 0, y: 1, z: 0}
+      centerFrom: {x: 0, y: 0, z: 0}
+      centerTo: {x: 0, y: 0, z: 0}
+      timeRange: {x: 0, y: 0}
+      radius: 1
+    rectData:
+      distance: 0
+      center: {x: 0, y: 0}
+      size: {x: 1, y: 1}
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
-  - enabled: 1
-    excludeFromOverlapTest: 0
-    center: {x: -4, y: 1, z: 0}
-    radius: 1
+  - type: 1
+    enabled: 1
+    sphereData:
+      moving: 0
+      excludeFromOverlapTest: 0
+      center: {x: -4, y: 1, z: 0}
+      centerFrom: {x: 0, y: 0, z: 0}
+      centerTo: {x: 0, y: 0, z: 0}
+      timeRange: {x: 0, y: 0}
+      radius: 1
+    rectData:
+      distance: 0
+      center: {x: 0, y: 0}
+      size: {x: 1, y: 1}
     material: {fileID: 11400000, guid: 78bb6ee3b98204fcb88a751b128d4217, type: 2}
-  - enabled: 1
-    excludeFromOverlapTest: 0
-    center: {x: 4, y: 1, z: 0}
-    radius: 1
+  - type: 1
+    enabled: 1
+    sphereData:
+      moving: 0
+      excludeFromOverlapTest: 0
+      center: {x: 4, y: 1, z: 0}
+      centerFrom: {x: 0, y: 0, z: 0}
+      centerTo: {x: 0, y: 0, z: 0}
+      timeRange: {x: 0, y: 0}
+      radius: 1
+    rectData:
+      distance: 0
+      center: {x: 0, y: 0}
+      size: {x: 1, y: 1}
     material: {fileID: 11400000, guid: 67ca2b630403548e990e54f0dda310a6, type: 2}
   randomSeed: 700
   randomSphereGroups:
@@ -48,6 +88,10 @@ MonoBehaviour:
     CenterX: {x: -11, y: 11}
     CenterY: {x: 0.2, y: 0.2}
     CenterZ: {x: -11, y: 11}
+    MovementChance: 0
+    MovementXOffset: {x: 0, y: 0}
+    MovementYOffset: {x: 0, y: 0}
+    MovementZOffset: {x: 0, y: 0}
     Radius: {x: 0.2, y: 0.2}
     MinDistance: 0.15
     LambertChance: 0.8
