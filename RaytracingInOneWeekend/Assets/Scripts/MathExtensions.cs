@@ -45,7 +45,10 @@ namespace RaytracerInOneWeekend
 
             float3 tangentSpaceDirection = float3(xy, sqrt(max(0, 1 - uv.x)));
 
-            float3 up = abs(normal.y) > 0.5 ? float3(1, 0, 0) : float3(0, 1, 0);
+            float3 up = abs(normal.y) > 0.5
+                ? abs(normal.x) > 0.5 ? float3(0, 0, 1) : float3(1, 0, 0)
+                : float3(0, 1, 0);
+
             float3 right = normalize(cross(normal, up));
             up = cross(right, normal);
 
