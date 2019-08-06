@@ -44,8 +44,7 @@ namespace RaytracerInOneWeekend
 			{
 				case MaterialType.Lambertian:
 				{
-					float3 target = rec.Point + rec.Normal + rng.UnitVector();
-					scattered = new Ray(rec.Point, target - rec.Point, r.Time);
+					scattered = new Ray(rec.Point, rec.Normal + rng.NextFloat3Direction(), r.Time);
 					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return true;
 				}

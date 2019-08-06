@@ -117,7 +117,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 			if (previewBvh)
 			{
-				if (!entityBuffer.IsCreated) RebuildEntityBuffer();
+				if (!entityBuffer.IsCreated) RebuildEntityBuffers();
 				if (!bvhNodeBuffer.IsCreated) RebuildBvh();
 			}
 			else
@@ -126,7 +126,7 @@ namespace RaytracerInOneWeekend
 				bvhNodeBuffer.SafeDispose();
 				entityBuffer.SafeDispose();
 
-				activeSpheres.Clear();
+				activeEntities.Clear();
 			}
 #endif // BVH
 
