@@ -15,12 +15,16 @@ namespace RaytracerInOneWeekend
 	class SceneData : ScriptableObject
 	{
 		[Title("Camera")]
+#if UNITY_EDITOR
 		[InlineButton(nameof(UpdateFromUnityCamera), "      Update      ")]
+#endif
 		[SerializeField]
 		[LabelText("Position")]
 		Vector3 cameraPosition = default;
 
+#if UNITY_EDITOR
 		[InlineButton(nameof(UpdateFromUnityCamera), "      Update      ")]
+#endif
 		[SerializeField]
 		[LabelText("Target Position")]
 		Vector3 cameraTarget = default;
@@ -126,15 +130,30 @@ namespace RaytracerInOneWeekend
 
 			return clone;
 		}
-#endif
 
 		public void UpdateFromUnityCamera()
 		{
-			var unityCamera = FindObjectOfType<UnityEngine.Camera>();
+			UnityEngine.Camera unityCamera;
+
+			if (Application.isPlaying)
+			{
+				unityCamera = FindObjectOfType<UnityEngine.Camera>();
+				cameraFieldOfView = unityCamera.fieldOfView;
+			}
+			else
+				unityCamera = UnityEditor.SceneView.GetAllSceneCameras()[0];
+
 			cameraPosition = unityCamera.transform.position;
 			cameraTarget = cameraPosition + unityCamera.transform.forward;
-			cameraFieldOfView = unityCamera.fieldOfView;
+
+			if (!Application.isPlaying)
+			{
+				unityCamera = FindObjectOfType<UnityEngine.Camera>();
+				unityCamera.transform.position = cameraPosition;
+				unityCamera.transform.forward = cameraTarget - cameraPosition;
+			}
 		}
+#endif
 	}
 
 	enum RandomDistribution
