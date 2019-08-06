@@ -30,24 +30,27 @@ namespace RaytracerInOneWeekend
             return radius * float2(cosTheta, sinTheta);
         }
 
-        public static float3 CosineWeightedHemisphereDirection(this Random rng, float3 normal)
+        // NOTE: normal is assumed to be of unit length
+        public static float3 InCosineWeightedHemisphere(this Random rng, float3 normal)
         {
             // from : http://www.rorydriscoll.com/2009/01/07/better-sampling/
+            // and : https://www.shadertoy.com/view/4tGcWD
             float2 uv = rng.NextFloat2();
 
-            float r = sqrt(uv.x);
+            float radius = sqrt(uv.x);
             float theta = 2 * PI * uv.y;
 
             sincos(theta, out float sinTheta, out float cosTheta);
-            float2 xy = r * float2(cosTheta, sinTheta);
+            float2 xy = radius * float2(cosTheta, sinTheta);
 
             float3 tangentSpaceDirection = float3(xy, sqrt(max(0, 1 - uv.x)));
 
-            float3 right = abs(normal.y) > 0.5 ? float3(1, 0, 0) : float3(0, 1, 0);
-            float3 up = cross(right, normal);
-            //float3x3 rotatonMatrix = float3x3();
-            // TODO
-            return default;
+            float3 up = abs(normal.y) > 0.5 ? float3(1, 0, 0) : float3(0, 1, 0);
+            float3 right = normalize(cross(normal, up));
+            up = cross(right, normal);
+
+            float3x3 rotationMatrix = float3x3(right, up, normal);
+            return mul(rotationMatrix, tangentSpaceDirection);
         }
 
         public static float3 ToFloat3(this Color c)
