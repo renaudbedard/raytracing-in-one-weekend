@@ -100,7 +100,10 @@ namespace RaytracerInOneWeekend
 			}
 
 			if (!EditorApplication.isPlaying)
+			{
+				transform.localPosition = Vector3.zero;
 				WatchForWorldChanges();
+			}
 
 #if BVH
 			if (bvhNodeBuffer.IsCreated && !EditorApplication.isPlaying &&

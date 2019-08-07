@@ -15,19 +15,38 @@ namespace RaytracerInOneWeekend
 	class SceneData : ScriptableObject
 	{
 		[Title("Camera")]
-#if UNITY_EDITOR
-		[InlineButton(nameof(UpdateFromUnityCamera), "      Update      ")]
-#endif
 		[SerializeField]
 		[LabelText("Position")]
 		Vector3 cameraPosition = default;
 
-#if UNITY_EDITOR
-		[InlineButton(nameof(UpdateFromUnityCamera), "      Update      ")]
-#endif
 		[SerializeField]
 		[LabelText("Target Position")]
 		Vector3 cameraTarget = default;
+
+#if UNITY_EDITOR
+		[ButtonGroup("Update Camera", -1)]
+		public void UpdateFromGameView()
+		{
+			UnityEngine.Camera unityCamera = FindObjectOfType<UnityEngine.Camera>();
+
+			cameraFieldOfView = unityCamera.fieldOfView;
+			cameraPosition = unityCamera.transform.position;
+			cameraTarget = cameraPosition + unityCamera.transform.forward;
+		}
+
+		[ButtonGroup("Update Camera", -1)]
+		public void UpdateFromSceneView()
+		{
+			UnityEngine.Camera unityCamera = UnityEditor.SceneView.GetAllSceneCameras()[0];
+
+			cameraPosition = unityCamera.transform.position;
+			cameraTarget = cameraPosition + unityCamera.transform.forward;
+
+			unityCamera = FindObjectOfType<UnityEngine.Camera>();
+			unityCamera.transform.position = cameraPosition;
+			unityCamera.transform.forward = cameraTarget - cameraPosition;
+		}
+#endif
 
 		[SerializeField]
 		[LabelText("Aperture Size")]
@@ -129,29 +148,6 @@ namespace RaytracerInOneWeekend
 			}
 
 			return clone;
-		}
-
-		public void UpdateFromUnityCamera()
-		{
-			UnityEngine.Camera unityCamera;
-
-			if (Application.isPlaying)
-			{
-				unityCamera = FindObjectOfType<UnityEngine.Camera>();
-				cameraFieldOfView = unityCamera.fieldOfView;
-			}
-			else
-				unityCamera = UnityEditor.SceneView.GetAllSceneCameras()[0];
-
-			cameraPosition = unityCamera.transform.position;
-			cameraTarget = cameraPosition + unityCamera.transform.forward;
-
-			if (!Application.isPlaying)
-			{
-				unityCamera = FindObjectOfType<UnityEngine.Camera>();
-				unityCamera.transform.position = cameraPosition;
-				unityCamera.transform.forward = cameraTarget - cameraPosition;
-			}
 		}
 #endif
 	}

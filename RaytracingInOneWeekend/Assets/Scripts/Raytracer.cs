@@ -272,8 +272,10 @@ namespace RaytracerInOneWeekend
 
 		void CleanCamera()
 		{
+#if UNITY_EDITOR
 			targetCamera.transform.hasChanged = false;
-			scene.UpdateFromUnityCamera();
+			scene.UpdateFromGameView();
+#endif
 		}
 
 		void SwapBuffers()

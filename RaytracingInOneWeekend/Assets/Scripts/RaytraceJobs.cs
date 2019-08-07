@@ -129,6 +129,8 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
+		// TODO: make Color() iterative
+
 #if BVH_ITERATIVE
 		bool Color(Ray r, uint depth, Random rng, WorkingArea wa, out float3 color, ref Diagnostics diagnostics)
 #else

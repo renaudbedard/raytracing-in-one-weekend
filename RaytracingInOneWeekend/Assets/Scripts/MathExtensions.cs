@@ -34,25 +34,31 @@ namespace RaytracerInOneWeekend
         public static float3 InCosineWeightedHemisphere(this Random rng, float3 normal)
         {
             // from : http://www.rorydriscoll.com/2009/01/07/better-sampling/
-            // and : https://www.shadertoy.com/view/4tGcWD
-            float2 uv = rng.NextFloat2();
-
-            float radius = sqrt(uv.x);
-            float theta = 2 * PI * uv.y;
-
+            float u = rng.NextFloat();
+            float radius = sqrt(u);
+            float theta = rng.NextFloat(0, 2 * PI);
             sincos(theta, out float sinTheta, out float cosTheta);
-            float2 xy = radius * float2(cosTheta, sinTheta);
+            float2 xy = float2(cosTheta, sinTheta) * radius;
+            float3 tangentSpaceDirection = float3(xy, sqrt(1 - u));
 
-            float3 tangentSpaceDirection = float3(xy, sqrt(max(0, 1 - uv.x)));
+            // build an orthonormal basis from the forward (normal) vector
+            // from : https://orbit.dtu.dk/files/126824972/onb_frisvad_jgt2012_v2.pdf
+            float3 right, up, forward = normal;
+            if(forward.z < -0.9999999f) // Handle the singularity
+            {
+                up = float3(0, -1, 0);
+                right = float3(-1, 0, 0);
+            }
+            else
+            {
+                float a = 1 / (1 + forward.z);
+                float b = -forward.x * forward.y * a;
+                up = float3(1 - forward.x * forward.x * a, b, -forward.x);
+                right = float3(b, 1 - forward.y * forward.y * a, -forward.y);
+            }
 
-            float3 up = abs(normal.y) > 0.5
-                ? abs(normal.x) > 0.5 ? float3(0, 0, 1) : float3(1, 0, 0)
-                : float3(0, 1, 0);
-
-            float3 right = normalize(cross(normal, up));
-            up = cross(right, normal);
-
-            float3x3 rotationMatrix = float3x3(right, up, normal);
+            // transform from tangent-space to world-space
+            float3x3 rotationMatrix = float3x3(right, up, forward);
             return mul(rotationMatrix, tangentSpaceDirection);
         }
 
