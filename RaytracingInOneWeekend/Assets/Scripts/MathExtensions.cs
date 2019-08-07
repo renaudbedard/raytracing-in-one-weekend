@@ -38,13 +38,12 @@ namespace RaytracerInOneWeekend
             float radius = sqrt(u);
             float theta = rng.NextFloat(0, 2 * PI);
             sincos(theta, out float sinTheta, out float cosTheta);
-            float2 xy = float2(cosTheta, sinTheta) * radius;
-            float3 tangentSpaceDirection = float3(xy, sqrt(1 - u));
+            float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), sqrt(1 - u));
 
             // build an orthonormal basis from the forward (normal) vector
             // from : https://orbit.dtu.dk/files/126824972/onb_frisvad_jgt2012_v2.pdf
             float3 right, up, forward = normal;
-            if(forward.z < -0.9999999f) // Handle the singularity
+            if(forward.z < -0.9999999f)
             {
                 up = float3(0, -1, 0);
                 right = float3(-1, 0, 0);

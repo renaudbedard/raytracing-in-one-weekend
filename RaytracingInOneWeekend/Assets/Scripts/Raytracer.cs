@@ -96,6 +96,7 @@ namespace RaytracerInOneWeekend
 		float focusDistance;
 		bool traceAborted;
 		bool ignoreBatchTimings;
+		uint lastTraceDepth;
 
 		readonly Stopwatch batchTimer = new Stopwatch();
 		readonly Stopwatch traceTimer = new Stopwatch();
@@ -195,7 +196,9 @@ namespace RaytracerInOneWeekend
 
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
 			bool cameraDirty = targetCamera.transform.hasChanged;
-			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty;
+			bool traceDepthChanged = traceDepth != lastTraceDepth;
+
+			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged;
 
 			void RebuildDirtyComponents()
 			{
@@ -365,6 +368,7 @@ namespace RaytracerInOneWeekend
 
 				mraysPerSecResults.Clear();
 				AccumulatedSamples = 0;
+				lastTraceDepth = traceDepth;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
 #endif

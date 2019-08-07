@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
+using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {

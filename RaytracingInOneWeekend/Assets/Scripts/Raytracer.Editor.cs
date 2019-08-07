@@ -18,8 +18,7 @@ namespace RaytracerInOneWeekend
 {
 	partial class Raytracer
 	{
-		[Title("Tools")]
-		[Button]
+		[ButtonGroup("Save")]
 		[DisableInEditorMode]
 		void SaveFrontBuffer()
 		{
@@ -27,6 +26,13 @@ namespace RaytracerInOneWeekend
 			File.WriteAllBytes(
 				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
 					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
+		}
+		[ButtonGroup("Save")]
+		[DisableInEditorMode]
+		void SaveView()
+		{
+			ScreenCapture.CaptureScreenshot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+				$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"));
 		}
 
 		[DisableIf(nameof(TraceActive))]
@@ -72,6 +78,7 @@ namespace RaytracerInOneWeekend
 				scene.ClearDirty();
 			}
 		}
+
 
 		void OnValidate()
 		{
