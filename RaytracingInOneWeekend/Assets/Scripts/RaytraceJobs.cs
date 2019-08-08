@@ -27,10 +27,7 @@ namespace RaytracerInOneWeekend
 #endif
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
-#if BVH
-	unsafe
-#endif
-	struct AccumulateJob : IJobParallelFor
+	unsafe struct AccumulateJob : IJobParallelFor
 	{
 #if BVH_ITERATIVE
 		public struct WorkingArea
@@ -47,7 +44,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public uint Seed;
 		[ReadOnly] public Camera Camera;
 		[ReadOnly] public uint SampleCount;
-		[ReadOnly] public uint TraceDepth;
+		[ReadOnly] public int TraceDepth;
 		[ReadOnly] public float3 SkyBottomColor;
 		[ReadOnly] public float3 SkyTopColor;
 
@@ -109,16 +106,20 @@ namespace RaytracerInOneWeekend
 #endif
 			};
 #endif
+
+			float3* emissionStack = stackalloc float3[TraceDepth];
+			float3* attenuationStack = stackalloc float3[TraceDepth];
+
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + rng.NextFloat2()) / Size; // (u, v)
 				Ray r = Camera.GetRay(normalizedCoordinates, rng);
 
+				if (Color(r, rng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE
-				if (Color(r, 0, rng, workingArea, out float3 sampleColor, ref diagnostics))
-#else
-				if (Color(r, 0, rng, out float3 sampleColor, ref diagnostics))
+					workingArea,
 #endif
+					out float3 sampleColor, ref diagnostics))
 				{
 					colorAcc += sampleColor;
 					sampleCount++;
@@ -129,53 +130,64 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
-		// TODO: make Color() iterative
-
+		bool Color(Ray r, Random rng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
-		bool Color(Ray r, uint depth, Random rng, WorkingArea wa, out float3 color, ref Diagnostics diagnostics)
-#else
-		bool Color(Ray r, uint depth, Random rng, out float3 color, ref Diagnostics diagnostics)
+			WorkingArea wa,
 #endif
+			out float3 color, ref Diagnostics diagnostics)
 		{
-			diagnostics.RayCount++;
+			float3* emissionCursor = emissionStack;
+			float3* attenuationCursor = attenuationStack;
 
-#if BVH_ITERATIVE
-#if FULL_DIAGNOSTICS
-			if (World->Hit(r, 0.001f, float.PositiveInfinity, wa, ref diagnostics, out HitRecord rec))
-#else
-			if (World->Hit(r, 0.001f, float.PositiveInfinity, wa, out HitRecord rec))
-#endif
-#elif BVH_RECURSIVE && FULL_DIAGNOSTICS
-			if (World->Hit(r, 0.001f, float.PositiveInfinity, ref diagnostics, out HitRecord rec))
-#elif BVH_RECURSIVE
-			if (World->Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
-#else
-			if (World.Hit(r, 0.001f, float.PositiveInfinity, out HitRecord rec))
-#endif
+			int depth = 0;
+			for (; depth < TraceDepth; depth++)
 			{
-				float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
-
-				if (depth < TraceDepth &&
-				    rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out Ray scattered))
-				{
-#if BVH_ITERATIVE
-					if (Color(scattered, depth + 1, rng, wa, out float3 scatteredColor, ref diagnostics))
+#if BVH
+				bool hit = World->Hit(
 #else
-					if (Color(scattered, depth + 1, rng, out float3 scatteredColor, ref diagnostics))
+				bool hit = World.Hit(
 #endif
-					{
-						color = emission + attenuation * scatteredColor;
-						return true;
-					}
-				}
+					r, 0.001f, float.PositiveInfinity,
+#if BVH_ITERATIVE
+					wa,
+#endif
+#if FULL_DIAGNOSTICS
+					ref diagnostics,
+#endif
+					out HitRecord rec);
 
-				color = default;
-				return false;
+				diagnostics.RayCount++;
+
+				if (hit)
+				{
+					*emissionCursor++ = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
+					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
+					*attenuationCursor++ = attenuation;
+					if (!didScatter) break;
+				}
+				else
+				{
+					// sample the sky color
+					float3 unitDirection = normalize(r.Direction);
+					float t = 0.5f * (unitDirection.y + 1);
+					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, t);
+					*attenuationCursor++ = 0;
+					break;
+				}
 			}
 
-			float3 unitDirection = normalize(r.Direction);
-			float t = 0.5f * (unitDirection.y + 1);
-			color = lerp(SkyBottomColor, SkyTopColor, t);
+			color = 0;
+
+			if (depth == TraceDepth)
+				return false;
+
+			// attenuate colors from the tail of the hit stack to the head
+			while (emissionCursor != emissionStack)
+			{
+				emissionCursor--;
+				attenuationCursor--;
+				color = color * *attenuationCursor + *emissionCursor;
+			}
 			return true;
 		}
 	}

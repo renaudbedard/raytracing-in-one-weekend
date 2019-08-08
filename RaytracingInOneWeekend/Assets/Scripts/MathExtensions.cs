@@ -1,4 +1,4 @@
-using Unity.Collections;
+using System.Runtime.CompilerServices;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
@@ -8,18 +8,7 @@ namespace RaytracerInOneWeekend
 {
     static class MathExtensions
     {
-        public static float3 InUnitSphere(this Random rng)
-        {
-            // from : https://karthikkaranth.me/blog/generating-random-points-in-a-sphere/#better-choice-of-spherical-coordinates
-            float2 doubleUv = rng.NextFloat2(0, 2);
-            float2 thetaPhi = float2( doubleUv.x * PI, acos(doubleUv.y - 1));
-            float r = pow(rng.NextFloat(), 1 / 3.0f);
-            sincos(thetaPhi, out float2 sinThetaPhi, out float2 cosThetaPhi);
-            return r * float3(
-                sinThetaPhi.y * cosThetaPhi.x,
-                sinThetaPhi.y * sinThetaPhi.x,
-                cosThetaPhi.y);
-        }
+        // TODO : stratified sampling
 
         public static float2 InUnitDisk(this Random rng)
         {
@@ -30,8 +19,36 @@ namespace RaytracerInOneWeekend
             return radius * float2(cosTheta, sinTheta);
         }
 
-        // NOTE: normal is assumed to be of unit length
-        public static float3 InCosineWeightedHemisphere(this Random rng, float3 normal)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetOrthonormalBasis(float3 normal, out float3 tangent, out float3 bitangent)
+        {
+            // from listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+            float s = normal.z >= 0.0f ? 1.0f : -1.0f;
+            float a = -1 / (s + normal.z);
+            float b = normal.x * normal.y * a;
+            tangent = float3(1 + s * normal.x * normal.x * a, s * b, -s * normal.x);
+            bitangent = float3(b, s + normal.y * normal.y * a, -normal.y);
+        }
+
+        public static float3 OnUniformHemisphere(this Random rng, float3 normal)
+        {
+            // uniform sampling of a hemisphere
+            // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 42)
+            float u = rng.NextFloat();
+            float radius = sqrt(1 - pow(1 - u, 2));
+            float theta = rng.NextFloat(0, 2 * PI);
+            sincos(theta, out float sinTheta, out float cosTheta);
+            float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), 1 - u);
+
+            // build an orthonormal basis from the forward (normal) vector
+            GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
+
+            // transform from tangent-space to world-space
+            float3x3 rotationMatrix = float3x3(tangent, bitangent, normal);
+            return mul(rotationMatrix, tangentSpaceDirection);
+        }
+
+        public static float3 OnCosineWeightedHemisphere(this Random rng, float3 normal)
         {
             // uniform sampling of a cosine-weighted hemisphere
             // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 47)
@@ -43,34 +60,20 @@ namespace RaytracerInOneWeekend
             float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), sqrt(1 - u));
 
             // build an orthonormal basis from the forward (normal) vector
-            // from listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
-            float s = normal.z >= 0.0f ? 1.0f : -1.0f;
-            float a = -1 / (s + normal.z);
-            float b = normal.x * normal.y * a;
-            float3 tangent = float3(1 + s * normal.x * normal.x * a, s * b, -s * normal.x);
-            float3 bitangent = float3(b, s + normal.y * normal.y * a, -normal.y);
+            GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
 
             // transform from tangent-space to world-space
-            float3x3 rotationMatrix = float3x3(bitangent, tangent, normal);
+            float3x3 rotationMatrix = float3x3(tangent, bitangent, normal);
             return mul(rotationMatrix, tangentSpaceDirection);
         }
 
-        public static float3 ToFloat3(this Color c)
-        {
-            return float3(c.r, c.g, c.b);
-        }
+        public static float3 ToFloat3(this Color c) => float3(c.r, c.g, c.b);
 
-        public static Color ToColor(this float3 c)
-        {
-            return new Color(c.x, c.y, c.z);
-        }
+        public static Color ToColor(this float3 c) => new Color(c.x, c.y, c.z);
 
-        public static Color GetAlphaReplaced(this Color c, float alpha)
-        {
-            c.a = alpha;
-            return c;
-        }
+        public static Color GetAlphaReplaced(this Color c, float alpha) => new Color(c.r, c.g, c.b, alpha);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float3 LinearToGamma(this float3 value)
         {
             value = max(value, 0);

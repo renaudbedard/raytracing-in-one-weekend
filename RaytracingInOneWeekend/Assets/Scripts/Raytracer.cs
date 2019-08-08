@@ -34,7 +34,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
-		[SerializeField] [Range(1, 100)] uint traceDepth = 35;
+		[SerializeField] [Range(1, 100)] int traceDepth = 35;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
 
@@ -96,7 +96,7 @@ namespace RaytracerInOneWeekend
 		float focusDistance;
 		bool traceAborted;
 		bool ignoreBatchTimings;
-		uint lastTraceDepth;
+		int lastTraceDepth;
 
 		readonly Stopwatch batchTimer = new Stopwatch();
 		readonly Stopwatch traceTimer = new Stopwatch();

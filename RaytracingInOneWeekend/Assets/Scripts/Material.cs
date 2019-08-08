@@ -44,9 +44,8 @@ namespace RaytracerInOneWeekend
 			{
 				case MaterialType.Lambertian:
 				{
-					//scattered = new Ray(rec.Point, rec.Normal + rng.NextFloat3Direction(), r.Time);
-					scattered = new Ray(rec.Point, rng.InCosineWeightedHemisphere(rec.Normal), r.Time);
 					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					scattered = new Ray(rec.Point, rng.OnCosineWeightedHemisphere(rec.Normal), r.Time);
 					return true;
 				}
 
@@ -54,9 +53,9 @@ namespace RaytracerInOneWeekend
 				{
 					float fuzz = Parameter;
 					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
-					scattered = new Ray(rec.Point, reflected + fuzz * rng.InUnitSphere(), r.Time);
 					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
-					return dot(scattered.Direction, rec.Normal) > 0;
+					scattered = new Ray(rec.Point, reflected + fuzz * rng.OnUniformHemisphere(rec.Normal), r.Time);
+					return true;
 				}
 
 				case MaterialType.Dielectric:
