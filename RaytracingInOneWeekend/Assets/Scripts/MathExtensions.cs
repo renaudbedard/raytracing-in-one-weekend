@@ -33,7 +33,9 @@ namespace RaytracerInOneWeekend
         // NOTE: normal is assumed to be of unit length
         public static float3 InCosineWeightedHemisphere(this Random rng, float3 normal)
         {
-            // from : http://www.rorydriscoll.com/2009/01/07/better-sampling/
+            // uniform sampling of a cosine-weighted hemisphere
+            // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 47)
+            // same algorithm used here : http://www.rorydriscoll.com/2009/01/07/better-sampling/
             float u = rng.NextFloat();
             float radius = sqrt(u);
             float theta = rng.NextFloat(0, 2 * PI);
@@ -41,23 +43,15 @@ namespace RaytracerInOneWeekend
             float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), sqrt(1 - u));
 
             // build an orthonormal basis from the forward (normal) vector
-            // from : https://orbit.dtu.dk/files/126824972/onb_frisvad_jgt2012_v2.pdf
-            float3 right, up, forward = normal;
-            if(forward.z < -0.9999999f)
-            {
-                up = float3(0, -1, 0);
-                right = float3(-1, 0, 0);
-            }
-            else
-            {
-                float a = 1 / (1 + forward.z);
-                float b = -forward.x * forward.y * a;
-                up = float3(1 - forward.x * forward.x * a, b, -forward.x);
-                right = float3(b, 1 - forward.y * forward.y * a, -forward.y);
-            }
+            // from listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+            float s = normal.z >= 0.0f ? 1.0f : -1.0f;
+            float a = -1 / (s + normal.z);
+            float b = normal.x * normal.y * a;
+            float3 tangent = float3(1 + s * normal.x * normal.x * a, s * b, -s * normal.x);
+            float3 bitangent = float3(b, s + normal.y * normal.y * a, -normal.y);
 
             // transform from tangent-space to world-space
-            float3x3 rotationMatrix = float3x3(right, up, forward);
+            float3x3 rotationMatrix = float3x3(bitangent, tangent, normal);
             return mul(rotationMatrix, tangentSpaceDirection);
         }
 
