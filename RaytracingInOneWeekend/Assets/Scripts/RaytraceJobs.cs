@@ -86,7 +86,7 @@ namespace RaytracerInOneWeekend
 			int sampleCount = (int) lastValue.w;
 
 			// big prime stolen from Unity's random class
-			var rng = new Random(Seed + (uint) index * 0x7383ED49u);
+			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
 			Diagnostics diagnostics = default;
 
 #if BVH_ITERATIVE
@@ -147,7 +147,7 @@ namespace RaytracerInOneWeekend
 #else
 				bool hit = World.Hit(
 #endif
-					r, 0.001f, float.PositiveInfinity,
+					r, 0, float.PositiveInfinity,
 #if BVH_ITERATIVE
 					wa,
 #endif
@@ -163,7 +163,14 @@ namespace RaytracerInOneWeekend
 					*emissionCursor++ = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
 					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
 					*attenuationCursor++ = attenuation;
-					if (!didScatter) break;
+					if (didScatter) r = r.OffsetTowards(rec.Normal);
+					else break;
+
+					// normal debugging
+					// rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
+					// *emissionCursor++ = r.Direction * 0.5f + 0.5f;
+					// *attenuationCursor++ = 0;
+					// break;
 				}
 				else
 				{
@@ -214,6 +221,9 @@ namespace RaytracerInOneWeekend
 
 			// TODO: tone-mapping
 			float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
+
+			// normal debugging
+			// float3 outputColor = normalize(inputSample.xyz) * 255;
 
 			Output[index] = new RGBA32
 			{
