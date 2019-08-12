@@ -40,7 +40,7 @@ namespace RaytracerInOneWeekend
 
 		[Title("World")]
 		[InlineEditor(DrawHeader = false)]
-		[SerializeField] SceneData scene = null;
+		[SerializeField] internal SceneData scene = null;
 
 		[Title("Debug")]
 		[SerializeField] Shader viewRangeShader = null;
@@ -102,7 +102,7 @@ namespace RaytracerInOneWeekend
 		readonly Stopwatch traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
 
-		readonly List<EntityData> activeEntities = new List<EntityData>();
+		internal readonly List<EntityData> activeEntities = new List<EntityData>();
 		readonly List<MaterialData> activeMaterials = new List<MaterialData>();
 
 		float2 bufferSize;
@@ -659,7 +659,7 @@ namespace RaytracerInOneWeekend
 
 				bool AnyOverlap(float3 center, float radius) => activeEntities.Where(x => x.Type == EntityType.Sphere)
 					.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
-					          distance(x.SphereData.Center(x.SphereData.MidTime), center) <
+					          distance(x.SphereData.CenterAt(x.SphereData.MidTime), center) <
 					          x.SphereData.Radius + radius + group.MinDistance);
 
 				EntityData GetSphere(float3 center, float radius)

@@ -7,9 +7,9 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using System.IO;
 using static Unity.Mathematics.math;
+
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
-
 #else
 using OdinMock;
 #endif
@@ -237,7 +237,7 @@ namespace RaytracerInOneWeekend
 					case EntityType.Sphere:
 						SphereData s = entity.SphereData;
 						previewCommandBuffer.DrawMesh(sphereMeshFilter.sharedMesh,
-							Matrix4x4.TRS(s.Center(s.MidTime), Quaternion.identity, s.Radius * 2 * Vector3.one),
+							Matrix4x4.TRS(s.CenterAt(s.MidTime), Quaternion.identity, s.Radius * 2 * Vector3.one),
 							material, 0,
 							material.FindPass("FORWARD"));
 						break;
@@ -280,6 +280,9 @@ namespace RaytracerInOneWeekend
 				Gizmos.color = e.Material.Type == MaterialType.Dielectric
 					? color.GetAlphaReplaced(0.5f)
 					: color.GetAlphaReplaced(1);
+
+				if (e.Selected)
+					Gizmos.color = Color.yellow;
 
 				switch (e.Type)
 				{

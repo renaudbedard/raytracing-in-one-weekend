@@ -57,6 +57,8 @@ namespace RaytracerInOneWeekend
 			.Select(asset => new ValueDropdownItem<MaterialData>(asset.name, asset))
 			.Concat(new[] { new ValueDropdownItem<MaterialData>("Null", null) })
 			.OrderBy(x => x.Value != null).ThenBy(x => x.Text);
+
+		public bool Selected { get; set; }
 #endif
 
 		public static EntityData Sphere(SphereData s, MaterialData m)
@@ -80,7 +82,12 @@ namespace RaytracerInOneWeekend
 		}
 
 		public EntityType Type => type;
-		public bool Enabled => enabled;
+
+		public bool Enabled
+		{
+			get => enabled;
+			set => enabled = value;
+		}
 
 		public MaterialData Material
 		{
@@ -94,8 +101,21 @@ namespace RaytracerInOneWeekend
 			{
 				switch (type)
 				{
-					case EntityType.Sphere: return sphereData.Center(sphereData.MidTime);
+					case EntityType.Sphere: return sphereData.CenterAt(sphereData.MidTime);
 					case EntityType.Rect: return float3(rectData.Center, rectData.Distance);
+				}
+				return default;
+			}
+		}
+
+		public Vector3 Size
+		{
+			get
+			{
+				switch (type)
+				{
+					case EntityType.Sphere: return sphereData.Radius * 2 * Vector3.one;
+					case EntityType.Rect: return rectData.Size;
 				}
 				return default;
 			}
@@ -105,11 +125,18 @@ namespace RaytracerInOneWeekend
 		public RectData RectData => rectData;
 
 #if UNITY_EDITOR
-		public bool Dirty => Material && Material.Dirty;
+		bool dirty = false;
+		public bool Dirty => (Material && Material.Dirty) || dirty;
 
 		public void ClearDirty()
 		{
 			if (Material) Material.ClearDirty();
+			dirty = false;
+		}
+
+		public void MarkDirty()
+		{
+			dirty = true;
 		}
 #endif
 	}

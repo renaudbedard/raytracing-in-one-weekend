@@ -41,13 +41,37 @@ namespace RaytracerInOneWeekend
 			this.radius = radius;
 		}
 
-		public Vector3 CenterFrom => !moving ? center : centerFrom;
-		public Vector3 CenterTo => !moving ? center : centerTo;
-		public Vector3 Center(float t) => lerp(CenterFrom, CenterTo, saturate(unlerp(FromTime, ToTime, t)));
+		public Vector3 CenterFrom
+		{
+			get => !moving ? center : centerFrom;
+			set => centerFrom = value;
+		}
+
+		public Vector3 CenterTo
+		{
+			get => !moving ? center : centerTo;
+			set => centerTo = value;
+		}
+
+		public Vector3 CenterAt(float t) =>
+			!moving ? center : (Vector3) lerp(centerFrom, centerTo, saturate(unlerp(FromTime, ToTime, t)));
+
+		public Vector3 Center
+		{
+			get => center;
+			set => center = value;
+		}
+
+		public float Radius
+		{
+			get => radius;
+			set => radius = value;
+		}
+
 		public float FromTime => timeRange.x;
 		public float ToTime => timeRange.y;
 		public float MidTime => (timeRange.x + timeRange.y) / 2;
-		public float Radius => radius;
+
 		public bool ExcludeFromOverlapTest => excludeFromOverlapTest;
 	}
 }
