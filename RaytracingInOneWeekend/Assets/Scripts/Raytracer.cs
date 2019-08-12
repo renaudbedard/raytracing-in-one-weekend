@@ -199,6 +199,7 @@ namespace RaytracerInOneWeekend
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged;
+			bool traceNeedsKick = traceNeedsReset || !commandBufferHooked;
 
 			void RebuildDirtyComponents()
 			{
@@ -224,10 +225,10 @@ namespace RaytracerInOneWeekend
 				ignoreBatchTimings = false;
 			}
 
-			if (!TraceActive && traceNeedsReset)
+			if (!TraceActive && traceNeedsKick)
 			{
 				RebuildDirtyComponents();
-				ScheduleAccumulate(true);
+				ScheduleAccumulate(traceNeedsReset);
 			}
 
 			if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
