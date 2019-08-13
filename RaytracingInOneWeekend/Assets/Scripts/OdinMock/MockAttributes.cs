@@ -51,6 +51,10 @@ namespace OdinMock
 	{
 	}
 
+	public class HideLabelAttribute : Attribute
+	{
+	}
+
 	public class DisableInEditorModeAttribute : Attribute
 	{
 	}

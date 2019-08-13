@@ -52,9 +52,9 @@ namespace RaytracerInOneWeekend
 				float minDistance = float.MaxValue;
 				foreach (EntityData entity in raytracer.activeEntities)
 				{
-					float distance = HandleUtility.DistancePointLine(entity.Center, viewRay.origin, viewRay.direction * 1000);
+					float distance = HandleUtility.DistancePointLine(entity.Position, viewRay.origin, viewRay.direction * 1000);
 
-					if (new Bounds(entity.Center, entity.Size).IntersectRay(viewRay) &&
+					if (new Bounds(entity.Position, entity.Size).IntersectRay(viewRay) &&
 					    distance < minDistance)
 					{
 						hotEntity = entity;
@@ -78,7 +78,7 @@ namespace RaytracerInOneWeekend
 				return;
 			}
 
-			Vector3 currentPosition = hotEntity.Center;
+			Vector3 currentPosition = hotEntity.Position;
 
 			switch (Tools.current)
 			{
@@ -88,19 +88,7 @@ namespace RaytracerInOneWeekend
 					if (EditorGUI.EndChangeCheck())
 					{
 						Undo.RecordObject(raytracer.scene, "Moved object");
-
-						switch (hotEntity.Type)
-						{
-							case EntityType.Sphere:
-								hotEntity.SphereData.Center = newPosition;
-								break;
-
-							case EntityType.Rect:
-								hotEntity.RectData.Center = newPosition;
-								hotEntity.RectData.Distance = newPosition.z;
-								break;
-						}
-
+						hotEntity.Position = newPosition;
 						hotEntity.MarkDirty();
 					}
 					break;

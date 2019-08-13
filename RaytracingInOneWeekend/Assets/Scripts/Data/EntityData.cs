@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
 
@@ -20,53 +21,46 @@ namespace RaytracerInOneWeekend
 	[Serializable]
 	class EntityData
 	{
-		[HorizontalGroup("FirstRow")] [SerializeField] [LabelWidth(35)]
-		EntityType type;
+		[HorizontalGroup("FirstRow")] [SerializeField] [LabelWidth(35)] EntityType type;
+		[HorizontalGroup("FirstRow")] [SerializeField] [LabelWidth(49)] bool enabled = true;
 
-		[HorizontalGroup("FirstRow")] [SerializeField] [LabelWidth(49)]
-		bool enabled = true;
+		[SerializeField] Vector3 position;
+		[SerializeField] Vector3 rotation;
 
 		[ShowIf(nameof(type), EntityType.Sphere)]
-		[SerializeField]
-		SphereData sphereData;
+		[SerializeField] [HideLabel] SphereData sphereData;
 
 		[ShowIf(nameof(type), EntityType.Rect)]
-		[SerializeField]
-		RectData rectData;
+		[SerializeField] [HideLabel] RectData rectData;
 
 		[SerializeField]
 #if UNITY_EDITOR
-		[ValueDropdown(nameof(GetMaterialAssets))]
+		[AssetList]
+		[HideLabel]
+		[BoxGroup("Material")]
 #endif
 		MaterialData material;
 
 #if UNITY_EDITOR
 		[ShowInInspector]
-		[InlineEditor(DrawHeader = false)]
+		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(material))]
+		[BoxGroup("Material")]
 		MaterialData MaterialData
 		{
 			get => material;
 			set => material = value;
 		}
 
-		protected IEnumerable<ValueDropdownItem<MaterialData>> GetMaterialAssets => AssetDatabase
-			.FindAssets("t:MaterialData")
-			.Select(AssetDatabase.GUIDToAssetPath)
-			.Select(AssetDatabase.LoadAssetAtPath<MaterialData>)
-			.Select(asset => new ValueDropdownItem<MaterialData>(asset.name, asset))
-			.Concat(new[] { new ValueDropdownItem<MaterialData>("Null", null) })
-			.OrderBy(x => x.Value != null).ThenBy(x => x.Text);
-
 		public bool Selected { get; set; }
 #endif
 
-		public static EntityData Sphere(SphereData s, MaterialData m)
+		public static EntityData Sphere(float3 position, float radius, MaterialData m)
 		{
 			return new EntityData
 			{
 				type = EntityType.Sphere,
-				sphereData = s,
+				sphereData = new SphereData(radius),
 				material = m
 			};
 		}
@@ -89,23 +83,22 @@ namespace RaytracerInOneWeekend
 			set => enabled = value;
 		}
 
+		public Vector3 Position
+		{
+			get => position;
+			set => position = value;
+		}
+
+		public Quaternion Rotation
+		{
+			get => Quaternion.Euler(rotation);
+			set => rotation = value.eulerAngles;
+		}
+
 		public MaterialData Material
 		{
 			get => material;
 			set => material = value;
-		}
-
-		public Vector3 Center
-		{
-			get
-			{
-				switch (type)
-				{
-					case EntityType.Sphere: return sphereData.CenterAt(sphereData.MidTime);
-					case EntityType.Rect: return float3(rectData.Center, rectData.Distance);
-				}
-				return default;
-			}
 		}
 
 		public Vector3 Size

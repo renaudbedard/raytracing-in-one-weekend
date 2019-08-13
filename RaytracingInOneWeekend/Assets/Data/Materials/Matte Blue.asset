@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Matte Blue
   m_EditorClassIdentifier: 
   type: 1
-  albedo: {fileID: 11400000, guid: d5a458f30d83e4271a8892c35035064b, type: 2}
+  textureScale: {x: 1, y: 1}
   fuzz: 0
   refractiveIndex: 1
+  albedo: {fileID: 11400000, guid: 6a56cdbbd217d42d3b7b559a329b88c4, type: 2}
+  emission: {fileID: 0}

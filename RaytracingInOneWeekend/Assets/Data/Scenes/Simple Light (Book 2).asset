@@ -19,62 +19,42 @@ MonoBehaviour:
   entities:
   - type: 1
     enabled: 1
+    position: {x: 0, y: -1000, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 0, y: -1000, z: 8}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 1000
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 8
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
-    material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
+    material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
   - type: 1
     enabled: 1
+    position: {x: 0, y: 2, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 0, y: 2, z: 0}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 2
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
     material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
   - type: 2
     enabled: 1
+    position: {x: -4, y: 2, z: -2}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 0, y: 0, z: 0}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 0
+      excludeFromOverlapTest: 0
     rectData:
-      distance: -2
-      center: {x: -4, y: 2}
       size: {x: 2, y: 2}
     material: {fileID: 11400000, guid: 182810c14a2f63d49b816d7784d4ce97, type: 2}
   - type: 1
     enabled: 1
+    position: {x: 0, y: 6, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 0, y: 6, z: 0}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 1
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
     material: {fileID: 11400000, guid: 182810c14a2f63d49b816d7784d4ce97, type: 2}
   randomSeed: 1

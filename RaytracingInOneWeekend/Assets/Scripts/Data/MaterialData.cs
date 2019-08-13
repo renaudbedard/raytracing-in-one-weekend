@@ -26,14 +26,17 @@ namespace RaytracerInOneWeekend
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
 #if UNITY_EDITOR
-		[ValueDropdown(nameof(GetMaterialAssets))]
+		[AssetList]
+		[HideLabel]
 		[ShowIf(nameof(AlbedoSupported))]
+		[BoxGroup("Albedo")]
 #endif
 		[SerializeField] TextureData albedo = null;
 #if UNITY_EDITOR
 		[ShowInInspector]
-		[InlineEditor(DrawHeader = false)]
+		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(albedo))]
+		[BoxGroup("Albedo")]
 		TextureData AlbedoTexture
 		{
 			get => albedo;
@@ -43,14 +46,17 @@ namespace RaytracerInOneWeekend
 #endif
 
 #if UNITY_EDITOR
-		[ValueDropdown(nameof(GetMaterialAssets))]
+		[AssetList]
+		[HideLabel]
 		[ShowIf(nameof(type), MaterialType.DiffuseLight)]
+		[BoxGroup("Emission")]
 #endif
 		[SerializeField] TextureData emission = null;
 #if UNITY_EDITOR
 		[ShowInInspector]
-		[InlineEditor(DrawHeader = false)]
+		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(emission))]
+		[BoxGroup("Emission")]
 		TextureData EmissiveTexture
 		{
 			get => emission;
@@ -120,13 +126,6 @@ namespace RaytracerInOneWeekend
 		{
 			dirty = true;
 		}
-
-		static IEnumerable<ValueDropdownItem<TextureData>> GetMaterialAssets => AssetDatabase.FindAssets("t:TextureData")
-			.Select(AssetDatabase.GUIDToAssetPath)
-			.Select(AssetDatabase.LoadAssetAtPath<TextureData>)
-			.Select(asset => new ValueDropdownItem<TextureData>(asset.name, asset))
-			.Concat(new[] { new ValueDropdownItem<TextureData>("Null", null) })
-			.OrderBy(x => x.Value != null).ThenBy(x => x.Text);
 #endif
 	}
 }

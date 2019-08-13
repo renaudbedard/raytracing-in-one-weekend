@@ -512,14 +512,13 @@ namespace RaytracerInOneWeekend
 			{
 				Vector2 sizeFactor = Vector2.one;
 				void* contentPointer = null;
-				RigidTransform rigidTransform = RigidTransform.identity;
+				RigidTransform rigidTransform = new RigidTransform(e.Rotation, e.Position);
 
 				switch (e.Type)
 				{
 					case EntityType.Sphere:
 						SphereData s = e.SphereData;
 						sphereBuffer[sphereIndex] = new Sphere(s.Radius);
-						rigidTransform.pos = s.Center;
 						sizeFactor *= s.Radius;
 						contentPointer = (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex;
 						sphereIndex++;
@@ -528,7 +527,6 @@ namespace RaytracerInOneWeekend
 					case EntityType.Rect:
 						RectData r = e.RectData;
 						rectBuffer[rectIndex] = new Rect(r.Size);
-						rigidTransform.pos = float3(r.Center, r.Distance);
 						sizeFactor *= r.Size;
 						contentPointer = (Rect*) rectBuffer.GetUnsafePtr() + rectIndex;
 						rectIndex++;
@@ -667,8 +665,7 @@ namespace RaytracerInOneWeekend
 
 				bool AnyOverlap(float3 center, float radius) => activeEntities.Where(x => x.Type == EntityType.Sphere)
 					.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
-					          distance(x.SphereData.CenterAt(x.SphereData.MidTime), center) <
-					          x.SphereData.Radius + radius + group.MinDistance);
+					          distance(x.Position, center) < x.SphereData.Radius + radius + group.MinDistance);
 
 				EntityData GetSphere(float3 center, float radius)
 				{
@@ -679,9 +676,10 @@ namespace RaytracerInOneWeekend
 							float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
 							float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
 
-						return EntityData.Sphere(new SphereData(center, offset, 0, 1, radius), GetMaterial());
+						// TODO: reimplement moving spheres
+						//return EntityData.Sphere(new SphereData(center, offset, 0, 1, radius), GetMaterial());
 					}
-					return EntityData.Sphere(new SphereData(center, radius), GetMaterial());
+					return EntityData.Sphere(center, radius, GetMaterial());
 				}
 
 				switch (group.Distribution)

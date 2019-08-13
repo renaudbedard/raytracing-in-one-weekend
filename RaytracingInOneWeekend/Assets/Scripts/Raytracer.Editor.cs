@@ -237,7 +237,7 @@ namespace RaytracerInOneWeekend
 					case EntityType.Sphere:
 						SphereData s = entity.SphereData;
 						previewCommandBuffer.DrawMesh(sphereMeshFilter.sharedMesh,
-							Matrix4x4.TRS(s.CenterAt(s.MidTime), Quaternion.identity, s.Radius * 2 * Vector3.one),
+							Matrix4x4.TRS(entity.Position, entity.Rotation, s.Radius * 2 * Vector3.one),
 							material, 0,
 							material.FindPass("FORWARD"));
 						break;
@@ -245,11 +245,11 @@ namespace RaytracerInOneWeekend
 					case EntityType.Rect:
 						RectData r = entity.RectData;
 						previewCommandBuffer.DrawMesh(rectMeshFilter.sharedMesh,
-							Matrix4x4.TRS(entity.Center, Quaternion.LookRotation(Vector3.forward), float3(r.Size, 1)),
+							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(Vector3.forward) * entity.Rotation, float3(r.Size, 1)),
 							material, 0,
 							material.FindPass("FORWARD"));
 						previewCommandBuffer.DrawMesh(rectMeshFilter.sharedMesh,
-							Matrix4x4.TRS(entity.Center, Quaternion.LookRotation(-Vector3.forward), float3(r.Size, 1)),
+							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(-Vector3.forward) * entity.Rotation, float3(r.Size, 1)),
 							material, 0,
 							material.FindPass("FORWARD"));
 						break;
@@ -271,7 +271,7 @@ namespace RaytracerInOneWeekend
 
 			foreach (EntityData e in activeEntities
 				.Where(x => x.Material)
-				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Center, sceneCameraTransform.forward)))
+				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Position, sceneCameraTransform.forward)))
 			{
 				Color color = e.Material.Albedo ? e.Material.Albedo.MainColor : Color.white;
 				if (e.Material.Emission)
@@ -287,11 +287,13 @@ namespace RaytracerInOneWeekend
 				switch (e.Type)
 				{
 					case EntityType.Rect:
-						Gizmos.DrawCube(e.Center, float3(e.RectData.Size, 0.001f));
+						Gizmos.matrix = Matrix4x4.Rotate(e.Rotation);
+						Gizmos.DrawCube(e.Position, float3(e.RectData.Size, 0.001f));
+						Gizmos.matrix = Matrix4x4.identity;
 						break;
 
 					case EntityType.Sphere:
-						Gizmos.DrawSphere(e.Center, e.SphereData.Radius);
+						Gizmos.DrawSphere(e.Position, e.SphereData.Radius);
 						break;
 				}
 			}
