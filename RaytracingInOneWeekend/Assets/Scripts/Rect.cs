@@ -7,20 +7,16 @@ namespace RaytracerInOneWeekend
 	// An axis-aligned rectangle in the XY plane
 	struct Rect
 	{
-		public readonly float Distance;
 		public readonly float2 From, To;
-		public readonly Material Material;
 
-		public Rect(float distance, float2 center, float2 size, Material material)
+		public Rect(float2 size)
 		{
-			Distance = distance;
-			From = center - size / 2;
-			To = center + size / 2;
-			Material = material;
+			From = -size / 2;
+			To = size / 2;
 		}
 
 		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(
-			float3(From, Distance - Mathf.Epsilon),
-			float3(To, Distance + Mathf.Epsilon));
+			float3(From, -Mathf.Epsilon),
+			float3(To, Mathf.Epsilon));
 	}
 }

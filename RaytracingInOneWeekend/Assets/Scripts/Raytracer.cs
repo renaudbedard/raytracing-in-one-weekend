@@ -13,8 +13,9 @@ using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
 using float3 = Unity.Mathematics.float3;
+using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
-
+using RigidTransform = Unity.Mathematics.RigidTransform;
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
@@ -509,36 +510,42 @@ namespace RaytracerInOneWeekend
 			int entityIndex = 0, sphereIndex = 0, rectIndex = 0;
 			foreach (EntityData e in activeEntities)
 			{
-				MaterialData material = e.Material;
-				TextureData albedo = material ? material.Albedo : null;
-				TextureData emission = material ? material.Emission : null;
+				Vector2 sizeFactor = Vector2.one;
+				void* contentPointer = null;
+				RigidTransform rigidTransform = RigidTransform.identity;
 
-				Entity entity = default;
 				switch (e.Type)
 				{
 					case EntityType.Sphere:
 						SphereData s = e.SphereData;
-						sphereBuffer[sphereIndex] = new Sphere(s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius,
-							material
-								? new Material(material.Type, material.TextureScale * s.Radius, albedo.GetRuntimeData(),
-									emission.GetRuntimeData(), material.Fuzz, material.RefractiveIndex)
-								: default);
-
-						entity = new Entity((Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++);
+						sphereBuffer[sphereIndex] = new Sphere(s.Radius);
+						rigidTransform.pos = s.Center;
+						sizeFactor *= s.Radius;
+						contentPointer = (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex;
+						sphereIndex++;
 						break;
 
 					case EntityType.Rect:
 						RectData r = e.RectData;
-						rectBuffer[rectIndex] = new Rect(r.Distance, r.Center, r.Size, material
-							? new Material(material.Type, material.TextureScale * r.Size, albedo.GetRuntimeData(),
-								emission.GetRuntimeData(), material.Fuzz, material.RefractiveIndex)
-							: default);
-
-						entity = new Entity((Rect*) rectBuffer.GetUnsafePtr() + rectIndex++);
+						rectBuffer[rectIndex] = new Rect(r.Size);
+						rigidTransform.pos = float3(r.Center, r.Distance);
+						sizeFactor *= r.Size;
+						contentPointer = (Rect*) rectBuffer.GetUnsafePtr() + rectIndex;
+						rectIndex++;
 						break;
 				}
 
-				entityBuffer[entityIndex++] = entity;
+				MaterialData materialData = e.Material;
+				TextureData albedo = materialData ? materialData.Albedo : null;
+				TextureData emission = materialData ? materialData.Emission : null;
+
+				Material material = materialData
+					? new Material(materialData.Type, materialData.TextureScale * sizeFactor,
+						albedo.GetRuntimeData(), emission.GetRuntimeData(),
+						materialData.Fuzz, materialData.RefractiveIndex)
+					: default;
+
+				entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
 			}
 		}
 #endif // !SOA_SIMD && !AOSOA_SIMD

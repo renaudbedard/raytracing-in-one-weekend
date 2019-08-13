@@ -17,14 +17,12 @@ namespace RaytracerInOneWeekend
 	{
 #if !(AOSOA_SIMD || SOA_SIMD)
 		// single sphere hit test
-		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
-			float3 center = s.Center(r.Time);
 			float squaredRadius = s.SquaredRadius;
 			float radius = s.Radius;
-			Material material = s.Material;
 
-			float3 oc = r.Origin - center;
+			float3 oc = r.Origin;
 			float a = dot(r.Direction, r.Direction);
 			float b = dot(oc, r.Direction);
 			float c = dot(oc, oc) - squaredRadius;
@@ -38,8 +36,8 @@ namespace RaytracerInOneWeekend
 				float t = (-b - sqrtDiscriminant) / a;
 				if (t < tMax && t > tMin)
 				{
-					float3 point = r.GetPoint(t);
-					rec = new HitRecord(t, point, (point - center) / radius, material);
+					distance = t;
+					normal = r.GetPoint(t) / radius;
 					return true;
 				}
 
@@ -47,29 +45,52 @@ namespace RaytracerInOneWeekend
 				t = (-b + sqrtDiscriminant) / a;
 				if (t < tMax && t > tMin)
 				{
-					float3 point = r.GetPoint(t);
-					rec = new HitRecord(t, point, (point - center) / radius, material);
+					distance = t;
+					normal = r.GetPoint(t) / radius;
 					return true;
 				}
 			}
 
-			rec = default;
+			distance = 0;
+			normal = 0;
 			return false;
 		}
 
-		public static bool Hit(this Rect rect, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static bool Hit(this Rect rect, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
-			rec = default;
+			distance = 0;
+			normal = 0;
 
 			// TODO: this breaks when ray direction Z is 0
-			float t = (rect.Distance - r.Origin.z) / r.Direction.z;
+			float t = -r.Origin.z / r.Direction.z;
 			if (t < tMin || t > tMax) return false;
 
 			float2 xy = r.Origin.xy + t * r.Direction.xy;
 			bool4 test = bool4(xy < rect.From, xy > rect.To);
 			if (any(test)) return false;
 
-			rec = new HitRecord(t, r.GetPoint(t), float3(0, 0, 1), rect.Material);
+			distance = t;
+			normal = float3(0, 0, 1);
+			return true;
+		}
+
+		public static bool Hit(this Box box, Ray r, float tMin, float tMax, out float distance, out float3 normal)
+		{
+			distance = 0;
+			normal = 0;
+
+			// from : http://iquilezles.org/www/articles/intersectors/intersectors.htm
+			float3 invDirection = 1 / r.Direction;
+			float3 n = invDirection * r.Origin;
+			float3 k = abs(invDirection) * box.Size;
+			float3 t1 = -n - k;
+			float3 t2 = -n + k;
+			float tN = cmax(t1);
+			float tF = cmin(t2);
+			if (tN > tF || tF > tMax || tF < tMin) return false;
+
+			normal = -sign(r.Direction) * step(t1.yzx,t1.xyz) * step(t1.zxy,t1.xyz);
+			distance = tF;
 			return true;
 		}
 #endif

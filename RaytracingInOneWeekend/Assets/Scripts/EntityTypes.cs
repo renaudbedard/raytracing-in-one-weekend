@@ -4,6 +4,7 @@ namespace RaytracerInOneWeekend
 	{
 		None,
 		Sphere,
-		Rect
+		Rect,
+		Box
 	}
 }
