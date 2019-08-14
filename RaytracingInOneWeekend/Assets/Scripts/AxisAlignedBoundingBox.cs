@@ -17,7 +17,9 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax)
 		{
-			// NOTE: I tried a SIMD version of it instead of a loop, and it only ended up slower :(
+			// TODO: try this optimized version
+			// https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
+
 			for (int a = 0; a < 3; a++)
 			{
 				float invDirection = 1 / r.Direction[a];

@@ -3,6 +3,8 @@ using static Unity.Mathematics.math;
 
 #if !BVH && !SOA_SIMD && !AOSOA_SIMD
 using Unity.Collections;
+using UnityEngine;
+
 #endif
 
 #if SOA_SIMD || AOSOA_SIMD
@@ -79,18 +81,26 @@ namespace RaytracerInOneWeekend
 			distance = 0;
 			normal = 0;
 
-			// from : http://iquilezles.org/www/articles/intersectors/intersectors.htm
-			float3 invDirection = 1 / r.Direction;
-			float3 n = invDirection * r.Origin;
-			float3 k = abs(invDirection) * box.Size;
-			float3 t1 = -n - k;
-			float3 t2 = -n + k;
-			float tN = cmax(t1);
-			float tF = cmin(t2);
-			if (tN > tF || tF > tMax || tF < tMin) return false;
+			// from "A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering" (Majercik, Crassin, Shirley & McGuire)
+			// http://jcgt.org/published/0007/03/04/
+			float3 rayDirection = normalize(r.Direction); // TODO: ray normalization could be done up-front
+			float winding = cmax(abs(r.Origin) * box.InverseExtents) < 1 ? -1 : 1;
+			float3 sgn = -sign(rayDirection);
+			float3 distanceToPlane = (box.Extents * winding * sgn - r.Origin) / rayDirection;
 
-			normal = -sign(r.Direction) * step(t1.yzx,t1.xyz) * step(t1.zxy,t1.xyz);
-			distance = tF;
+			bool3 test = distanceToPlane >= 0 & bool3(
+				all(abs(r.Origin.yz + rayDirection.yz * distanceToPlane.x) < box.Extents.yz),
+				all(abs(r.Origin.zx + rayDirection.zx * distanceToPlane.y) < box.Extents.zx),
+				all(abs(r.Origin.xy + rayDirection.xy * distanceToPlane.z) < box.Extents.xy));
+
+			sgn = test.x ? float3(sgn.x, 0, 0) : test.y ? float3(0, sgn.y, 0) : float3(0, 0, test.z ? sgn.z : 0);
+			bool3 nonZero = sgn != 0;
+			if (any(nonZero)) return false;
+
+			distance = nonZero.x ? distanceToPlane.x : nonZero.y ? distanceToPlane.y : distanceToPlane.z;
+			if (distance < tMin || distance > tMax) return false;
+
+			normal = sgn;
 			return true;
 		}
 #endif

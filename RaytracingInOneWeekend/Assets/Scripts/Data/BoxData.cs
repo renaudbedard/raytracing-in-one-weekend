@@ -5,16 +5,16 @@ using UnityEngine;
 namespace RaytracerInOneWeekend
 {
 	[Serializable]
-	class RectData
+	public class BoxData
 	{
-		[SerializeField] Vector2 size = Vector2.one;
+		[SerializeField] Vector3 size = Vector3.one;
 
-		public RectData(float2 size)
+		public BoxData(float3 size)
 		{
 			this.size = size;
 		}
 
-		public Vector2 Size
+		public Vector3 Size
 		{
 			get => size;
 			set => size = value;

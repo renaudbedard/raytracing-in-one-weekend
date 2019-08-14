@@ -42,6 +42,11 @@ namespace OdinMock
 	{
 	}
 
+	public class BoxGroupAttribute : Attribute
+	{
+		public BoxGroupAttribute(string _) { }
+	}
+
 	public class ValueDropdownAttribute : Attribute
 	{
 		public ValueDropdownAttribute(string _) { }

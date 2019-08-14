@@ -33,11 +33,12 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(type), EntityType.Rect)]
 		[SerializeField] [HideLabel] RectData rectData;
 
+		[ShowIf(nameof(type), EntityType.Box)]
+		[SerializeField] [HideLabel] BoxData boxData;
+
 		[SerializeField]
 #if UNITY_EDITOR
 		[AssetList]
-		[HideLabel]
-		[BoxGroup("Material")]
 #endif
 		MaterialData material;
 
@@ -45,7 +46,7 @@ namespace RaytracerInOneWeekend
 		[ShowInInspector]
 		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(material))]
-		[BoxGroup("Material")]
+		[BoxGroup]
 		MaterialData MaterialData
 		{
 			get => material;
@@ -60,17 +61,32 @@ namespace RaytracerInOneWeekend
 			return new EntityData
 			{
 				type = EntityType.Sphere,
+				position = position,
 				sphereData = new SphereData(radius),
 				material = m
 			};
 		}
 
-		public static EntityData Rect(RectData r, MaterialData m)
+		public static EntityData Rect(float3 position, quaternion rotation, float2 size, MaterialData m)
 		{
 			return new EntityData
 			{
 				type = EntityType.Rect,
-				rectData = r,
+				rectData = new RectData(size),
+				position = position,
+				Rotation = rotation,
+				material = m
+			};
+		}
+
+		public static EntityData Box(float3 position, quaternion rotation, float3 size, MaterialData m)
+		{
+			return new EntityData
+			{
+				type = EntityType.Box,
+				boxData = new BoxData(size),
+				position = position,
+				Rotation = rotation,
 				material = m
 			};
 		}
@@ -109,6 +125,7 @@ namespace RaytracerInOneWeekend
 				{
 					case EntityType.Sphere: return sphereData.Radius * 2 * Vector3.one;
 					case EntityType.Rect: return rectData.Size;
+					case EntityType.Box: return boxData.Size;
 				}
 				return default;
 			}
@@ -116,6 +133,7 @@ namespace RaytracerInOneWeekend
 
 		public SphereData SphereData => sphereData;
 		public RectData RectData => rectData;
+		public BoxData BoxData => boxData;
 
 #if UNITY_EDITOR
 		bool dirty = false;

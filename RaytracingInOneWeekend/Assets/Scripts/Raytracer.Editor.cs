@@ -7,9 +7,9 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using System.IO;
 using static Unity.Mathematics.math;
-
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
+
 #else
 using OdinMock;
 #endif
@@ -27,6 +27,7 @@ namespace RaytracerInOneWeekend
 				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
 					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
 		}
+
 		[ButtonGroup("Save")]
 		[DisableInEditorMode]
 		void SaveView()
@@ -55,7 +56,7 @@ namespace RaytracerInOneWeekend
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
 		bool hookedEditorUpdate;
 
-		[SerializeField] [HideInInspector] GameObject previewSphere, previewRect;
+		MeshFilter previewSphere, previewRect, previewBox;
 
 		[SerializeField] [HideInInspector]
 		List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
@@ -176,20 +177,20 @@ namespace RaytracerInOneWeekend
 			skybox.material.SetColor("_Color1", scene.SkyBottomColor);
 			skybox.material.SetColor("_Color2", scene.SkyTopColor);
 
-			if (previewSphere == null)
-				previewSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-			previewSphere.hideFlags = HideFlags.HideAndDontSave;
-			previewSphere.SetActive(false);
+			void EnsurePreviewObjectExists(PrimitiveType type, ref MeshFilter previewObject)
+			{
+				if (previewObject != null) return;
+				GameObject primitive = GameObject.CreatePrimitive(type);
+				primitive.hideFlags = HideFlags.HideAndDontSave;
+				primitive.SetActive(false);
+				previewObject = primitive.GetComponent<MeshFilter>();
+			}
 
-			if (previewRect == null)
-				previewRect = GameObject.CreatePrimitive(PrimitiveType.Quad);
-			previewRect.hideFlags = HideFlags.HideAndDontSave;
-			previewRect.SetActive(false);
+			EnsurePreviewObjectExists(PrimitiveType.Sphere, ref previewSphere);
+			EnsurePreviewObjectExists(PrimitiveType.Quad, ref previewRect);
+			EnsurePreviewObjectExists(PrimitiveType.Cube, ref previewBox);
 
 			var previewMeshRenderer = previewSphere.GetComponent<MeshRenderer>();
-
-			var sphereMeshFilter = previewSphere.GetComponent<MeshFilter>();
-			var rectMeshFilter = previewRect.GetComponent<MeshFilter>();
 
 			CollectActiveEntities();
 
@@ -236,7 +237,7 @@ namespace RaytracerInOneWeekend
 				{
 					case EntityType.Sphere:
 						SphereData s = entity.SphereData;
-						previewCommandBuffer.DrawMesh(sphereMeshFilter.sharedMesh,
+						previewCommandBuffer.DrawMesh(previewSphere.sharedMesh,
 							Matrix4x4.TRS(entity.Position, entity.Rotation, s.Radius * 2 * Vector3.one),
 							material, 0,
 							material.FindPass("FORWARD"));
@@ -244,13 +245,20 @@ namespace RaytracerInOneWeekend
 
 					case EntityType.Rect:
 						RectData r = entity.RectData;
-						previewCommandBuffer.DrawMesh(rectMeshFilter.sharedMesh,
-							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(Vector3.forward) * entity.Rotation, float3(r.Size, 1)),
+						previewCommandBuffer.DrawMesh(previewRect.sharedMesh,
+							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(Vector3.forward) * entity.Rotation,float3(r.Size, 1)),
 							material, 0,
 							material.FindPass("FORWARD"));
-						previewCommandBuffer.DrawMesh(rectMeshFilter.sharedMesh,
-							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(-Vector3.forward) * entity.Rotation, float3(r.Size, 1)),
+						previewCommandBuffer.DrawMesh(previewRect.sharedMesh,
+							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(-Vector3.forward) * entity.Rotation,float3(r.Size, 1)),
 							material, 0,
+							material.FindPass("FORWARD"));
+						break;
+
+					case EntityType.Box:
+						BoxData b = entity.BoxData;
+						previewCommandBuffer.DrawMesh(previewBox.sharedMesh,
+							Matrix4x4.TRS(entity.Position, entity.Rotation, b.Size), material, 0,
 							material.FindPass("FORWARD"));
 						break;
 				}
@@ -294,6 +302,12 @@ namespace RaytracerInOneWeekend
 
 					case EntityType.Sphere:
 						Gizmos.DrawSphere(e.Position, e.SphereData.Radius);
+						break;
+
+					case EntityType.Box:
+						Gizmos.matrix = Matrix4x4.Rotate(e.Rotation);
+						Gizmos.DrawCube(e.Position, e.BoxData.Size);
+						Gizmos.matrix = Matrix4x4.identity;
 						break;
 				}
 			}

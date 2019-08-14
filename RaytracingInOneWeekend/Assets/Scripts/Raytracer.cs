@@ -74,6 +74,7 @@ namespace RaytracerInOneWeekend
 #else // !SOA_SIMD && !AOSOA_SIMD
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Rect> rectBuffer;
+		NativeArray<Box> boxBuffer;
 		NativeArray<Entity> entityBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
@@ -171,6 +172,7 @@ namespace RaytracerInOneWeekend
 			entityBuffer.SafeDispose();
 			sphereBuffer.SafeDispose();
 			rectBuffer.SafeDispose();
+			boxBuffer.SafeDispose();
 #endif
 			accumulationInputBuffer.SafeDispose();
 			accumulationOutputBuffer.SafeDispose();
@@ -506,8 +508,9 @@ namespace RaytracerInOneWeekend
 
 			sphereBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Sphere));
 			rectBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Rect));
+			boxBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Box));
 
-			int entityIndex = 0, sphereIndex = 0, rectIndex = 0;
+			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0;
 			foreach (EntityData e in activeEntities)
 			{
 				Vector2 sizeFactor = Vector2.one;
@@ -517,19 +520,21 @@ namespace RaytracerInOneWeekend
 				switch (e.Type)
 				{
 					case EntityType.Sphere:
-						SphereData s = e.SphereData;
-						sphereBuffer[sphereIndex] = new Sphere(s.Radius);
-						sizeFactor *= s.Radius;
-						contentPointer = (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex;
-						sphereIndex++;
+						sphereBuffer[sphereIndex] = new Sphere(e.SphereData.Radius);
+						sizeFactor *= e.SphereData.Radius;
+						contentPointer = (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++;
 						break;
 
 					case EntityType.Rect:
-						RectData r = e.RectData;
-						rectBuffer[rectIndex] = new Rect(r.Size);
-						sizeFactor *= r.Size;
-						contentPointer = (Rect*) rectBuffer.GetUnsafePtr() + rectIndex;
-						rectIndex++;
+						rectBuffer[rectIndex] = new Rect(e.RectData.Size);
+						sizeFactor *= e.RectData.Size;
+						contentPointer = (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++;
+						break;
+
+					case EntityType.Box:
+						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
+						sizeFactor *= e.BoxData.Size;
+						contentPointer = (Box*) boxBuffer.GetUnsafePtr() + boxIndex++;
 						break;
 				}
 

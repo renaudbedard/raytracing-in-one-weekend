@@ -27,16 +27,14 @@ namespace RaytracerInOneWeekend
 
 #if UNITY_EDITOR
 		[AssetList]
-		[HideLabel]
 		[ShowIf(nameof(AlbedoSupported))]
-		[BoxGroup("Albedo")]
 #endif
 		[SerializeField] TextureData albedo = null;
 #if UNITY_EDITOR
 		[ShowInInspector]
 		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(albedo))]
-		[BoxGroup("Albedo")]
+		[BoxGroup]
 		TextureData AlbedoTexture
 		{
 			get => albedo;
@@ -47,16 +45,14 @@ namespace RaytracerInOneWeekend
 
 #if UNITY_EDITOR
 		[AssetList]
-		[HideLabel]
 		[ShowIf(nameof(type), MaterialType.DiffuseLight)]
-		[BoxGroup("Emission")]
 #endif
 		[SerializeField] TextureData emission = null;
 #if UNITY_EDITOR
 		[ShowInInspector]
 		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(emission))]
-		[BoxGroup("Emission")]
+		[BoxGroup]
 		TextureData EmissiveTexture
 		{
 			get => emission;

@@ -25,9 +25,9 @@ namespace RaytracerInOneWeekend
         {
             // Hugues-Möller method
             // from : https://expf.wordpress.com/2010/05/05/building-an-orthonormal-basis-from-a-unit-vector/
-            
+
             float3 absNormal = abs(normal);
-            
+
             // TODO: there's probably a more clever and less branching way to do this
             int minComponent = 0;
             float minValue = absNormal.x;
@@ -48,7 +48,7 @@ namespace RaytracerInOneWeekend
                     tangent = float3(-normal.y, normal.x, 0);
                     break;
             }
-            
+
             tangent = normalize(tangent);
             bitangent = cross(normal, tangent);
 
@@ -146,6 +146,18 @@ namespace RaytracerInOneWeekend
         {
             value = max(value, 0);
             return max(1.055f * pow(value, 0.416666667f) - 0.055f, 0);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool AlmostEquals(this float lhs, float rhs)
+        {
+            return abs(rhs - lhs) < 1e-7f;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool3 AlmostEquals(this float3 lhs, float3 rhs)
+        {
+            return abs(rhs - lhs) < 1e-7f;
         }
     }
 }

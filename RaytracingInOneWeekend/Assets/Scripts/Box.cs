@@ -5,13 +5,15 @@ namespace RaytracerInOneWeekend
 {
 	struct Box
 	{
-		public readonly float3 Size;
+		public readonly float3 InverseExtents;
+		public readonly float3 Extents;
 
 		public Box(float3 size)
 		{
-			Size = size;
+			Extents = size / 2;
+			InverseExtents = 1 / Extents;
 		}
 
-		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(float3(-Size / 2), float3(Size / 2));
+		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(float3(-Extents), float3(Extents));
 	}
 }
