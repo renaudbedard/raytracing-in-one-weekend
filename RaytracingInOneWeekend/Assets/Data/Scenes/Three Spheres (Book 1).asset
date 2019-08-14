@@ -15,82 +15,67 @@ MonoBehaviour:
   cameraPosition: {x: 0, y: 0, z: -2.25}
   cameraTarget: {x: 0, y: 0, z: 0}
   cameraAperture: 0
-  cameraFieldOfView: 90
+  cameraFieldOfView: 60
   entities:
   - type: 1
     enabled: 1
+    position: {x: 0, y: -100.5, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 0, y: -100.5, z: 0}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 100
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: f24c03b9bb71f4783a7c78310435851e, type: 2}
   - type: 1
     enabled: 1
+    position: {x: 1, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 0, y: 0, z: -1}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 0.5
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
   - type: 1
     enabled: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: 1, y: 0, z: -1}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 0.5
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 2b589fea2cde947bb9dd0396429df3b6, type: 2}
   - type: 1
     enabled: 1
+    position: {x: -1, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: -1, y: 0, z: -1}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: 0.5
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
   - type: 1
     enabled: 1
+    position: {x: -1, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      moving: 0
-      excludeFromOverlapTest: 0
-      center: {x: -1, y: 0, z: -1}
-      centerFrom: {x: 0, y: 0, z: 0}
-      centerTo: {x: 0, y: 0, z: 0}
-      timeRange: {x: 0, y: 0}
       radius: -0.45
+      excludeFromOverlapTest: 0
     rectData:
-      distance: 0
-      center: {x: 0, y: 0}
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
   randomSeed: 10000
   randomSphereGroups: []

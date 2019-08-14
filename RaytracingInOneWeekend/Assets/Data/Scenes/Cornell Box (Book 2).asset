@@ -12,17 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
   m_Name: Cornell Box (Book 2)
   m_EditorClassIdentifier: 
-  cameraPosition: {x: -4.1575947, y: 3.7403507, z: 1.7622161}
-  cameraTarget: {x: -3.4187596, y: 3.1329403, z: 1.4703678}
+  cameraPosition: {x: -1.8235083, y: 1.6730185, z: 1.1941562}
+  cameraTarget: {x: -1.0495521, y: 1.1506549, z: 0.8362056}
   cameraAperture: 0
-  cameraFieldOfView: 22.2
+  cameraFieldOfView: 70
   entities:
   - type: 3
     enabled: 1
-    position: {x: 0.5252614, y: 0.45532703, z: 0.50584865}
+    position: {x: 0.5, y: 0.5, z: 0.5}
     rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      radius: 0
+      radius: 1
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}
@@ -34,7 +34,7 @@ MonoBehaviour:
     position: {x: 0, y: 0, z: 0}
     rotation: {x: 0, y: 0, z: 0}
     sphereData:
-      radius: 0
+      radius: 1
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}

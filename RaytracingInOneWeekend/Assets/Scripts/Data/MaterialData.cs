@@ -17,6 +17,7 @@ namespace RaytracerInOneWeekend
 	{
 		[SerializeField] MaterialType type = MaterialType.None;
 
+		[ShowIf(nameof(TextureCanScale))]
 		[SerializeField] Vector2 textureScale = Vector2.one;
 
 		[ShowIf(nameof(Type), MaterialType.Metal)]
@@ -122,6 +123,9 @@ namespace RaytracerInOneWeekend
 		{
 			dirty = true;
 		}
+
+		bool TextureCanScale => (albedo && albedo.Type != TextureType.Constant) ||
+								(emission && emission.Type != TextureType.Constant);
 #endif
 	}
 }

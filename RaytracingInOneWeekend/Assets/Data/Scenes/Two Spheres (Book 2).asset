@@ -16,16 +16,30 @@ MonoBehaviour:
   cameraTarget: {x: 0, y: 0, z: 0}
   cameraAperture: 0
   cameraFieldOfView: 20
-  spheres:
-  - enabled: 1
-    excludeFromOverlapTest: 0
-    center: {x: 0, y: -10, z: 0}
-    radius: 10
+  entities:
+  - type: 1
+    enabled: 1
+    position: {x: 0, y: -10, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    sphereData:
+      radius: 10
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 0, y: 0}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: e2b440160971b4fecbbfadbe5fcdab3a, type: 2}
-  - enabled: 1
-    excludeFromOverlapTest: 0
-    center: {x: 0, y: 10, z: 0}
-    radius: 10
+  - type: 1
+    enabled: 1
+    position: {x: 0, y: 10, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    sphereData:
+      radius: 10
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 0, y: 0}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: e2b440160971b4fecbbfadbe5fcdab3a, type: 2}
   randomSeed: 1
   randomSphereGroups: []

@@ -39,6 +39,8 @@ namespace RaytracerInOneWeekend
 		[SerializeField]
 #if UNITY_EDITOR
 		[AssetList]
+		[FoldoutGroup("Material")]
+		[HideLabel]
 #endif
 		MaterialData material;
 
@@ -46,7 +48,7 @@ namespace RaytracerInOneWeekend
 		[ShowInInspector]
 		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(material))]
-		[BoxGroup]
+		[FoldoutGroup("Material")]
 		MaterialData MaterialData
 		{
 			get => material;
