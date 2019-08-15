@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
-  m_Name: Hall Of Mirrors
+  m_Name: Random Planets
   m_EditorClassIdentifier: 
   cameraPosition: {x: 0, y: 0, z: -76.6}
   cameraTarget: {x: 0, y: 0, z: -75.6}
   cameraAperture: 0
   cameraFieldOfView: 50
+  entities: []
   randomSeed: 3500
-  spheres: []
   randomSphereGroups:
   - Distribution: 0
     PeriodX: 10
@@ -28,6 +28,10 @@ MonoBehaviour:
     CenterX: {x: -50, y: 50}
     CenterY: {x: -50, y: 50}
     CenterZ: {x: 0, y: 50}
+    MovementChance: 0
+    MovementXOffset: {x: 0, y: 0}
+    MovementYOffset: {x: 0, y: 0}
+    MovementZOffset: {x: 0, y: 0}
     Radius: {x: 0, y: 100}
     MinDistance: 0
     LambertChance: 0.33

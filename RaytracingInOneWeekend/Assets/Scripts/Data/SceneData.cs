@@ -100,6 +100,8 @@ namespace RaytracerInOneWeekend
 					entity.ClearDirty();
 		}
 
+		public void MarkDirty() => dirty = true;
+
 		void OnValidate()
 		{
 			dirty = true;

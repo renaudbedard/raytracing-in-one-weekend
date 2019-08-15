@@ -1,6 +1,8 @@
+using System;
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
 using UnityEditor;
+using UnityEditor.Callbacks;
 using UnityEngine;
 using static Unity.Mathematics.math;
 
@@ -11,6 +13,26 @@ namespace RaytracerInOneWeekend
 	{
 		bool mouseButtonWasDown;
 		EntityData hotEntity;
+
+		[OnOpenAsset]
+		public static bool OnOpenAsset(int instanceId, int line)
+		{
+			string assetPath = AssetDatabase.GetAssetPath(instanceId);
+			Type assetType = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
+			if (assetType == typeof(SceneData))
+			{
+				var scene = AssetDatabase.LoadAssetAtPath<SceneData>(assetPath);
+				var raytracer = FindObjectOfType<Raytracer>();
+				if (raytracer)
+				{
+					raytracer.scene = scene;
+					raytracer.scene.MarkDirty();
+					Selection.SetActiveObjectWithContext(raytracer, null);
+					return true;
+				}
+			}
+			return false;
+		}
 
 		protected override void OnEnable()
 		{

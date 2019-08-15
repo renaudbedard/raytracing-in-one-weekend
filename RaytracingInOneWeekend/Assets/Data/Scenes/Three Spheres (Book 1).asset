@@ -66,7 +66,7 @@ MonoBehaviour:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
   - type: 1
-    enabled: 1
+    enabled: 0
     position: {x: -1, y: 0, z: 0}
     rotation: {x: 0, y: 0, z: 0}
     sphereData:

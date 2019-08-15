@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
+  m_Name: Refraction Testbed
+  m_EditorClassIdentifier: 
+  cameraPosition: {x: 0, y: -0.25, z: -3}
+  cameraTarget: {x: 0, y: -0.25, z: 0}
+  cameraAperture: 0.05
+  cameraFieldOfView: 55
+  entities:
+  - type: 1
+    enabled: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    sphereData:
+      radius: 1
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 0, y: 0}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
+  - type: 1
+    enabled: 1
+    position: {x: 0, y: -101, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    sphereData:
+      radius: 100
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 0, y: 0}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: e2b440160971b4fecbbfadbe5fcdab3a, type: 2}
+  randomSeed: 1
+  randomSphereGroups: []
+  skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
+  skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
