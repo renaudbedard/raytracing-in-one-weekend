@@ -62,7 +62,7 @@ namespace RaytracerInOneWeekend
 			distance = 0;
 			normal = 0;
 
-			// TODO: this breaks when ray direction Z is 0
+			if (r.Direction.z.AlmostEquals(0)) return false;
 			float t = -r.Origin.z / r.Direction.z;
 			if (t < tMin || t > tMax) return false;
 

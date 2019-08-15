@@ -47,6 +47,8 @@ namespace RaytracerInOneWeekend
 				{
 					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					scattered = new Ray(rec.Point, normalize(rec.Normal + rng.NextFloat3Direction()), r.Time);
+
+					// NOTE: both of those alternate methods fail with artifacts for reasons unknown
 					//scattered = new Ray(rec.Point, rng.OnUniformHemisphere(rec.Normal), r.Time);
 					//scattered = new Ray(rec.Point, rng.OnCosineWeightedHemisphere(rec.Normal), r.Time);
 					return true;
@@ -55,7 +57,7 @@ namespace RaytracerInOneWeekend
 				case MaterialType.Metal:
 				{
 					float fuzz = Parameter;
-					float3 reflected = reflect(normalize(r.Direction), rec.Normal);
+					float3 reflected = reflect(r.Direction, rec.Normal);
 					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					scattered = new Ray(rec.Point, normalize(reflected + fuzz * rng.NextFloat3Direction()), r.Time);
 					return true;
@@ -74,13 +76,13 @@ namespace RaytracerInOneWeekend
 					{
 						outwardNormal = -rec.Normal;
 						niOverNt = refractiveIndex;
-						cosine = refractiveIndex * dot(r.Direction, rec.Normal) / length(r.Direction);
+						cosine = refractiveIndex * dot(r.Direction, rec.Normal);
 					}
 					else
 					{
 						outwardNormal = rec.Normal;
 						niOverNt = 1 / refractiveIndex;
-						cosine = -dot(r.Direction, rec.Normal) / length(r.Direction);
+						cosine = -dot(r.Direction, rec.Normal);
 					}
 
 					if (Refract(r.Direction, outwardNormal, niOverNt, out float3 refracted))

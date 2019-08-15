@@ -204,6 +204,7 @@ namespace RaytracerInOneWeekend
 	struct CombineJob : IJobParallelFor
 	{
 		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
+		static readonly float3 NaNColor = new float3(0, 1, 1);
 
 		[ReadOnly] public NativeArray<float4> Input;
 		[WriteOnly] public NativeArray<RGBA32> Output;
@@ -217,6 +218,8 @@ namespace RaytracerInOneWeekend
 			float3 finalColor;
 			if (realSampleCount == 0)
 				finalColor = NoSamplesColor;
+			else if (any(isnan(inputSample)))
+				finalColor = NaNColor;
 			else
 				finalColor = inputSample.xyz / realSampleCount;
 
