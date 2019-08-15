@@ -44,9 +44,9 @@ namespace RaytracerInOneWeekend
 			float3 offset = Right * rd.x + Up * rd.y;
 
 			return new Ray(Origin + offset,
-				LowerLeftCorner - offset +
-				normalizedCoordinates.x * Horizontal +
-				normalizedCoordinates.y * Vertical,
+				normalize(LowerLeftCorner - offset +
+				          normalizedCoordinates.x * Horizontal +
+				          normalizedCoordinates.y * Vertical),
 				rng.NextFloat(TimeRange.x, TimeRange.y));
 		}
 	}

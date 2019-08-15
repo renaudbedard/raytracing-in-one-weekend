@@ -1,5 +1,5 @@
 #if !(AOSOA_SIMD || SOA_SIMD)
-using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -63,10 +63,6 @@ namespace RaytracerInOneWeekend
 			}
 
 			rec = new HitRecord(distance, ray.GetPoint(distance), rotate(Transform, normal), Material);
-
-			//float3 point = transform(Transform, entitySpaceRay.GetPoint(distance));
-			//rec = new HitRecord(length(point - ray.Origin), point, rotate(Transform, normal), Material);
-
 			return true;
 		}
 

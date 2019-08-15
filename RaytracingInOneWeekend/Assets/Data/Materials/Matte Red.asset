@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Matte Green
+  m_Name: Matte Red
   m_EditorClassIdentifier: 
   type: 1
   textureScale: {x: 1, y: 1}
   fuzz: 0
   refractiveIndex: 1
-  albedo: {fileID: 11400000, guid: 5e124d9e3818469428e9801b43ed72af, type: 2}
+  albedo: {fileID: 11400000, guid: d0b15b51a46cb4a5d93b11a0858626cf, type: 2}
   emission: {fileID: 0}

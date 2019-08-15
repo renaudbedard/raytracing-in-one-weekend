@@ -163,13 +163,14 @@ namespace RaytracerInOneWeekend
 					*emissionCursor++ = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
 					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
 					*attenuationCursor++ = attenuation;
-					if (didScatter) r = r.OffsetTowards(rec.Normal);
+					if (didScatter) r = r.OffsetTowards(dot(r.Direction, rec.Normal) > 0 ? rec.Normal : -rec.Normal);
 					else break;
 
-					// normal debugging
-					// rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
-					// *emissionCursor++ = r.Direction * 0.5f + 0.5f;
-					// *attenuationCursor++ = 0;
+					// scatter debugging
+					//rec.Material.Scatter(r, rec, rng, PerlinData, out float3 _, out r);
+					//*emissionCursor++ = normalize(r.Direction) * 0.5f + 0.5f;
+					////*emissionCursor++ = normalize(rec.Normal) * 0.5f + 0.5f;
+					//*attenuationCursor++ = 0;
 					// break;
 				}
 				else
@@ -222,7 +223,7 @@ namespace RaytracerInOneWeekend
 			// TODO: tone-mapping
 			float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
 
-			// normal debugging
+			// scatter debugging
 			// float3 outputColor = normalize(inputSample.xyz) * 255;
 
 			Output[index] = new RGBA32

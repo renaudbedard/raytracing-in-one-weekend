@@ -12,6 +12,7 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace RaytracerInOneWeekend
 {
 	// TODO: lots of code duplication between SoA/AoSoA and BVH SIMD
+	// TODO: do we even need tMin and tMax?
 
 	static class HitTests
 	{
@@ -74,6 +75,7 @@ namespace RaytracerInOneWeekend
 			return true;
 		}
 
+		// ray direction is assumed to be normalized
 		public static bool Hit(this Box box, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
 			distance = 0;
@@ -81,7 +83,7 @@ namespace RaytracerInOneWeekend
 
 			// from "A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering" (Majercik et al.)
 			// http://jcgt.org/published/0007/03/04/
-			float3 rayDirection = normalize(r.Direction); // TODO: ray normalization could be done up-front
+			float3 rayDirection = r.Direction;
 			float winding = cmax(abs(r.Origin) * box.InverseExtents) < 1 ? -1 : 1;
 			float3 sgn = -sign(rayDirection);
 			float3 distanceToPlane = (box.Extents * winding * sgn - r.Origin) / rayDirection;
@@ -123,6 +125,8 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif AOSOA_SIMD || SOA_SIMD
+		// TODO: this is fully broken
+
 #if SOA_SIMD
 		public static unsafe bool Hit(this SoaSpheres s, Ray r, float tMin, float tMax, out HitRecord rec)
 #elif AOSOA_SIMD
@@ -328,6 +332,7 @@ namespace RaytracerInOneWeekend
 			}
 
 #if BVH_SIMD
+			// TODO: this is fully broken
 			// skip SIMD codepath if there's only one
 			if (candidateCount == 1)
 				return candidateListHead->Hit(r, tMin, tMax, out rec);

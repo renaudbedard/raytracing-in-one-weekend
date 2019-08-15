@@ -13,5 +13,7 @@ MonoBehaviour:
   m_Name: Red
   m_EditorClassIdentifier: 
   type: 1
-  mainColor: {r: 0.6431373, g: 0.03133387, b: 0, a: 0}
+  mainColor: {r: 0.65, g: 0.05, b: 0.05, a: 0}
   secondaryColor: {r: 0, g: 0, b: 0, a: 0}
+  noiseFrequency: 1
+  image: {fileID: 0}

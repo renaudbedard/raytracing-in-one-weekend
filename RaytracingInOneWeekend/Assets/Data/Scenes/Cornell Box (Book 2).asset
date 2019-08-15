@@ -12,36 +12,84 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
   m_Name: Cornell Box (Book 2)
   m_EditorClassIdentifier: 
-  cameraPosition: {x: -1.8235083, y: 1.6730185, z: 1.1941562}
-  cameraTarget: {x: -1.0495521, y: 1.1506549, z: 0.8362056}
+  cameraPosition: {x: -1.7, y: 0, z: 0}
+  cameraTarget: {x: 1, y: 0, z: 0}
   cameraAperture: 0
-  cameraFieldOfView: 70
+  cameraFieldOfView: 45
   entities:
-  - type: 3
+  - type: 2
     enabled: 1
-    position: {x: 0.5, y: 0.5, z: 0.5}
-    rotation: {x: 0, y: 0, z: 0}
+    position: {x: 0, y: -0.5, z: 0}
+    rotation: {x: -90, y: 0, z: 0}
     sphereData:
-      radius: 1
+      radius: 0
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}
     boxData:
-      size: {x: 1, y: 1, z: 1}
-    material: {fileID: 11400000, guid: d5a643c2e998b418c9ca96504e5827ca, type: 2}
-  - type: 3
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - type: 2
     enabled: 1
-    position: {x: 0, y: 0, z: 0}
-    rotation: {x: 0, y: 0, z: 0}
+    position: {x: 0, y: 0, z: 0.5}
+    rotation: {x: 180, y: 0, z: 0}
     sphereData:
-      radius: 1
+      radius: 0
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}
     boxData:
-      size: {x: 1, y: 1, z: 1}
-    material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 0, y: 0, z: -0.5}
+    rotation: {x: 0, y: 0, z: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 0, y: 0.5, z: 0}
+    rotation: {x: 90, y: 0, z: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 0.5, y: 0, z: 0}
+    rotation: {x: 0, y: -90, z: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 0, y: 0.499, z: 0}
+    rotation: {x: 90, y: 0, z: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 0.25, y: 0.25}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 0b170a1736e6a88489bdaf19d22db596, type: 2}
   randomSeed: 1
   randomSphereGroups: []
   skyBottomColor: {r: 0, g: 0, b: 0, a: 1}
-  skyTopColor: {r: 1, g: 1, b: 1, a: 1}
+  skyTopColor: {r: 0, g: 0, b: 0, a: 1}

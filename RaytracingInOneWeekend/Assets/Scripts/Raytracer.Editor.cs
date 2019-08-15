@@ -295,8 +295,8 @@ namespace RaytracerInOneWeekend
 				switch (e.Type)
 				{
 					case EntityType.Rect:
-						Gizmos.matrix = Matrix4x4.Rotate(e.Rotation);
-						Gizmos.DrawCube(e.Position, float3(e.RectData.Size, 0.001f));
+						Gizmos.matrix = Matrix4x4.TRS(e.Position, e.Rotation, Vector3.one);
+						Gizmos.DrawCube(Vector3.zero, float3(e.RectData.Size, 0.001f));
 						Gizmos.matrix = Matrix4x4.identity;
 						break;
 
@@ -305,8 +305,8 @@ namespace RaytracerInOneWeekend
 						break;
 
 					case EntityType.Box:
-						Gizmos.matrix = Matrix4x4.Rotate(e.Rotation);
-						Gizmos.DrawCube(e.Position, e.BoxData.Size);
+						Gizmos.matrix = Matrix4x4.TRS(e.Position, e.Rotation, Vector3.one);
+						Gizmos.DrawCube(Vector3.zero, e.BoxData.Size);
 						Gizmos.matrix = Matrix4x4.identity;
 						break;
 				}

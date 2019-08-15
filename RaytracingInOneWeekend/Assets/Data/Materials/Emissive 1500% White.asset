@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Matte Green
+  m_Name: Emissive 1500% White
   m_EditorClassIdentifier: 
-  type: 1
+  type: 4
   textureScale: {x: 1, y: 1}
   fuzz: 0
   refractiveIndex: 1
-  albedo: {fileID: 11400000, guid: 5e124d9e3818469428e9801b43ed72af, type: 2}
-  emission: {fileID: 0}
+  albedo: {fileID: 0}
+  emission: {fileID: 11400000, guid: 72cd3d120019d7b4abd1f027c1e52116, type: 2}
