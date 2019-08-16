@@ -57,7 +57,7 @@ namespace RaytracerInOneWeekend
 
 		public bool Selected { get; set; }
 
-		[UsedImplicitly] string MaterialTitle => $"Material ({(material ? material.name : null)})";
+		[UsedImplicitly] string MaterialTitle => $"Material ({(material ? material.name : "none")})";
 #endif
 
 		public static EntityData Sphere(float3 position, float radius, MaterialData m)
