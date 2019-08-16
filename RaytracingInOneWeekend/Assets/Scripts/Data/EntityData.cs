@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using JetBrains.Annotations;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
@@ -39,8 +40,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField]
 #if UNITY_EDITOR
 		[AssetList]
-		[FoldoutGroup("Material")]
-		[HideLabel]
+		[FoldoutGroup("$MaterialTitle")]
 #endif
 		MaterialData material;
 
@@ -48,7 +48,7 @@ namespace RaytracerInOneWeekend
 		[ShowInInspector]
 		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
 		[ShowIf(nameof(material))]
-		[FoldoutGroup("Material")]
+		[FoldoutGroup("$MaterialTitle")]
 		MaterialData MaterialData
 		{
 			get => material;
@@ -56,6 +56,8 @@ namespace RaytracerInOneWeekend
 		}
 
 		public bool Selected { get; set; }
+
+		[UsedImplicitly] string MaterialTitle => $"Material ({(material ? material.name : null)})";
 #endif
 
 		public static EntityData Sphere(float3 position, float radius, MaterialData m)
