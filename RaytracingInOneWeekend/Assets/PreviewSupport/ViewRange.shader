@@ -6,8 +6,9 @@ Shader "Hidden/ViewRange"
     }
     SubShader
     {
-        // No culling or depth
-        Cull Off ZWrite Off ZTest Always
+        Cull Off
+        ZWrite Off
+        ZTest Always
 
         Pass
         {
@@ -19,6 +20,7 @@ Shader "Hidden/ViewRange"
 
             uniform int _Channel;
             uniform float2 _Minimum_Range;
+            uniform int _NormalDisplay;
 
             struct appdata
             {
@@ -57,9 +59,13 @@ Shader "Hidden/ViewRange"
                 return c0+t*(c1+t*(c2+t*(c3+t*(c4+t*(c5+t*c6)))));
             }
 
-            float4 frag (v2f i) : SV_Target
+            float4 frag(v2f i) : SV_Target
             {
                 fixed4 col = tex2D(_MainTex, i.uv);
+
+                if (_NormalDisplay == 1)
+                    return float4(GammaToLinearSpace(normalize(col.yzw) * 0.5 + 0.5), 1);
+
                 return float4(inferno(saturate((col[_Channel] - _Minimum_Range.x) / _Minimum_Range.y)), 1);
             }
             ENDCG

@@ -8,12 +8,10 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Assertions.Must;
 using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
 using float3 = Unity.Mathematics.float3;
-using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 #if ODIN_INSPECTOR
@@ -116,15 +114,19 @@ namespace RaytracerInOneWeekend
 			Front,
 			RayCount,
 #if FULL_DIAGNOSTICS
+#if BVH
 			BvhHitCount,
 			CandidateCount
+#else
+			Normals
+#endif
 #endif
 		}
 
 #if !UNITY_EDITOR
 		const BufferView bufferView = BufferView.Front;
 #endif
-		int channelPropertyId, minimumRangePropertyId;
+		int channelPropertyId, minimumRangePropertyId, normalDisplayId;
 
 		void Awake()
 		{
@@ -132,7 +134,7 @@ namespace RaytracerInOneWeekend
 
 			const HideFlags flags = HideFlags.HideAndDontSave;
 			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RGBAFloat, false) { hideFlags = flags };
 #else
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
@@ -141,6 +143,7 @@ namespace RaytracerInOneWeekend
 			viewRangeMaterial = new UnityEngine.Material(viewRangeShader);
 			channelPropertyId = Shader.PropertyToID("_Channel");
 			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
+			normalDisplayId = Shader.PropertyToID("_NormalDisplay");
 
 			ignoreBatchTimings = true;
 		}
@@ -148,11 +151,9 @@ namespace RaytracerInOneWeekend
 		void Start()
 		{
 			targetCamera.RemoveAllCommandBuffers();
-
-	#if UNITY_EDITOR
+#if UNITY_EDITOR
 			scene = scene.DeepClone();
-	#endif
-
+#endif
 			RebuildWorld();
 			EnsureBuffersBuilt();
 			CleanCamera();
@@ -328,6 +329,10 @@ namespace RaytracerInOneWeekend
 					viewRangeMaterial.SetVector(minimumRangePropertyId, new Vector4(bufferMin, bufferMax - bufferMin));
 					break;
 			}
+
+#if FULL_DIAGNOSTICS && !BVH_ITERATIVE
+			viewRangeMaterial.SetInt(normalDisplayId, bufferView == BufferView.Normals ? 1 : 0);
+#endif
 
 			if (!commandBufferHooked)
 			{

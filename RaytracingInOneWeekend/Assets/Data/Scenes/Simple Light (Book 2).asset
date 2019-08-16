@@ -26,7 +26,9 @@ MonoBehaviour:
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}
-    material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
   - type: 1
     enabled: 1
     position: {x: 0, y: 2, z: 0}
@@ -36,6 +38,8 @@ MonoBehaviour:
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
   - type: 2
     enabled: 1
@@ -46,6 +50,8 @@ MonoBehaviour:
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 2, y: 2}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 182810c14a2f63d49b816d7784d4ce97, type: 2}
   - type: 1
     enabled: 1
@@ -56,6 +62,8 @@ MonoBehaviour:
       excludeFromOverlapTest: 0
     rectData:
       size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 182810c14a2f63d49b816d7784d4ce97, type: 2}
   randomSeed: 1
   randomSphereGroups: []

@@ -9,15 +9,20 @@ using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS
 	struct Diagnostics
 	{
 		public float RayCount;
+#if BVH_ITERATIVE
 		public float BoundsHitCount;
 		public float CandidateCount;
 #pragma warning disable 649
 		public float Padding;
 #pragma warning restore 649
+#else
+		// ReSharper disable once NotAccessedField.Global
+		public float3 Normal;
+#endif
 	}
 #else
 	struct Diagnostics
@@ -85,7 +90,7 @@ namespace RaytracerInOneWeekend
 			float3 colorAcc = lastValue.xyz;
 			int sampleCount = (int) lastValue.w;
 
-			// big prime stolen from Unity's random class
+			// big primes stolen from Unity's random class
 			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
 			Diagnostics diagnostics = default;
 
@@ -151,7 +156,7 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 					wa,
 #endif
-#if FULL_DIAGNOSTICS
+#if BVH && FULL_DIAGNOSTICS
 					ref diagnostics,
 #endif
 					out HitRecord rec);
@@ -160,18 +165,14 @@ namespace RaytracerInOneWeekend
 
 				if (hit)
 				{
+#if !BVH && FULL_DIAGNOSTICS
+					if (depth == 0) diagnostics.Normal = rec.Normal;
+#endif
 					*emissionCursor++ = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
 					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
 					*attenuationCursor++ = attenuation;
 					if (didScatter) r = r.OffsetTowards(dot(r.Direction, rec.Normal) > 0 ? rec.Normal : -rec.Normal);
 					else break;
-
-					// scatter debugging
-					//rec.Material.Scatter(r, rec, rng, PerlinData, out float3 _, out r);
-					//*emissionCursor++ = normalize(r.Direction) * 0.5f + 0.5f;
-					////*emissionCursor++ = normalize(rec.Normal) * 0.5f + 0.5f;
-					//*attenuationCursor++ = 0;
-					// break;
 				}
 				else
 				{
@@ -225,9 +226,6 @@ namespace RaytracerInOneWeekend
 
 			// TODO: tone-mapping
 			float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
-
-			// scatter debugging
-			// float3 outputColor = normalize(inputSample.xyz) * 255;
 
 			Output[index] = new RGBA32
 			{
