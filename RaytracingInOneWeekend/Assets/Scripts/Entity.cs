@@ -62,7 +62,7 @@ namespace RaytracerInOneWeekend
 				return false;
 			}
 
-			rec = new HitRecord(distance, ray.GetPoint(distance), rotate(Transform, normal), Material);
+			rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(Transform, normal)), Material);
 			return true;
 		}
 

@@ -49,7 +49,7 @@ namespace RaytracerInOneWeekend
 					scattered = new Ray(rec.Point, normalize(rec.Normal + rng.NextFloat3Direction()), r.Time);
 
 					// NOTE: both of those alternate methods fail with artifacts for reasons unknown
-					//scattered = new Ray(rec.Point, rng.OnUniformHemisphere(rec.Normal), r.Time);
+					//scattered = new Ray(rec.Point, normalize(rng.OnUniformHemisphere(rec.Normal)), r.Time);
 					//scattered = new Ray(rec.Point, rng.OnCosineWeightedHemisphere(rec.Normal), r.Time);
 					return true;
 				}
@@ -118,12 +118,11 @@ namespace RaytracerInOneWeekend
 
 		static bool Refract(float3 v, float3 n, float niOverNt, out float3 refracted)
 		{
-			float3 normalizedV = normalize(v);
-			float dt = dot(normalizedV, n);
+			float dt = dot(v, n);
 			float discriminant = 1 - niOverNt * niOverNt * (1 - dt * dt);
 			if (discriminant > 0)
 			{
-				refracted = niOverNt * (normalizedV - n * dt) - n * sqrt(discriminant);
+				refracted = niOverNt * (v - n * dt) - n * sqrt(discriminant);
 				return true;
 			}
 

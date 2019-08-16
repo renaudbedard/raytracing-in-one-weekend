@@ -33,7 +33,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
-		[SerializeField] [Range(1, 100)] int traceDepth = 35;
+		[SerializeField] [Range(1, 500)] int traceDepth = 35;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
 

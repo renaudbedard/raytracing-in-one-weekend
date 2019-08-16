@@ -100,6 +100,22 @@ namespace RaytracerInOneWeekend
 				return;
 			}
 
+			if (currentEvent.OnKeyDown(KeyCode.D) && currentEvent.control)
+			{
+				Undo.RecordObject(raytracer.scene, "Cloned object");
+
+				var clonedEntity = (EntityData) Activator.CreateInstance(hotEntity.GetType());
+				EditorUtility.CopySerializedManagedFieldsOnly(hotEntity, clonedEntity);
+				clonedEntity.Material = hotEntity.Material;
+
+				raytracer.scene.AddEntity(clonedEntity);
+
+				hotEntity = clonedEntity;
+				hotEntity.MarkDirty();
+				hotEntity = null;
+				return;
+			}
+
 			Vector3 currentPosition = hotEntity.Position;
 
 			switch (Tools.current)

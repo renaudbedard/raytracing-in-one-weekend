@@ -151,6 +151,13 @@ namespace RaytracerInOneWeekend
 
 			return clone;
 		}
+
+		public void AddEntity(EntityData entity)
+		{
+			Array.Resize(ref entities, entities.Length + 1);
+			entities[entities.Length - 1] = entity;
+			MarkDirty();
+		}
 #endif
 	}
 

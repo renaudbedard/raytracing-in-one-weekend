@@ -165,20 +165,21 @@ namespace RaytracerInOneWeekend
 
 				if (hit)
 				{
-#if !BVH && FULL_DIAGNOSTICS
-					if (depth == 0) diagnostics.Normal = rec.Normal;
-#endif
-					*emissionCursor++ = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
+					float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
+					*emissionCursor++ = emission;
 					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
 					*attenuationCursor++ = attenuation;
-					if (didScatter) r = r.OffsetTowards(dot(r.Direction, rec.Normal) > 0 ? rec.Normal : -rec.Normal);
+#if !BVH && FULL_DIAGNOSTICS
+					diagnostics.Normal += rec.Normal;
+					//diagnostics.Normal += normalize(r.Direction);
+#endif
+					if (didScatter) r = r.OffsetTowards(dot(r.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
 					else break;
 				}
 				else
 				{
 					// sample the sky color
-					float3 unitDirection = normalize(r.Direction);
-					float t = 0.5f * (unitDirection.y + 1);
+					float t = 0.5f * (r.Direction.y + 1);
 					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, t);
 					*attenuationCursor++ = 0;
 					break;
@@ -187,6 +188,7 @@ namespace RaytracerInOneWeekend
 
 			color = 0;
 
+			// safety : if we don't hit an emissive surface within the trace depth limit, fail this sample
 			if (depth == TraceDepth)
 				return false;
 
