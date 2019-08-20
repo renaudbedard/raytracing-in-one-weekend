@@ -78,6 +78,9 @@ namespace RaytracerInOneWeekend
 		NativeArray<Entity> World => entityBuffer;
 #endif
 #endif
+#if PATH_DEBUGGING
+		NativeArray<DebugPath> debugPaths;
+#endif
 
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
@@ -182,6 +185,9 @@ namespace RaytracerInOneWeekend
 			bvhNodeMetadataBuffer.SafeDispose();
 #endif
 			perlinData.Dispose();
+#if PATH_DEBUGGING
+			debugPaths.SafeDispose();
+#endif
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -403,6 +409,10 @@ namespace RaytracerInOneWeekend
 				NodeCount = bvhNodeBuffer.Length,
 				EntityCount = entityBuffer.Length,
 #endif
+#if PATH_DEBUGGING
+				DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
+				DebugCoordinates = int2(bufferSize / 2)
+#endif
 			};
 
 			accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1);
@@ -448,6 +458,10 @@ namespace RaytracerInOneWeekend
 				Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
 
 			bufferSize = float2(width, height);
+
+#if PATH_DEBUGGING
+			debugPaths.EnsureCapacity(traceDepth);
+#endif
 		}
 
 		void RebuildWorld()

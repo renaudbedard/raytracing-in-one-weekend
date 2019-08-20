@@ -7,9 +7,9 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using System.IO;
 using static Unity.Mathematics.math;
+
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
-
 #else
 using OdinMock;
 #endif
@@ -329,7 +329,16 @@ namespace RaytracerInOneWeekend
 					Gizmos.DrawCube(bounds.Center, bounds.Size);
 				}
 			}
-#endif // BVH
+#endif
+
+#if PATH_DEBUGGING
+			if (debugPaths.IsCreated)
+			{
+				Gizmos.color = Color.white;
+				foreach (DebugPath path in debugPaths)
+					Gizmos.DrawLine(path.From, path.To);
+			}
+#endif
 		}
 	}
 }

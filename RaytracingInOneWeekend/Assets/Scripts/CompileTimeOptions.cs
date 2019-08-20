@@ -22,13 +22,8 @@ namespace RaytracerInOneWeekend
 			IterativeBvhSimd
 		}
 
-		[SerializeField]
-		[DisableInPlayMode]
-		HitTestingMode hitTestingMode = HitTestingMode.Basic;
-
-		[SerializeField]
-		[DisableInPlayMode]
-		bool fullDiagnostics = false;
+		[SerializeField] [DisableInPlayMode] HitTestingMode hitTestingMode = HitTestingMode.Basic;
+		[SerializeField] [DisableInPlayMode] bool fullDiagnostics = false, pathDebugging = false;
 
 #if UNITY_EDITOR
 		void OnValidate()
@@ -52,6 +47,7 @@ namespace RaytracerInOneWeekend
 			newDefinitions.Remove("BVH_SIMD");
 			newDefinitions.Remove("QUAD_BVH");
 			newDefinitions.Remove("FULL_DIAGNOSTICS");
+			newDefinitions.Remove("PATH_DEBUGGING");
 
 			switch (hitTestingMode)
 			{
@@ -84,8 +80,8 @@ namespace RaytracerInOneWeekend
 					break;
 			}
 
-			if (fullDiagnostics)
-				newDefinitions.Add("FULL_DIAGNOSTICS");
+			if (fullDiagnostics) newDefinitions.Add("FULL_DIAGNOSTICS");
+			if (pathDebugging) newDefinitions.Add("PATH_DEBUGGING");
 
 			if (!newDefinitions.SetEquals(originalDefinitions))
 			{

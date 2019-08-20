@@ -31,6 +31,13 @@ namespace RaytracerInOneWeekend
 	}
 #endif
 
+#if PATH_DEBUGGING
+	struct DebugPath
+	{
+		public float3 From, To;
+	}
+#endif
+
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
@@ -77,6 +84,11 @@ namespace RaytracerInOneWeekend
 		[WriteOnly] public NativeArray<float4> OutputSamples;
 		[WriteOnly] public NativeArray<Diagnostics> OutputDiagnostics;
 
+#if PATH_DEBUGGING
+		[ReadOnly] public int2 DebugCoordinates;
+		[NativeDisableUnsafePtrRestriction] public DebugPath* DebugPaths;
+#endif
+
 		public void Execute(int index)
 		{
 			// ReSharper disable once PossibleLossOfFraction
@@ -112,6 +124,13 @@ namespace RaytracerInOneWeekend
 			};
 #endif
 
+#if PATH_DEBUGGING
+			int2 intCoordinates = (int2) coordinates;
+			bool doDebugPaths = all(intCoordinates == DebugCoordinates);
+			if (doDebugPaths)
+				for (int i = 0; i < TraceDepth; i++) DebugPaths[i] = default;
+#endif
+
 			float3* emissionStack = stackalloc float3[TraceDepth];
 			float3* attenuationStack = stackalloc float3[TraceDepth];
 
@@ -123,6 +142,9 @@ namespace RaytracerInOneWeekend
 				if (Color(r, rng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE
 					workingArea,
+#endif
+#if PATH_DEBUGGING
+					doDebugPaths,
 #endif
 					out float3 sampleColor, ref diagnostics))
 				{
@@ -138,6 +160,9 @@ namespace RaytracerInOneWeekend
 		bool Color(Ray r, Random rng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
 			WorkingArea wa,
+#endif
+#if PATH_DEBUGGING
+			bool doDebugPaths,
 #endif
 			out float3 color, ref Diagnostics diagnostics)
 		{
@@ -165,6 +190,10 @@ namespace RaytracerInOneWeekend
 
 				if (hit)
 				{
+#if PATH_DEBUGGING
+					if (doDebugPaths)
+						DebugPaths[depth] = new DebugPath { From = r.Origin, To = rec.Point };
+#endif
 					float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
 					*emissionCursor++ = emission;
 					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
@@ -178,6 +207,10 @@ namespace RaytracerInOneWeekend
 				}
 				else
 				{
+#if PATH_DEBUGGING
+					if (doDebugPaths)
+						DebugPaths[depth] = new DebugPath { From = r.Origin, To = r.Direction * 99999 };
+#endif
 					// sample the sky color
 					float t = 0.5f * (r.Direction.y + 1);
 					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, t);
