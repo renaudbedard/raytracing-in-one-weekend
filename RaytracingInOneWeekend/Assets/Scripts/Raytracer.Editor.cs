@@ -334,9 +334,13 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 			if (debugPaths.IsCreated)
 			{
-				Gizmos.color = Color.white;
+				float alpha = 1;
 				foreach (DebugPath path in debugPaths)
-					Gizmos.DrawLine(path.From, path.To);
+				{
+					Debug.DrawLine(path.From, path.To,
+						fadeDebugPaths ? Color.white.GetAlphaReplaced(alpha) : Color.white, debugPathDuration);
+					alpha *= 0.5f;
+				}
 			}
 #endif
 		}

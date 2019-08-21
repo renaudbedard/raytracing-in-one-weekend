@@ -59,6 +59,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public int TraceDepth;
 		[ReadOnly] public float3 SkyBottomColor;
 		[ReadOnly] public float3 SkyTopColor;
+		[ReadOnly] public bool SubPixelJitter;
 
 		[ReadOnly] public NativeArray<float4> InputSamples;
 
@@ -136,7 +137,7 @@ namespace RaytracerInOneWeekend
 
 			for (int s = 0; s < SampleCount; s++)
 			{
-				float2 normalizedCoordinates = (coordinates + rng.NextFloat2()) / Size; // (u, v)
+				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0)) / Size;
 				Ray r = Camera.GetRay(normalizedCoordinates, rng);
 
 				if (Color(r, rng, emissionStack, attenuationStack,

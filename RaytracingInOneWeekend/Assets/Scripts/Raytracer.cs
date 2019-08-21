@@ -34,8 +34,13 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
+		[SerializeField] bool subPixelJitter = true;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
+#if PATH_DEBUGGING
+		[SerializeField] bool fadeDebugPaths = false;
+		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
+#endif
 
 		[Title("World")]
 		[InlineEditor(DrawHeader = false)]
@@ -401,6 +406,7 @@ namespace RaytracerInOneWeekend
 				Seed = (uint) Time.frameCount + 1,
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
 				TraceDepth = traceDepth,
+				SubPixelJitter = subPixelJitter,
 				World = World,
 				PerlinData = perlinData.GetRuntimeData(),
 				OutputSamples = accumulationOutputBuffer,
