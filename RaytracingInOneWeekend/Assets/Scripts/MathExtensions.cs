@@ -11,7 +11,7 @@ namespace RaytracerInOneWeekend
     {
         // TODO : stratified sampling
 
-        public static float2 InUnitDisk(this Random rng)
+        public static float2 InUnitDisk(this ref Random rng)
         {
             // from : https://programming.guide/random-point-within-circle.html
             float theta = rng.NextFloat(0, 2 * PI);
@@ -25,48 +25,49 @@ namespace RaytracerInOneWeekend
         {
             // Hugues-Möller method
             // from : https://expf.wordpress.com/2010/05/05/building-an-orthonormal-basis-from-a-unit-vector/
+            // (not optimized)
 
-            float3 absNormal = abs(normal);
-
-            // TODO: there's probably a more clever and less branching way to do this
-            int minComponent = 0;
-            float minValue = absNormal.x;
-            for (int i = 1; i < 3; i++)
-            {
-                if (absNormal[i] < minValue)
-                {
-                    minValue = absNormal[i];
-                    minComponent = i;
-                }
-            }
-            switch (minComponent)
-            {
-                case 0: tangent = float3(0, -normal.z, normal.y); break;
-                case 1: tangent = float3(-normal.z, 0, normal.x); break;
-                //case 2:
-                default:
-                    tangent = float3(-normal.y, normal.x, 0);
-                    break;
-            }
-
-            tangent = normalize(tangent);
-            bitangent = cross(normal, tangent);
+            // float3 absNormal = abs(normal);
+            //
+            // int minComponent = 0;
+            // float minValue = absNormal.x;
+            // for (int i = 1; i < 3; i++)
+            // {
+            //     if (absNormal[i] < minValue)
+            //     {
+            //         minValue = absNormal[i];
+            //         minComponent = i;
+            //     }
+            // }
+            // switch (minComponent)
+            // {
+            //     case 0: tangent = float3(0, -normal.z, normal.y); break;
+            //     case 1: tangent = float3(-normal.z, 0, normal.x); break;
+            //     //case 2:
+            //     default:
+            //         tangent = float3(-normal.y, normal.x, 0);
+            //         break;
+            // }
+            //
+            // tangent = normalize(tangent);
+            // bitangent = cross(normal, tangent);
 
             // ----------
 
             // Corrected Frisvad method
             // from listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
-            //
-            // float s = normal.z >= 0 ? 1.0f : -1.0f;
-            // float a = -1 / (s + normal.z);
-            // float b = normal.x * normal.y * a;
-            // tangent = float3(1 + s * normal.x * normal.x * a, s * b, -s * normal.x);
-            // bitangent = float3(b, s + normal.y * normal.y * a, -normal.y);
+
+            float s = normal.z >= 0 ? 1.0f : -1.0f;
+            float a = -1 / (s + normal.z);
+            float b = normal.x * normal.y * a;
+            tangent = float3(1 + s * normal.x * normal.x * a, s * b, -s * normal.x);
+            bitangent = float3(b, s + normal.y * normal.y * a, -normal.y);
 
             // ----------
 
             // Combined method
             // from listing 2 in : http://jcgt.org/published/0006/01/02/paper.pdf
+            // (likely overkill)
             //
             // const double dThreshold = -0.9999999999776;
             // const float rThreshold = -0.7f;
@@ -97,7 +98,7 @@ namespace RaytracerInOneWeekend
             // }
         }
 
-        public static float3 OnUniformHemisphere(this Random rng, float3 normal)
+        public static float3 OnUniformHemisphere(this ref Random rng, float3 normal)
         {
             // uniform sampling of a hemisphere
             // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 42)
@@ -114,25 +115,6 @@ namespace RaytracerInOneWeekend
             float3x3 rotationMatrix = float3x3(tangent, bitangent, normal);
             float3 result = mul(rotationMatrix, tangentSpaceDirection);
             return normalize(result);
-        }
-
-        public static float3 OnCosineWeightedHemisphere(this Random rng, float3 normal)
-        {
-            // uniform sampling of a cosine-weighted hemisphere
-            // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 47)
-            // same algorithm used here : http://www.rorydriscoll.com/2009/01/07/better-sampling/
-            float u = rng.NextFloat();
-            float radius = sqrt(u);
-            float theta = rng.NextFloat(0, 2 * PI);
-            sincos(theta, out float sinTheta, out float cosTheta);
-            float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), sqrt(1 - u));
-
-            // build an orthonormal basis from the forward (normal) vector
-            GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
-
-            // transform from tangent-space to world-space
-            float3x3 rotationMatrix = float3x3(tangent, bitangent, normal);
-            return mul(rotationMatrix, tangentSpaceDirection);
         }
 
         public static float3 ToFloat3(this Color c) => float3(c.r, c.g, c.b);

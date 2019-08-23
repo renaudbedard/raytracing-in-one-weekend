@@ -1,5 +1,4 @@
 using JetBrains.Annotations;
-using Sirenix.OdinInspector;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
@@ -38,7 +37,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Scatter(Ray r, HitRecord rec, Random rng, PerlinData perlinData,
+		public bool Scatter(Ray r, HitRecord rec, ref Random rng, PerlinData perlinData,
 			out float3 attenuation, out Ray scattered)
 		{
 			switch (Type)
@@ -47,10 +46,7 @@ namespace RaytracerInOneWeekend
 				{
 					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					scattered = new Ray(rec.Point, normalize(rec.Normal + rng.NextFloat3Direction()), r.Time);
-
-					// NOTE: both of those alternate methods fail with artifacts for reasons unknown
 					//scattered = new Ray(rec.Point, normalize(rng.OnUniformHemisphere(rec.Normal)), r.Time);
-					//scattered = new Ray(rec.Point, rng.OnCosineWeightedHemisphere(rec.Normal), r.Time);
 					return true;
 				}
 

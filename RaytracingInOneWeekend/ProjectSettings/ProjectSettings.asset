@@ -524,7 +524,7 @@ PlayerSettings:
   webGLThreadsSupport: 0
   webGLWasmStreaming: 0
   scriptingDefineSymbols:
-    1: ODIN_INSPECTOR;SOA_SIMD
+    1: ODIN_INSPECTOR;BASIC
   platformArchitecture: {}
   scriptingBackend:
     Standalone: 1

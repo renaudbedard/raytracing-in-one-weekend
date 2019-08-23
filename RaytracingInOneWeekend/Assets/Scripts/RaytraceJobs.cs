@@ -140,7 +140,7 @@ namespace RaytracerInOneWeekend
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0)) / Size;
 				Ray r = Camera.GetRay(normalizedCoordinates, rng);
 
-				if (Color(r, rng, emissionStack, attenuationStack,
+				if (Color(r, ref rng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE
 					workingArea,
 #endif
@@ -158,7 +158,7 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
-		bool Color(Ray r, Random rng, float3* emissionStack, float3* attenuationStack,
+		bool Color(Ray r, ref Random rng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
 			WorkingArea wa,
 #endif
@@ -197,7 +197,7 @@ namespace RaytracerInOneWeekend
 #endif
 					float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
 					*emissionCursor++ = emission;
-					bool didScatter = rec.Material.Scatter(r, rec, rng, PerlinData, out float3 attenuation, out r);
+					bool didScatter = rec.Material.Scatter(r, rec, ref rng, PerlinData, out float3 attenuation, out r);
 					*attenuationCursor++ = attenuation;
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;
