@@ -43,7 +43,7 @@ MonoBehaviour:
     material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
   - type: 2
     enabled: 1
-    position: {x: 277.5, y: 554, z: 277.5}
+    position: {x: 277.5, y: 554.998, z: 277.5}
     rotation: {x: -90, y: 0, z: 0}
     sphereData:
       radius: 0
