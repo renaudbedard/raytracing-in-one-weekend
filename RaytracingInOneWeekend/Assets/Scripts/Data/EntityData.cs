@@ -28,6 +28,10 @@ namespace RaytracerInOneWeekend
 		[SerializeField] Vector3 position;
 		[SerializeField] Vector3 rotation;
 
+		[SerializeField] bool moving;
+		[ShowIf(nameof(moving))] [SerializeField] Vector3 destinationPosition;
+		[ShowIf(nameof(moving))] [SerializeField] [HorizontalGroup("Time")] [MinMaxSlider(0, 1)] Vector2 timeRange;
+
 		[ShowIf(nameof(type), EntityType.Sphere)]
 		[SerializeField] [HideLabel] SphereData sphereData;
 
@@ -60,42 +64,11 @@ namespace RaytracerInOneWeekend
 		[UsedImplicitly] string MaterialTitle => $"Material ({(material ? material.name : "none")})";
 #endif
 
-		public static EntityData Sphere(float3 position, float radius, MaterialData m)
+		public EntityType Type
 		{
-			return new EntityData
-			{
-				type = EntityType.Sphere,
-				position = position,
-				sphereData = new SphereData(radius),
-				material = m
-			};
+			get => type;
+			set => type = value;
 		}
-
-		public static EntityData Rect(float3 position, quaternion rotation, float2 size, MaterialData m)
-		{
-			return new EntityData
-			{
-				type = EntityType.Rect,
-				rectData = new RectData(size),
-				position = position,
-				Rotation = rotation,
-				material = m
-			};
-		}
-
-		public static EntityData Box(float3 position, quaternion rotation, float3 size, MaterialData m)
-		{
-			return new EntityData
-			{
-				type = EntityType.Box,
-				boxData = new BoxData(size),
-				position = position,
-				Rotation = rotation,
-				material = m
-			};
-		}
-
-		public EntityType Type => type;
 
 		public bool Enabled
 		{
@@ -135,9 +108,41 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		public SphereData SphereData => sphereData;
-		public RectData RectData => rectData;
-		public BoxData BoxData => boxData;
+		public bool Moving
+		{
+			get => moving;
+			set => moving = value;
+		}
+
+		public Vector3 DestinationPosition
+		{
+			get => destinationPosition;
+			set => destinationPosition = value;
+		}
+
+		public Vector2 TimeRange
+		{
+			get => timeRange;
+			set => timeRange = value;
+		}
+
+		public SphereData SphereData
+		{
+			get => sphereData;
+			set => sphereData = value;
+		}
+
+		public RectData RectData
+		{
+			get => rectData;
+			set => rectData = value;
+		}
+
+		public BoxData BoxData
+		{
+			get => boxData;
+			set => boxData = value;
+		}
 
 #if UNITY_EDITOR
 		bool dirty = false;

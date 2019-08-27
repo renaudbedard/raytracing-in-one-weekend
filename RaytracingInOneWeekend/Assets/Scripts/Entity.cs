@@ -1,37 +1,55 @@
 #if !(AOSOA_SIMD || SOA_SIMD)
-using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
+
+#if BVH
+using System.Collections.Generic;
+#endif
 
 namespace RaytracerInOneWeekend
 {
 	unsafe struct Entity
 	{
 		public readonly EntityType Type;
-		public readonly RigidTransform Transform, InverseTransform;
+		public readonly RigidTransform OriginTransform;
+		public readonly float3 DestinationPosition;
+		public readonly float2 TimeRange;
 		public readonly Material Material;
-
-		// TODO: reimplement motion
 
 		[NativeDisableUnsafePtrRestriction] readonly void* content;
 
-		public Entity(EntityType type, void* contentPointer, RigidTransform transform, Material material) : this()
+		public Entity(EntityType type, void* contentPointer, RigidTransform transform, Material material)
 		{
 			Type = type;
-			Transform = transform;
-			InverseTransform = inverse(transform);
+			OriginTransform = transform;
 			content = contentPointer;
+			Material = material;
+			TimeRange = float2(0, 1);
+			DestinationPosition = OriginTransform.pos;
+		}
+
+		public Entity(EntityType type, void* contentPointer, RigidTransform originTransform, float3 destinationPosition, float2 timeRange, Material material)
+		{
+			Type = type;
+			OriginTransform = originTransform;
+			DestinationPosition = destinationPosition;
+			content = contentPointer;
+			TimeRange = timeRange;
 			Material = material;
 		}
 
 		[Pure]
 		public bool Hit(Ray ray, float tMin, float tMax, out HitRecord rec)
 		{
+			var transformAtTime = new RigidTransform(OriginTransform.rot,
+				lerp(OriginTransform.pos, DestinationPosition, unlerp(TimeRange.x, TimeRange.y, ray.Time)));
+			RigidTransform inverseTransform = inverse(transformAtTime);
+
 			var entitySpaceRay = new Ray(
-				transform(InverseTransform, ray.Origin),
-				rotate(InverseTransform, ray.Direction));
+				transform(inverseTransform, ray.Origin),
+				rotate(inverseTransform, ray.Direction));
 
 			bool hit;
 			float distance;
@@ -62,10 +80,11 @@ namespace RaytracerInOneWeekend
 				return false;
 			}
 
-			rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(Transform, normal)), Material);
+			rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, normal)), Material);
 			return true;
 		}
 
+#if BVH
 		public AxisAlignedBoundingBox Bounds
 		{
 			get
@@ -80,9 +99,15 @@ namespace RaytracerInOneWeekend
 					default: return default;
 				}
 
-				return new AxisAlignedBoundingBox(transform(Transform, bounds.Min), transform(Transform, bounds.Max));
+				var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, DestinationPosition));
+				var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, DestinationPosition));
+
+				return new AxisAlignedBoundingBox(
+					transform(minTransform, bounds.Min),
+					transform(maxTransform, bounds.Max));
 			}
 		}
+#endif
 	}
 
 #if BVH

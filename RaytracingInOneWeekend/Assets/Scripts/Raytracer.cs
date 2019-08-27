@@ -377,7 +377,7 @@ namespace RaytracerInOneWeekend
 				focusDistance = hitRec.Distance;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
-				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance, 0, 1);
+				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -573,7 +573,10 @@ namespace RaytracerInOneWeekend
 						materialData.Fuzz, materialData.RefractiveIndex)
 					: default;
 
-				entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
+				if (e.Moving)
+					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, e.DestinationPosition, e.TimeRange, material);
+				else
+					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
 			}
 		}
 #endif // !SOA_SIMD && !AOSOA_SIMD
@@ -700,16 +703,24 @@ namespace RaytracerInOneWeekend
 				EntityData GetSphere(float3 center, float radius)
 				{
 					bool moving = rng.NextFloat() < group.MovementChance;
+					var entityData = new EntityData
+					{
+						Type = EntityType.Sphere,
+						Position = center,
+						SphereData = new SphereData(radius),
+						Material = GetMaterial()
+					};
+
 					if (moving)
 					{
 						float3 offset = rng.NextFloat3(
 							float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
 							float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
 
-						// TODO: reimplement moving spheres
-						//return EntityData.Sphere(new SphereData(center, offset, 0, 1, radius), GetMaterial());
+						entityData.DestinationPosition = center + offset;
 					}
-					return EntityData.Sphere(center, radius, GetMaterial());
+
+					return entityData;
 				}
 
 				switch (group.Distribution)
