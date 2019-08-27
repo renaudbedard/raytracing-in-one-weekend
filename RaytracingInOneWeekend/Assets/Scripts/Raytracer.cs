@@ -717,6 +717,8 @@ namespace RaytracerInOneWeekend
 							float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
 							float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
 
+						entityData.TimeRange = new Vector2(0, 1);
+						entityData.Moving = true;
 						entityData.DestinationPosition = center + offset;
 					}
 

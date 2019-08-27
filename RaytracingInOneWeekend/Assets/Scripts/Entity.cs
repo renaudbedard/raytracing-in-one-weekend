@@ -44,7 +44,9 @@ namespace RaytracerInOneWeekend
 		public bool Hit(Ray ray, float tMin, float tMax, out HitRecord rec)
 		{
 			var transformAtTime = new RigidTransform(OriginTransform.rot,
-				lerp(OriginTransform.pos, DestinationPosition, unlerp(TimeRange.x, TimeRange.y, ray.Time)));
+				lerp(OriginTransform.pos, DestinationPosition,
+					clamp(unlerp(TimeRange.x, TimeRange.y, ray.Time), 0.0f, 1.0f)));
+
 			RigidTransform inverseTransform = inverse(transformAtTime);
 
 			var entitySpaceRay = new Ray(
