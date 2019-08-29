@@ -14,29 +14,23 @@ namespace RaytracerInOneWeekend
 	{
 		public readonly EntityType Type;
 		public readonly RigidTransform OriginTransform;
-		public readonly float3 DestinationPosition;
+		public readonly float3 DestinationOffset;
 		public readonly float2 TimeRange;
+		public readonly float Density;
 		public readonly Material Material;
 
 		[NativeDisableUnsafePtrRestriction] readonly void* content;
 
-		public Entity(EntityType type, void* contentPointer, RigidTransform transform, Material material)
+		public Entity(EntityType type, void* contentPointer, RigidTransform transform, Material material,
+			float3 destinationOffset = default, float2 timeRange = default, float density = 1)
 		{
 			Type = type;
 			OriginTransform = transform;
 			content = contentPointer;
-			Material = material;
-			TimeRange = float2(0, 1);
-			DestinationPosition = OriginTransform.pos;
-		}
-
-		public Entity(EntityType type, void* contentPointer, RigidTransform originTransform, float3 destinationPosition, float2 timeRange, Material material)
-		{
-			Type = type;
-			OriginTransform = originTransform;
-			DestinationPosition = destinationPosition;
-			content = contentPointer;
 			TimeRange = timeRange;
+			DestinationOffset = destinationOffset;
+			TimeRange = timeRange;
+			Density = density;
 			Material = material;
 		}
 
@@ -44,8 +38,8 @@ namespace RaytracerInOneWeekend
 		public bool Hit(Ray ray, float tMin, float tMax, out HitRecord rec)
 		{
 			var transformAtTime = new RigidTransform(OriginTransform.rot,
-				lerp(OriginTransform.pos, DestinationPosition,
-					clamp(unlerp(TimeRange.x, TimeRange.y, ray.Time), 0.0f, 1.0f)));
+				OriginTransform.pos +
+				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, ray.Time), 0.0f, 1.0f));
 
 			RigidTransform inverseTransform = inverse(transformAtTime);
 
@@ -76,6 +70,8 @@ namespace RaytracerInOneWeekend
 					return false;
 			}
 
+			// TODO: density function
+
 			if (!hit)
 			{
 				rec = default;
@@ -103,8 +99,9 @@ namespace RaytracerInOneWeekend
 
 				float3[] corners = bounds.Corners;
 
-				var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, DestinationPosition));
-				var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, DestinationPosition));
+				float3 destinationPosition = OriginTransform.pos + DestinationOffset;
+				var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
+				var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
 
 				var minimum = new float3(float.PositiveInfinity);
 				var maximum = new float3(float.NegativeInfinity);

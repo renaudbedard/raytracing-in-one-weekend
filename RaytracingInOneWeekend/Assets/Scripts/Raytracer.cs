@@ -574,7 +574,10 @@ namespace RaytracerInOneWeekend
 					: default;
 
 				if (e.Moving)
-					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, e.DestinationPosition, e.TimeRange, material);
+				{
+					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material,
+						e.DestinationPosition, e.TimeRange);
+				}
 				else
 					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
 			}

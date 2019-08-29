@@ -11,7 +11,8 @@ namespace RaytracerInOneWeekend
 		Lambertian,
 		Metal,
 		Dielectric,
-		DiffuseLight
+		DiffuseLight,
+		Isotropic
 	}
 
 	struct Material
@@ -33,6 +34,7 @@ namespace RaytracerInOneWeekend
 				case MaterialType.Metal: Parameter = saturate(fuzz); Texture = albedo; break;
 				case MaterialType.Dielectric: Parameter = refractiveIndex; break;
 				case MaterialType.DiffuseLight: Texture = emission; break;
+				case MaterialType.Isotropic: Texture = albedo; break;
 			}
 		}
 
@@ -91,6 +93,11 @@ namespace RaytracerInOneWeekend
 
 					return true;
 				}
+
+				case MaterialType.Isotropic:
+					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
+					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					return true;
 
 				default:
 					attenuation = default;
