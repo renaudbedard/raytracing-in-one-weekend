@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using UnityEngine;
 using UnityEngine.Assertions;
 
 namespace RaytracerInOneWeekend
@@ -47,20 +48,10 @@ namespace RaytracerInOneWeekend
 
 		public bool IsLeaf => Content.Type != EntityType.None;
 
-		public static int GetNodeCount(NativeArray<Entity> entities)
-		{
-			using (var tempNodes = new NativeList<BvhNode>(Allocator.Temp))
-			using (var tempMetadata = new NativeList<BvhNodeMetadata>(Allocator.Temp))
-			{
-				tempNodes.Add(new BvhNode(entities, tempNodes, tempMetadata));
-				return tempNodes.Length;
-			}
-		}
-
 		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, NativeList<BvhNodeMetadata> metadata,
 			int depth = 0, int rank = 0, int parentNodeId = 0) : this()
 		{
-			metadata.Add(default);
+			metadata.AddNoResize(default);
 			Metadata = (BvhNodeMetadata*) metadata.GetUnsafePtr() + metadata.Length - 1;
 
 			Metadata->Depth = depth;
@@ -96,12 +87,12 @@ namespace RaytracerInOneWeekend
 					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes, metadata,
 						depth + 1, 0, Metadata->Id);
 					Metadata->LeftId = leftNode.Metadata->Id = nodes.Length;
-					nodes.Add(leftNode);
+					nodes.AddNoResize(leftNode);
 
 					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes, metadata,
 						depth + 1, 1, Metadata->Id);
 					Metadata->RightId = rightNode.Metadata->Id = nodes.Length;
-					nodes.Add(rightNode);
+					nodes.AddNoResize(rightNode);
 
 					Bounds = AxisAlignedBoundingBox.Enclose(leftNode.Bounds, rightNode.Bounds);
 					break;
@@ -120,6 +111,8 @@ namespace RaytracerInOneWeekend
 				if (nodes[i].Metadata->Id == Metadata->RightId) Right = (BvhNode*) nodes.GetUnsafePtr() + i;
 				if (Left != null && Right != null) break;
 			}
+
+			Assert.IsFalse(Left == null || Right == null, "Subnodes should not be null");
 
 			Left->SetupPointers(nodes);
 			Right->SetupPointers(nodes);

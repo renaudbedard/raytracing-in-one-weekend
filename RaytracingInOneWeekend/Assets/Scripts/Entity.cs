@@ -101,12 +101,20 @@ namespace RaytracerInOneWeekend
 					default: return default;
 				}
 
+				float3[] corners = bounds.Corners;
+
 				var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, DestinationPosition));
 				var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, DestinationPosition));
 
-				return new AxisAlignedBoundingBox(
-					transform(minTransform, bounds.Min),
-					transform(maxTransform, bounds.Max));
+				var minimum = new float3(float.PositiveInfinity);
+				var maximum = new float3(float.NegativeInfinity);
+				foreach (float3 c in corners)
+				{
+					minimum = min(minimum, transform(minTransform, c));
+					maximum = max(maximum, transform(maxTransform, c));
+				}
+
+				return new AxisAlignedBoundingBox(minimum, maximum);
 			}
 		}
 #endif

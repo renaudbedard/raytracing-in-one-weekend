@@ -584,16 +584,15 @@ namespace RaytracerInOneWeekend
 #if BVH
 		void RebuildBvh()
 		{
-			int nodeCount = BvhNode.GetNodeCount(entityBuffer);
-			bvhNodeBuffer.EnsureCapacity(nodeCount);
-			bvhNodeMetadataBuffer.EnsureCapacity(nodeCount);
+			bvhNodeBuffer.EnsureCapacity(entityBuffer.Length * 2);
+			bvhNodeMetadataBuffer.EnsureCapacity(entityBuffer.Length * 2);
 
 			bvhNodeBuffer.Clear();
 			bvhNodeMetadataBuffer.Clear();
 
 			var rootNode = new BvhNode(entityBuffer, bvhNodeBuffer, bvhNodeMetadataBuffer);
 			rootNode.Metadata->Id = bvhNodeBuffer.Length;
-			bvhNodeBuffer.Add(rootNode);
+			bvhNodeBuffer.AddNoResize(rootNode);
 
 			bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
 			World->SetupPointers(bvhNodeBuffer);

@@ -1,6 +1,5 @@
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using UnityEngine;
 
 namespace RaytracerInOneWeekend
 {
@@ -16,7 +15,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(
-			float3(From, -Mathf.Epsilon),
-			float3(To, Mathf.Epsilon));
+			float3(From, -0.001f),
+			float3(To, 0.001f));
 	}
 }

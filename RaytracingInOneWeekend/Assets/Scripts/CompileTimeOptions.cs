@@ -14,12 +14,12 @@ namespace RaytracerInOneWeekend
 	{
 		enum HitTestingMode
 		{
-			Basic,
-			SoaSimd,
-			AosoaSimd,
-			RecursiveBvh,
-			IterativeBvh,
-			IterativeBvhSimd
+			Basic = 0,
+			//SoaSimd = 1,
+			//AosoaSimd = 2,
+			RecursiveBvh = 3,
+			IterativeBvh = 4,
+			//IterativeBvhSimd = 5
 		}
 
 		[SerializeField] [DisableInPlayMode] HitTestingMode hitTestingMode = HitTestingMode.Basic;
@@ -55,13 +55,13 @@ namespace RaytracerInOneWeekend
 					newDefinitions.Add("BASIC");
 					break;
 
-				case HitTestingMode.SoaSimd:
-					newDefinitions.Add("SOA_SIMD");
-					break;
-
-				case HitTestingMode.AosoaSimd:
-					newDefinitions.Add("AOSOA_SIMD");
-					break;
+				// case HitTestingMode.SoaSimd:
+				// 	newDefinitions.Add("SOA_SIMD");
+				// 	break;
+				//
+				// case HitTestingMode.AosoaSimd:
+				// 	newDefinitions.Add("AOSOA_SIMD");
+				// 	break;
 
 				case HitTestingMode.RecursiveBvh:
 					newDefinitions.Add("BVH");
@@ -73,11 +73,11 @@ namespace RaytracerInOneWeekend
 					newDefinitions.Add("BVH_ITERATIVE");
 					break;
 
-				case HitTestingMode.IterativeBvhSimd:
-					newDefinitions.Add("BVH");
-					newDefinitions.Add("BVH_ITERATIVE");
-					newDefinitions.Add("BVH_SIMD");
-					break;
+				// case HitTestingMode.IterativeBvhSimd:
+				// 	newDefinitions.Add("BVH");
+				// 	newDefinitions.Add("BVH_ITERATIVE");
+				// 	newDefinitions.Add("BVH_SIMD");
+				// 	break;
 			}
 
 			if (fullDiagnostics) newDefinitions.Add("FULL_DIAGNOSTICS");
