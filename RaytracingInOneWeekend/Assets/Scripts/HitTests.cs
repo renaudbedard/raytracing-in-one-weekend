@@ -78,7 +78,9 @@ namespace RaytracerInOneWeekend
 		// ray direction is assumed to be normalized
 		public static bool Hit(this Box box, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
-			// TODO: this hit function does not report exit hits when tMin is farther than the first hit
+			// offset origin by tMin
+			r = new Ray(r.Origin + r.Direction * tMin, r.Direction, r.Time);
+
 			distance = 0;
 			normal = 0;
 
@@ -99,7 +101,9 @@ namespace RaytracerInOneWeekend
 			if (!any(nonZero)) return false;
 
 			distance = nonZero.x ? distanceToPlane.x : nonZero.y ? distanceToPlane.y : distanceToPlane.z;
-			if (distance < tMin || distance > tMax) return false;
+			distance += tMin;
+
+			if (distance > tMax) return false;
 
 			normal = sgn;
 			return true;
