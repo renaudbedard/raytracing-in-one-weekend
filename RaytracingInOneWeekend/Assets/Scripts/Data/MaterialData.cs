@@ -26,6 +26,9 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
+		[ShowIf(nameof(Type), MaterialType.Isotropic)]
+		[Range(0, 1)] [SerializeField] float density = 1;
+
 #if UNITY_EDITOR
 		[AssetList]
 		[ShowIf(nameof(AlbedoSupported))]
@@ -41,7 +44,8 @@ namespace RaytracerInOneWeekend
 			get => albedo;
 			set => albedo = value;
 		}
-		bool AlbedoSupported => type == MaterialType.Lambertian || type == MaterialType.Metal;
+		bool AlbedoSupported => type == MaterialType.Lambertian || type == MaterialType.Metal ||
+		                        type == MaterialType.Isotropic;
 #endif
 
 #if UNITY_EDITOR
@@ -65,6 +69,7 @@ namespace RaytracerInOneWeekend
 		public float Fuzz => fuzz;
 		public float RefractiveIndex => refractiveIndex;
 		public Vector2 TextureScale => textureScale;
+		public float Density => density;
 
 		public TextureData Albedo
 		{

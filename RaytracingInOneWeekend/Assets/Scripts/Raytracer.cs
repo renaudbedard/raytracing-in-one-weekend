@@ -570,7 +570,7 @@ namespace RaytracerInOneWeekend
 				Material material = materialData
 					? new Material(materialData.Type, materialData.TextureScale * sizeFactor,
 						albedo.GetRuntimeData(), emission.GetRuntimeData(),
-						materialData.Fuzz, materialData.RefractiveIndex)
+						materialData.Fuzz, materialData.RefractiveIndex, materialData.Density)
 					: default;
 
 				if (e.Moving)
@@ -627,7 +627,8 @@ namespace RaytracerInOneWeekend
 			Diagnostics _ = default;
 			return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
 #else
-			return World->Hit(r, 0, float.PositiveInfinity, workingArea, out hitRec);
+			var rng = new Random(scene.RandomSeed);
+			return World->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
 #endif
 		}
 

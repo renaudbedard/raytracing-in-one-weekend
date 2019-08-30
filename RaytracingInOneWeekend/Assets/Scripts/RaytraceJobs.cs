@@ -178,7 +178,7 @@ namespace RaytracerInOneWeekend
 #else
 				bool hit = World.Hit(
 #endif
-					r, 0, float.PositiveInfinity,
+					r, 0, float.PositiveInfinity, ref rng,
 #if BVH_ITERATIVE
 					wa,
 #endif

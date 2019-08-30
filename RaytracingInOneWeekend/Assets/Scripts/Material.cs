@@ -23,7 +23,7 @@ namespace RaytracerInOneWeekend
 		public readonly float Parameter;
 
 		public Material(MaterialType type, float2 textureScale, Texture albedo = default,
-			Texture emission = default, float fuzz = 0, float refractiveIndex = 1) : this()
+			Texture emission = default, float fuzz = 0, float refractiveIndex = 1, float density = 1) : this()
 		{
 			Type = type;
 			TextureScale = textureScale;
@@ -34,7 +34,7 @@ namespace RaytracerInOneWeekend
 				case MaterialType.Metal: Parameter = saturate(fuzz); Texture = albedo; break;
 				case MaterialType.Dielectric: Parameter = refractiveIndex; break;
 				case MaterialType.DiffuseLight: Texture = emission; break;
-				case MaterialType.Isotropic: Texture = albedo; break;
+				case MaterialType.Isotropic: Parameter = density; Texture = albedo; break;
 			}
 		}
 

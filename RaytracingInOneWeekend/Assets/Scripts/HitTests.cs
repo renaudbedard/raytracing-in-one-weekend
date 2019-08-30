@@ -78,6 +78,7 @@ namespace RaytracerInOneWeekend
 		// ray direction is assumed to be normalized
 		public static bool Hit(this Box box, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
+			// TODO: this hit function does not report exit hits when tMin is farther than the first hit
 			distance = 0;
 			normal = 0;
 
@@ -288,7 +289,8 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, AccumulateJob.WorkingArea wa,
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, ref Random rng,
+			AccumulateJob.WorkingArea wa,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
@@ -420,10 +422,10 @@ namespace RaytracerInOneWeekend
 
 #else
 			// iterative candidate tests (non-SIMD)
-			bool anyHit = candidateListHead->Hit(r, tMin, tMax, out rec);
+			bool anyHit = candidateListHead->Hit(r, tMin, tMax, ref rng, out rec);
 			for (int i = 1; i < candidateCount; i++)
 			{
-				bool thisHit = candidateListHead[i].Hit(r, tMin, tMax, out HitRecord thisRec);
+				bool thisHit = candidateListHead[i].Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
 				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
 				{
 					anyHit = true;

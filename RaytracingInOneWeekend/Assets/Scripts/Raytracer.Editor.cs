@@ -285,9 +285,14 @@ namespace RaytracerInOneWeekend
 				if (e.Material.Emission)
 					color += e.Material.Emission.MainColor;
 
-				Gizmos.color = e.Material.Type == MaterialType.Dielectric
-					? color.GetAlphaReplaced(0.5f)
-					: color.GetAlphaReplaced(1);
+				switch (e.Material.Type)
+				{
+					case MaterialType.Dielectric: color = color.GetAlphaReplaced(0.5f); break;
+					case MaterialType.Isotropic: color = color.GetAlphaReplaced(max(e.Material.Density, 0.5f)); break;
+					default: color = color.GetAlphaReplaced(1); break;
+				}
+
+				Gizmos.color = color;
 
 				if (e.Selected)
 					Gizmos.color = Color.yellow;

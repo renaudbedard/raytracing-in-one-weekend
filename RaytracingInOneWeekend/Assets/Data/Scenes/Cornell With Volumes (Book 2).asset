@@ -1,0 +1,143 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
+  m_Name: Cornell With Volumes (Book 2)
+  m_EditorClassIdentifier: 
+  cameraPosition: {x: -700, y: 277.5, z: 277.5}
+  cameraTarget: {x: 0, y: 277.5, z: 277.5}
+  cameraAperture: 0
+  cameraFieldOfView: 45
+  entities:
+  - type: 2
+    enabled: 1
+    position: {x: 277.5, y: 277.5, z: 555}
+    rotation: {x: 180, y: 0, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 277.5, y: 277.5, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 277.5, y: 554.998, z: 277.5}
+    rotation: {x: -90, y: 0, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 330, y: 305}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 21917e64af32b624bb64fb3764a7a789, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 277.5, y: 0, z: 277.5}
+    rotation: {x: -90, y: 0, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 277.5, y: 555, z: 277.5}
+    rotation: {x: 90, y: 0, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - type: 2
+    enabled: 1
+    position: {x: 555, y: 277.5, z: 277.5}
+    rotation: {x: 0, y: -90, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - type: 3
+    enabled: 1
+    position: {x: 180, y: 82.5, z: 185}
+    rotation: {x: 0, y: 18, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 165, y: 165, z: 165}
+    material: {fileID: 11400000, guid: 2f5910aade267db4f8c5c66fa0e91c9e, type: 2}
+  - type: 3
+    enabled: 1
+    position: {x: 347.5, y: 165, z: 370}
+    rotation: {x: 0, y: -15, z: 0}
+    moving: 0
+    destinationPosition: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 165, y: 330, z: 165}
+    material: {fileID: 11400000, guid: 31257c7dd76759e42b4899643c021006, type: 2}
+  randomSeed: 1
+  randomSphereGroups: []
+  skyBottomColor: {r: 0, g: 0, b: 0, a: 1}
+  skyTopColor: {r: 0, g: 0, b: 0, a: 1}
