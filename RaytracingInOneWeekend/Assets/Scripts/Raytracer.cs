@@ -576,7 +576,7 @@ namespace RaytracerInOneWeekend
 				if (e.Moving)
 				{
 					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material,
-						e.DestinationPosition, e.TimeRange);
+						e.DestinationOffset, e.TimeRange);
 				}
 				else
 					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
@@ -722,7 +722,7 @@ namespace RaytracerInOneWeekend
 
 						entityData.TimeRange = new Vector2(0, 1);
 						entityData.Moving = true;
-						entityData.DestinationPosition = center + offset;
+						entityData.DestinationOffset = offset;
 					}
 
 					return entityData;

@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Matte Dark Brown
+  m_Name: Matte Copper
   m_EditorClassIdentifier: 
   type: 1
   textureScale: {x: 1, y: 1}
   fuzz: 0
   refractiveIndex: 1
   density: 1
-  albedo: {fileID: 11400000, guid: f485d16265ddc4c4ea1ebd80dc3e9d89, type: 2}
+  albedo: {fileID: 11400000, guid: 1f2a1fbdc5d424df1afc65847460b5fe, type: 2}
   emission: {fileID: 0}

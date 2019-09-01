@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using Sirenix.Utilities;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
@@ -22,29 +23,30 @@ namespace RaytracerInOneWeekend
 	[Serializable]
 	class EntityData
 	{
-		[HorizontalGroup("FirstRow")] [SerializeField] [LabelWidth(35)] EntityType type;
-		[HorizontalGroup("FirstRow")] [SerializeField] [LabelWidth(49)] bool enabled = true;
+		[FoldoutGroup("$EntityTitle")] [SerializeField] string name = null;
 
-		[SerializeField] Vector3 position;
-		[SerializeField] Vector3 rotation;
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [LabelWidth(35)] EntityType type;
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [LabelWidth(49)] bool enabled = true;
 
-		[SerializeField] bool moving;
-		[ShowIf(nameof(moving))] [SerializeField] Vector3 destinationPosition;
-		[ShowIf(nameof(moving))] [SerializeField] [HorizontalGroup("Time")] [MinMaxSlider(0, 1)] Vector2 timeRange;
+		[FoldoutGroup("$EntityTitle")] [SerializeField] Vector3 position;
+		[FoldoutGroup("$EntityTitle")] [SerializeField] Vector3 rotation;
 
-		[ShowIf(nameof(type), EntityType.Sphere)]
-		[SerializeField] [HideLabel] SphereData sphereData;
+		[FoldoutGroup("$EntityTitle")] [SerializeField] bool moving;
+		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(moving))] [SerializeField] Vector3 destinationOffset;
+		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(moving))] [SerializeField] [MinMaxSlider(0, 1)] Vector2 timeRange;
 
-		[ShowIf(nameof(type), EntityType.Rect)]
-		[SerializeField] [HideLabel] RectData rectData;
+		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(type), EntityType.Sphere)]
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] SphereData sphereData;
 
-		[ShowIf(nameof(type), EntityType.Box)]
-		[SerializeField] [HideLabel] BoxData boxData;
+		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(type), EntityType.Rect)]
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] RectData rectData;
+
+		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(type), EntityType.Box)]
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] BoxData boxData;
 
 		[SerializeField]
 #if UNITY_EDITOR
-		[AssetList]
-		[FoldoutGroup("$MaterialTitle")]
+		[AssetList] [FoldoutGroup("$MaterialTitle")]
 #endif
 		MaterialData material;
 
@@ -62,6 +64,7 @@ namespace RaytracerInOneWeekend
 		public bool Selected { get; set; }
 
 		[UsedImplicitly] string MaterialTitle => $"Material ({(material ? material.name : "none")})";
+		[UsedImplicitly] string EntityTitle => $"{(name.IsNullOrWhitespace() ? "Entity" : name)} ({type})";
 #endif
 
 		public EntityType Type
@@ -114,10 +117,10 @@ namespace RaytracerInOneWeekend
 			set => moving = value;
 		}
 
-		public Vector3 DestinationPosition
+		public Vector3 DestinationOffset
 		{
-			get => destinationPosition;
-			set => destinationPosition = value;
+			get => destinationOffset;
+			set => destinationOffset = value;
 		}
 
 		public Vector2 TimeRange
