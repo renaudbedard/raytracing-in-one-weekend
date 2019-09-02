@@ -138,7 +138,7 @@ namespace RaytracerInOneWeekend
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0)) / Size;
-				Ray r = Camera.GetRay(normalizedCoordinates, rng);
+				Ray r = Camera.GetRay(normalizedCoordinates, ref rng);
 
 				if (Color(r, ref rng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE

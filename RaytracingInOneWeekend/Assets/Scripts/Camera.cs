@@ -35,7 +35,7 @@ namespace RaytracerInOneWeekend
 			Origin = origin;
 		}
 
-		public Ray GetRay(float2 normalizedCoordinates, Random rng)
+		public Ray GetRay(float2 normalizedCoordinates, ref Random rng)
 		{
 			float2 rd = LensRadius * rng.InUnitDisk();
 			float3 offset = Right * rd.x + Up * rd.y;
