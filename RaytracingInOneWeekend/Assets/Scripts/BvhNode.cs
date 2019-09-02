@@ -5,6 +5,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Assertions;
+using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
@@ -75,8 +76,7 @@ namespace RaytracerInOneWeekend
 
 			entities.Sort(new EntityBoundsComparer(biggestPartition));
 
-			int n = entities.Length;
-			switch (n)
+			switch (entities.Length)
 			{
 				case 1:
 					Content = entities[0];
@@ -84,12 +84,30 @@ namespace RaytracerInOneWeekend
 					break;
 
 				default:
-					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, n / 2), nodes, metadata,
+					int partitionLength = 0;
+					float partitionStart = entities[0].Bounds.Min[biggestPartition.GetAxisId()];
+
+					// decide the size of the partition according to the size of the entities
+					foreach (Entity entity in entities)
+					{
+						partitionLength++;
+						AxisAlignedBoundingBox bounds = entity.Bounds;
+						if (bounds.Min[biggestPartition.GetAxisId()] - partitionStart > biggestPartitionSize / 2 ||
+						    bounds.Size[biggestPartition.GetAxisId()] > biggestPartitionSize / 2)
+						{
+							break;
+						}
+					}
+					// ensure we have at least 1 entity in each partition
+					if (partitionLength == entities.Length)
+						partitionLength--;
+
+					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, partitionLength), nodes, metadata,
 						depth + 1, 0, Metadata->Id);
 					Metadata->LeftId = leftNode.Metadata->Id = nodes.Length;
 					nodes.AddNoResize(leftNode);
 
-					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, n / 2), nodes, metadata,
+					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, partitionLength), nodes, metadata,
 						depth + 1, 1, Metadata->Id);
 					Metadata->RightId = rightNode.Metadata->Id = nodes.Length;
 					nodes.AddNoResize(rightNode);
@@ -145,6 +163,19 @@ namespace RaytracerInOneWeekend
 		public unsafe int Compare(BvhNode lhs, BvhNode rhs)
 		{
 			return lhs.Metadata->Order - rhs.Metadata->Order;
+		}
+	}
+
+	struct EntityBoundsComparer : IComparer<Entity>
+	{
+		readonly PartitionAxis axis;
+
+		public EntityBoundsComparer(PartitionAxis axis) => this.axis = axis;
+
+		public int Compare(Entity lhs, Entity rhs)
+		{
+			int axisId = axis.GetAxisId();
+			return (int) sign(lhs.Bounds.Min[axisId] - rhs.Bounds.Min[axisId]);
 		}
 	}
 }

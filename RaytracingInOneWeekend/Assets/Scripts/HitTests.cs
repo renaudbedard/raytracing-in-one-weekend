@@ -112,14 +112,14 @@ namespace RaytracerInOneWeekend
 
 #if BASIC
 		// iterative entity array hit test
-		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, out HitRecord rec)
+		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, ref Random rng, out HitRecord rec)
 		{
 			bool hitAnything = false;
 			rec = new HitRecord(tMax, 0, 0, default);
 
 			for (var i = 0; i < entities.Length; i++)
 			{
-				if (entities[i].Hit(r, tMin, rec.Distance, out HitRecord thisRec))
+				if (entities[i].Hit(r, tMin, rec.Distance, ref rng, out HitRecord thisRec))
 				{
 					hitAnything = true;
 					rec = thisRec;

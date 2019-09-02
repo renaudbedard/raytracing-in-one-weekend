@@ -636,10 +636,11 @@ namespace RaytracerInOneWeekend
 #else // !BVH_ITERATIVE
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
+			var rng = new Random(scene.RandomSeed);
 #if BVH_RECURSIVE
-			return World->Hit(r, 0, float.PositiveInfinity, out hitRec);
+			return World->Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
 #else
-			return World.Hit(r, 0, float.PositiveInfinity, out hitRec);
+			return World.Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
 #endif
 		}
 #endif

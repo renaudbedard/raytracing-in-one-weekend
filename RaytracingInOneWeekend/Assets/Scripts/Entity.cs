@@ -136,20 +136,5 @@ namespace RaytracerInOneWeekend
 		}
 #endif
 	}
-
-#if BVH
-	struct EntityBoundsComparer : IComparer<Entity>
-	{
-		readonly PartitionAxis axis;
-
-		public EntityBoundsComparer(PartitionAxis axis) => this.axis = axis;
-
-		public int Compare(Entity lhs, Entity rhs)
-		{
-			int axisId = axis.GetAxisId();
-			return (int) sign(lhs.Bounds.Center[axisId] - rhs.Bounds.Center[axisId]);
-		}
-	}
-#endif
 }
 #endif
