@@ -12,6 +12,7 @@ using UnityEngine.Rendering;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
 using float3 = Unity.Mathematics.float3;
+using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 #if ODIN_INSPECTOR
@@ -623,11 +624,11 @@ namespace RaytracerInOneWeekend
 #endif
 			};
 
+			var rng = new Random(scene.RandomSeed);
 #if FULL_DIAGNOSTICS
 			Diagnostics _ = default;
-			return World->Hit(r, 0, float.PositiveInfinity, workingArea, ref _, out hitRec);
+			return World->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);
 #else
-			var rng = new Random(scene.RandomSeed);
 			return World->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
 #endif
 		}
@@ -654,7 +655,7 @@ namespace RaytracerInOneWeekend
 					activeEntities.Add(entity);
 
 			var rng = new Random(scene.RandomSeed);
-			foreach (RandomSphereGroup group in scene.RandomSphereGroups)
+			foreach (RandomEntityGroup group in scene.RandomEntityGroups)
 			{
 				MaterialData GetMaterial()
 				{
@@ -699,20 +700,28 @@ namespace RaytracerInOneWeekend
 					return material;
 				}
 
+				// TODO: fix overlap test to account for all entity types
 				bool AnyOverlap(float3 center, float radius) => activeEntities.Where(x => x.Type == EntityType.Sphere)
 					.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
 					          distance(x.Position, center) < x.SphereData.Radius + radius + group.MinDistance);
 
-				EntityData GetSphere(float3 center, float radius)
+				EntityData GetEntity(float3 center, float3 radius)
 				{
 					bool moving = rng.NextFloat() < group.MovementChance;
+					quaternion rotation = quaternion.Euler(group.Rotation);
 					var entityData = new EntityData
 					{
-						Type = EntityType.Sphere,
-						Position = center,
-						SphereData = new SphereData(radius),
+						Type = group.Type,
+						Position = rotate(rotation, center - (float3) group.Offset) + (float3) group.Offset,
+						Rotation = rotation,
 						Material = GetMaterial()
 					};
+					switch (group.Type)
+					{
+						case EntityType.Sphere: entityData.SphereData = new SphereData(radius.x); break;
+						case EntityType.Box: entityData.BoxData = new BoxData(radius); break;
+						case EntityType.Rect: entityData.RectData = new RectData(radius.xy); break;
+					}
 
 					if (moving)
 					{
@@ -734,42 +743,43 @@ namespace RaytracerInOneWeekend
 						for (int i = 0; i < group.TentativeCount; i++)
 						{
 							float3 center = rng.NextFloat3(
-								float3(group.CenterX.x, group.CenterY.x, group.CenterZ.x),
-								float3(group.CenterX.y, group.CenterY.y, group.CenterZ.y));
+								float3(-group.SpreadX / 2, -group.SpreadY / 2, -group.SpreadZ / 2),
+								float3(group.SpreadX / 2, group.SpreadY / 2, group.SpreadZ / 2));
+
+							center += (float3) group.Offset;
 
 							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
 
-							if (AnyOverlap(center, radius))
+							if (!group.SkipOverlapTest && AnyOverlap(center, radius))
 								continue;
 
-							activeEntities.Add(GetSphere(center, radius));
+							activeEntities.Add(GetEntity(center, radius));
 						}
 						break;
 
 					case RandomDistribution.JitteredGrid:
-						float3 ranges = float3(
-							group.CenterX.y - group.CenterX.x,
-							group.CenterY.y - group.CenterY.x,
-							group.CenterZ.y - group.CenterZ.x);
-
+						float3 ranges = float3(group.SpreadX, group.SpreadY, group.SpreadZ);
 						float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
 
 						// correct the range so that it produces the same result as the book
-						float3 correctedRangeEnd = float3(group.CenterX.y, group.CenterY.y, group.CenterZ.y);
+						float3 correctedRangeEnd = (float3) group.Offset + ranges / 2;
 						float3 period = max(float3(group.PeriodX, group.PeriodY, group.PeriodZ), 1);
 						correctedRangeEnd += (1 - abs(sign(ranges))) * period / 2;
 
-						for (float i = group.CenterX.x; i < correctedRangeEnd.x; i += period.x)
-						for (float j = group.CenterY.x; j < correctedRangeEnd.y; j += period.y)
-						for (float k = group.CenterZ.x; k < correctedRangeEnd.z; k += period.z)
+						for (float i = group.Offset.x - ranges.x / 2; i < correctedRangeEnd.x; i += period.x)
+						for (float j = group.Offset.y - ranges.y / 2; j < correctedRangeEnd.y; j += period.y)
+						for (float k = group.Offset.z - ranges.z / 2; k < correctedRangeEnd.z; k += period.z)
 						{
-							float3 center = float3(i, j, k) + rng.NextFloat3(group.Variation * cellSize);
-							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+							float3 center = float3(i, j, k) + rng.NextFloat3(group.PositionVariation * cellSize);
+							float3 radius = rng.NextFloat(group.Radius.x, group.Radius.y) *
+							                float3(rng.NextFloat(group.ScaleVariationX.x, group.ScaleVariationX.y),
+								                rng.NextFloat(group.ScaleVariationY.x, group.ScaleVariationY.y),
+								                rng.NextFloat(group.ScaleVariationZ.x, group.ScaleVariationZ.y));
 
-							if (AnyOverlap(center, radius))
+							if (!group.SkipOverlapTest && AnyOverlap(center, radius.x))
 								continue;
 
-							activeEntities.Add(GetSphere(center, radius));
+							activeEntities.Add(GetEntity(center, radius));
 						}
 						break;
 				}

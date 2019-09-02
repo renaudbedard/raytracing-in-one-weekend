@@ -64,7 +64,7 @@ namespace RaytracerInOneWeekend
 		[Range(1, 10000)]
 		uint randomSeed = 1;
 
-		[SerializeField] RandomSphereGroup[] randomSphereGroups = null;
+		[SerializeField] RandomEntityGroup[] randomEntityGroups = null;
 
 		[Title("Sky")]
 		[SerializeField]
@@ -83,7 +83,7 @@ namespace RaytracerInOneWeekend
 		public float CameraFieldOfView => cameraFieldOfView;
 		public uint RandomSeed => randomSeed;
 		public IReadOnlyList<EntityData> Entities => entities;
-		public IReadOnlyList<RandomSphereGroup> RandomSphereGroups => randomSphereGroups;
+		public IReadOnlyList<RandomEntityGroup> RandomEntityGroups => randomEntityGroups;
 		public Color SkyBottomColor => skyBottomColor;
 		public Color SkyTopColor => skyTopColor;
 
@@ -139,14 +139,14 @@ namespace RaytracerInOneWeekend
 				clone.entities[i] = clonedEntity;
 			}
 
-			for (int i = 0; i < randomSphereGroups.Length; i++)
+			for (int i = 0; i < randomEntityGroups.Length; i++)
 			{
-				var sourceGroup = randomSphereGroups[i];
+				var sourceGroup = randomEntityGroups[i];
 
-				var clonedGroup = new RandomSphereGroup();
+				var clonedGroup = new RandomEntityGroup();
 				UnityEditor.EditorUtility.CopySerializedManagedFieldsOnly(sourceGroup, clonedGroup);
 
-				clone.randomSphereGroups[i] = clonedGroup;
+				clone.randomEntityGroups[i] = clonedGroup;
 			}
 
 			return clone;
@@ -168,30 +168,39 @@ namespace RaytracerInOneWeekend
 	}
 
 	[Serializable]
-	class RandomSphereGroup
+	class RandomEntityGroup
 	{
+		public EntityType Type = EntityType.Sphere;
 		public RandomDistribution Distribution = default;
 
 		// TODO: this way of setting up the grid is pretty aggravating to work with
 		[ShowIf(nameof(Distribution), RandomDistribution.JitteredGrid)]
-		[Range(0.01f, 10)]
+		[Range(0.01f, 100)]
 		public float PeriodX = 1;
 		[ShowIf(nameof(Distribution), RandomDistribution.JitteredGrid)]
-		[Range(0.01f, 10)]
+		[Range(0.01f, 100)]
 		public float PeriodY = 1;
 		[ShowIf(nameof(Distribution), RandomDistribution.JitteredGrid)]
-		[Range(0.01f, 10f)]
+		[Range(0.01f, 100f)]
 		public float PeriodZ = 1;
 
 		[ShowIf(nameof(Distribution), RandomDistribution.JitteredGrid)]
 		[Range(0, 1)]
-		public float Variation = default;
+		public float PositionVariation = default;
+
+		[ShowIf(nameof(Distribution), RandomDistribution.JitteredGrid)]
+		[MinMaxSlider(0, 2, true)]
+		public Vector2 ScaleVariationX = Vector2.one, ScaleVariationY = Vector2.one, ScaleVariationZ = Vector2.one;
 
 		[ShowIf(nameof(Distribution), RandomDistribution.DartThrowing)]
 		[Range(0, 1000)] public float TentativeCount = 1;
 
-		[MinMaxSlider(-50, 50, true)]
-		public Vector2 CenterX = default, CenterY = default, CenterZ = default;
+		public bool SkipOverlapTest = false;
+
+		[Range(0, 2000)]
+		public float SpreadX = default, SpreadY = default, SpreadZ = default;
+		public Vector3 Offset = default;
+		public Vector3 Rotation = default;
 
 		[Range(0, 1)] public float MovementChance = 0;
 
@@ -201,6 +210,7 @@ namespace RaytracerInOneWeekend
 
 		[MinMaxSlider(0, 100, true)] public Vector2 Radius = default;
 
+		[HideIf(nameof(SkipOverlapTest))]
 		[Range(0, 100)] public float MinDistance = default;
 
 		[Range(0, 1)] public float LambertChance = 1;

@@ -129,8 +129,8 @@ namespace RaytracerInOneWeekend
 			dirty = true;
 		}
 
-		bool TextureCanScale => (albedo && albedo.Type != TextureType.Constant) ||
-								(emission && emission.Type != TextureType.Constant);
+		bool TextureCanScale => (albedo && albedo.Type == TextureType.CheckerPattern) ||
+								(emission && emission.Type == TextureType.CheckerPattern);
 #endif
 	}
 }

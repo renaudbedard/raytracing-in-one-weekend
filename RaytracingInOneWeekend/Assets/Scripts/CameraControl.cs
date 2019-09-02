@@ -15,6 +15,8 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] [SerializeField] new UnityEngine.Camera camera = null;
 		[SerializeField] Raytracer raytracer = null;
 
+		[SerializeField] [Range(0, 100)] float movementSpeed = 1;
+
 		Vector2 lastMousePosition;
 		Vector3 orbitCenter;
 		float dragDistance;
@@ -30,7 +32,8 @@ namespace RaytracerInOneWeekend
 			var keyboard = Keyboard.current;
 			var dt = Time.deltaTime;
 
-			var speed = keyboard.leftShiftKey.isPressed ? 5 : 1;
+			float speed = keyboard.leftShiftKey.isPressed ? 5 : 1;
+			speed *= movementSpeed;
 
 			if (keyboard.wKey.isPressed) transform.Translate(dt * speed * Vector3.forward, Space.Self);
 			if (keyboard.sKey.isPressed) transform.Translate(dt * speed * Vector3.back, Space.Self);

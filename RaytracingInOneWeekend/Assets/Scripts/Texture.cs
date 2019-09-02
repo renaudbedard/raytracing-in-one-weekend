@@ -43,7 +43,7 @@ namespace RaytracerInOneWeekend
 		public float3 Value(float3 position, float3 normal, float2 scale, PerlinData perlinData)
 		{
 			// TODO: make this use UVW coordinates instead
-			
+
 			switch (Type)
 			{
 				case TextureType.Constant:
@@ -64,7 +64,8 @@ namespace RaytracerInOneWeekend
 				}
 
 				case TextureType.PerlinNoise:
-					return 0.5f * (1 + sin(NoiseFrequency * position.z + 10 * perlinData.Turbulence(position))) *
+					return 0.5f * (1 + sin(NoiseFrequency * position.x +
+					                       5 * perlinData.Turbulence(NoiseFrequency * position))) *
 					       MainColor;
 
 				case TextureType.Image:
