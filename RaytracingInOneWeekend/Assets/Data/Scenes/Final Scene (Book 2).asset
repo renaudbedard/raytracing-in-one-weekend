@@ -190,8 +190,8 @@ MonoBehaviour:
     DieletricChance: 0
     DiffuseAlbedo:
       serializedVersion: 2
-      key0: {r: 1, g: 1, b: 1, a: 1}
-      key1: {r: 1, g: 1, b: 1, a: 1}
+      key0: {r: 0.73, g: 0.73, b: 0.73, a: 1}
+      key1: {r: 0.7294118, g: 0.7294118, b: 0.7294118, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
@@ -256,7 +256,7 @@ MonoBehaviour:
     PeriodZ: 100
     PositionVariation: 0
     ScaleVariationX: {x: 1, y: 1}
-    ScaleVariationY: {x: 0.01, y: 1.01}
+    ScaleVariationY: {x: 0.01, y: 2}
     ScaleVariationZ: {x: 1, y: 1}
     TentativeCount: 1
     SkipOverlapTest: 1
@@ -335,5 +335,5 @@ MonoBehaviour:
       m_NumAlphaKeys: 2
     Fuzz: {x: 0, y: 0}
     RefractiveIndex: {x: 0, y: 0}
-  skyBottomColor: {r: 0.009433985, g: 0.009433985, b: 0.009433985, a: 1}
+  skyBottomColor: {r: 0, g: 0, b: 0, a: 1}
   skyTopColor: {r: 0, g: 0, b: 0, a: 1}
