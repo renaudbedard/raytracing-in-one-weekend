@@ -178,7 +178,7 @@ MonoBehaviour:
     SpreadY: 165
     SpreadZ: 165
     Offset: {x: 573.5, y: 352.5, z: 477.5}
-    Rotation: {x: 0, y: 15, z: 0}
+    Rotation: {x: 0, y: 75, z: 0}
     MovementChance: 0
     MovementXOffset: {x: 0, y: 0}
     MovementYOffset: {x: 0, y: 0}
