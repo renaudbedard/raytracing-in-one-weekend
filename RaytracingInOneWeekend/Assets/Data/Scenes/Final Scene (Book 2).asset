@@ -161,7 +161,7 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: daa9f1f9567a2458f947f457da77da6a, type: 2}
-  randomSeed: 700
+  randomSeed: 1998
   randomEntityGroups:
   - Type: 1
     Distribution: 0
@@ -263,7 +263,7 @@ MonoBehaviour:
     SpreadX: 2000
     SpreadY: 0
     SpreadZ: 2000
-    Offset: {x: 0, y: 0, z: 0}
+    Offset: {x: 500, y: 0, z: 500}
     Rotation: {x: 0, y: 0, z: 0}
     MovementChance: 0
     MovementXOffset: {x: 0, y: 0}
