@@ -17,26 +17,20 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public bool Hit(Ray r, float tMin, float tMax)
 		{
-			// TODO: try this optimized version
+			// optimized algorithm from Roman Wiche
 			// https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
 
-			for (int a = 0; a < 3; a++)
-			{
-				float invDirection = 1 / r.Direction[a];
-				float t0 = (Min[a] - r.Origin[a]) * invDirection;
-				float t1 = (Max[a] - r.Origin[a]) * invDirection;
+			float3 invD = rcp(r.Direction);
+			float3 t0s = (Min - r.Origin) * invD;
+			float3 t1s = (Max - r.Origin) * invD;
 
-				if (invDirection < 0)
-					Util.Swap(ref t0, ref t1);
+			float3 tSmaller = min(t0s, t1s);
+			float3 tBigger  = max(t0s, t1s);
 
-				tMin = t0 > tMin ? t0 : tMin;
-				tMax = t1 < tMax ? t1 : tMax;
+			tMin = max(tMin, cmax(tSmaller));
+			tMax = min(tMax, cmin(tBigger));
 
-				if (tMax <= tMin)
-					return false;
-			}
-
-			return true;
+			return tMin < tMax;
 		}
 
 		public float3 Center => Min + (Max - Min) / 2;
