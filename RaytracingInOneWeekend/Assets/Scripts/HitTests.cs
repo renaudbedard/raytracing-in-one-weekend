@@ -177,6 +177,7 @@ namespace RaytracerInOneWeekend
 			int candidateCount = 0, nodeStackHeight = 1;
 			BvhNode** nodeStackTail = wa.Nodes;
 			Entity* candidateListTail = wa.Entities - 1, candidateListHead = wa.Entities;
+			float3 rayInvDirection = rcp(r.Direction);
 
 			*nodeStackTail = &n;
 
@@ -185,7 +186,7 @@ namespace RaytracerInOneWeekend
 				BvhNode* nodePtr = *nodeStackTail--;
 				nodeStackHeight--;
 
-				if (!nodePtr->Bounds.Hit(r, tMin, tMax))
+				if (!nodePtr->Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 					continue;
 #if FULL_DIAGNOSTICS
 				diagnostics.BoundsHitCount++;

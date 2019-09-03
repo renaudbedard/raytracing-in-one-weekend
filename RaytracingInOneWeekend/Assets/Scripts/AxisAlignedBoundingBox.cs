@@ -15,20 +15,16 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Hit(Ray r, float tMin, float tMax)
+		public bool Hit(float3 rayOrigin, float3 rayInvDirection, float tMin, float tMax)
 		{
 			// optimized algorithm from Roman Wiche
 			// https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
 
-			float3 invD = rcp(r.Direction);
-			float3 t0s = (Min - r.Origin) * invD;
-			float3 t1s = (Max - r.Origin) * invD;
+			float3 t0 = (Min - rayOrigin) * rayInvDirection;
+			float3 t1 = (Max - rayOrigin) * rayInvDirection;
 
-			float3 tSmaller = min(t0s, t1s);
-			float3 tBigger  = max(t0s, t1s);
-
-			tMin = max(tMin, cmax(tSmaller));
-			tMax = min(tMax, cmin(tBigger));
+			tMin = max(tMin, cmax(min(t0, t1)));
+			tMax = min(tMax, cmin(max(t0, t1)));
 
 			return tMin < tMax;
 		}
