@@ -18,16 +18,23 @@ MonoBehaviour:
   cameraFieldOfView: 50
   entities: []
   randomSeed: 3500
-  randomSphereGroups:
-  - Distribution: 0
+  randomEntityGroups:
+  - Type: 1
+    Distribution: 0
     PeriodX: 10
     PeriodY: 10
     PeriodZ: 10
-    Variation: 1
+    PositionVariation: 0
+    ScaleVariationX: {x: 1, y: 1}
+    ScaleVariationY: {x: 1, y: 1}
+    ScaleVariationZ: {x: 1, y: 1}
     TentativeCount: 1000
-    CenterX: {x: -50, y: 50}
-    CenterY: {x: -50, y: 50}
-    CenterZ: {x: 0, y: 50}
+    SkipOverlapTest: 0
+    SpreadX: 100
+    SpreadY: 100
+    SpreadZ: 50
+    Offset: {x: 0, y: 0, z: 25}
+    Rotation: {x: 0, y: 0, z: 0}
     MovementChance: 0
     MovementXOffset: {x: 0, y: 0}
     MovementYOffset: {x: 0, y: 0}
