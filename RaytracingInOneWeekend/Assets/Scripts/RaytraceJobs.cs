@@ -65,10 +65,6 @@ namespace RaytracerInOneWeekend
 
 #if BASIC
 		[ReadOnly] public NativeArray<Entity> World;
-#elif SOA_SIMD
-		[ReadOnly] public SoaSpheres World;
-#elif AOSOA_SIMD
-		[ReadOnly] public AosoaSpheres World;
 #elif BVH
 		[ReadOnly]
 		[NativeDisableUnsafePtrRestriction]

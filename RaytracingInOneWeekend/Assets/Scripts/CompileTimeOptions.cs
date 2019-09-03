@@ -15,8 +15,6 @@ namespace RaytracerInOneWeekend
 		enum HitTestingMode
 		{
 			Basic = 0,
-			//SoaSimd = 1,
-			//AosoaSimd = 2,
 			RecursiveBvh = 3,
 			IterativeBvh = 4,
 			//IterativeBvhSimd = 5
@@ -38,8 +36,6 @@ namespace RaytracerInOneWeekend
 			var newDefinitions = new HashSet<string>(originalDefinitions);
 
 			newDefinitions.Remove("BASIC");
-			newDefinitions.Remove("SOA_SIMD");
-			newDefinitions.Remove("AOSOA_SIMD");
 			newDefinitions.Remove("BUFFERED_MATERIALS");
 			newDefinitions.Remove("BVH");
 			newDefinitions.Remove("BVH_RECURSIVE");
@@ -54,14 +50,6 @@ namespace RaytracerInOneWeekend
 				case HitTestingMode.Basic:
 					newDefinitions.Add("BASIC");
 					break;
-
-				// case HitTestingMode.SoaSimd:
-				// 	newDefinitions.Add("SOA_SIMD");
-				// 	break;
-				//
-				// case HitTestingMode.AosoaSimd:
-				// 	newDefinitions.Add("AOSOA_SIMD");
-				// 	break;
 
 				case HitTestingMode.RecursiveBvh:
 					newDefinitions.Add("BVH");

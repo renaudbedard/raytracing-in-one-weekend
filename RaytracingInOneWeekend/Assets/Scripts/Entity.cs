@@ -1,11 +1,9 @@
-#if !(AOSOA_SIMD || SOA_SIMD)
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 #if BVH
 using System.Collections.Generic;
-
 #endif
 
 namespace RaytracerInOneWeekend
@@ -137,4 +135,3 @@ namespace RaytracerInOneWeekend
 #endif
 	}
 }
-#endif

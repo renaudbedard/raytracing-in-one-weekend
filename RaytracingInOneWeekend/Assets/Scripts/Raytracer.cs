@@ -69,20 +69,12 @@ namespace RaytracerInOneWeekend
 		NativeArray<Diagnostics> diagnosticsBuffer;
 		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
 
-#if SOA_SIMD
-		SoaSpheres sphereBuffer;
-		SoaSpheres World => sphereBuffer;
-#elif AOSOA_SIMD
-		AosoaSpheres sphereBuffer;
-		AosoaSpheres World => sphereBuffer;
-#else // !SOA_SIMD && !AOSOA_SIMD
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Rect> rectBuffer;
 		NativeArray<Box> boxBuffer;
 		NativeArray<Entity> entityBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
-#endif
 #endif
 #if PATH_DEBUGGING
 		NativeArray<DebugPath> debugPaths;
@@ -176,14 +168,11 @@ namespace RaytracerInOneWeekend
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
 
-#if SOA_SIMD || AOSOA_SIMD
-			sphereBuffer.Dispose(); // this actually isn't a NativeArray<T>!
-#else
 			entityBuffer.SafeDispose();
 			sphereBuffer.SafeDispose();
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
-#endif
+
 			accumulationInputBuffer.SafeDispose();
 			accumulationOutputBuffer.SafeDispose();
 #if BVH
@@ -483,39 +472,7 @@ namespace RaytracerInOneWeekend
 				if (!activeMaterials.Contains(entity.Material))
 					activeMaterials.Add(entity.Material);
 
-#if SOA_SIMD || AOSOA_SIMD
-			int sphereCount = activeEntities.Count(x => x.Type == EntityType.Sphere);
-			if (sphereBuffer.Length != sphereCount)
-			{
-				sphereBuffer.Dispose();
-#if SOA_SIMD
-				sphereBuffer = new SoaSpheres(sphereCount);
-#elif AOSOA_SIMD
-				sphereBuffer = new AosoaSpheres(sphereCount);
-#endif
-			}
-
-			int i = 0;
-			foreach (var e in activeEntities.Where(x => x.Type == EntityType.Sphere))
-			{
-				var s = e.SphereData;
-				sphereBuffer.SetElement(i, s.CenterFrom, s.CenterTo, s.FromTime, s.ToTime, s.Radius);
-
-				MaterialData material = e.Material;
-				TextureData albedo = material ? material.Albedo : null;
-				TextureData emission = material ? material.Emission : null;
-
-				sphereBuffer.Material[i] =
-					new Material(material.Type, material.TextureScale * s.Radius, albedo.GetRuntimeData(),
-						emission.GetRuntimeData(), material.Fuzz, material.RefractiveIndex);
-
-				i++;
-			}
-
-#else // !SOA_SIMD && !AOSOA_SIMD
 			RebuildEntityBuffers();
-#endif
-
 #if BVH
 			RebuildBvh();
 #endif
@@ -525,7 +482,6 @@ namespace RaytracerInOneWeekend
 			worldNeedsRebuild = false;
 		}
 
-#if !SOA_SIMD && !AOSOA_SIMD
 		void RebuildEntityBuffers()
 		{
 			int entityCount = activeEntities.Count;
@@ -583,7 +539,6 @@ namespace RaytracerInOneWeekend
 					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
 			}
 		}
-#endif // !SOA_SIMD && !AOSOA_SIMD
 
 #if BVH
 		void RebuildBvh()

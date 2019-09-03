@@ -1,22 +1,14 @@
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
-#if !BVH && !SOA_SIMD && !AOSOA_SIMD
+#if !BVH
 using Unity.Collections;
-#endif
-
-#if SOA_SIMD || AOSOA_SIMD
-using Unity.Collections.LowLevel.Unsafe;
 #endif
 
 namespace RaytracerInOneWeekend
 {
-	// TODO: lots of code duplication between SoA/AoSoA and BVH SIMD
-	// TODO: do we even need tMin and tMax?
-
 	static class HitTests
 	{
-#if !(AOSOA_SIMD || SOA_SIMD)
 		// single sphere hit test
 		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
@@ -108,7 +100,6 @@ namespace RaytracerInOneWeekend
 			normal = sgn;
 			return true;
 		}
-#endif
 
 #if BASIC
 		// iterative entity array hit test
@@ -127,123 +118,6 @@ namespace RaytracerInOneWeekend
 			}
 
 			return hitAnything;
-		}
-
-#elif AOSOA_SIMD || SOA_SIMD
-		// TODO: this is fully broken
-
-#if SOA_SIMD
-		public static unsafe bool Hit(this SoaSpheres s, Ray r, float tMin, float tMax, out HitRecord rec)
-#elif AOSOA_SIMD
-		public static unsafe bool Hit(this AosoaSpheres s, Ray r, float tMin, float tMax, out HitRecord rec)
-#endif
-		{
-#if SOA_SIMD
-			float4* centerFromX = s.PtrCenterFromX, centerFromY = s.PtrCenterFromY, centerFromZ = s.PtrCenterFromZ;
-			float4* centerToX = s.PtrCenterToX, centerToY = s.PtrCenterToY, centerToZ = s.PtrCenterToZ;
-			float4* fromTime = s.PtrFromTime, toTime = s.PtrToTime;
-			float4* sqRadius = s.PtrSqRadius;
-#elif AOSOA_SIMD
-			float4* blockCursor = s.ReadOnlyDataPointer;
-#endif
-			rec = new HitRecord(tMax, 0, 0, default);
-			float4 a = dot(r.Direction, r.Direction);
-			int4 curId = int4(0, 1, 2, 3), hitId = -1;
-			float4 hitT = tMax;
-			int count = s.BlockCount;
-
-			for (int i = 0; i < count; i++)
-			{
-#if AOSOA_SIMD
-				float4* fromTime = blockCursor + (int) AosoaSpheres.Streams.FromTime,
-					toTime = blockCursor + (int) AosoaSpheres.Streams.ToTime,
-					centerFromX = blockCursor + (int) AosoaSpheres.Streams.CenterFromX,
-					centerToX = blockCursor + (int) AosoaSpheres.Streams.CenterToX,
-					centerFromY = blockCursor + (int) AosoaSpheres.Streams.CenterFromY,
-					centerToY = blockCursor + (int) AosoaSpheres.Streams.CenterToY,
-					centerFromZ = blockCursor + (int) AosoaSpheres.Streams.CenterFromZ,
-					centerToZ = blockCursor + (int) AosoaSpheres.Streams.CenterToZ,
-					sqRadius = blockCursor + (int) AosoaSpheres.Streams.SquaredRadius;
-#endif
-				float4 timeStep = saturate(unlerp(*fromTime, *toTime, r.Time));
-
-				float4 centerX = lerp(*centerFromX, *centerToX, timeStep),
-					centerY = lerp(*centerFromY, *centerToY, timeStep),
-					centerZ = lerp(*centerFromZ, *centerToZ, timeStep);
-
-				float4 ocX = r.Origin.x - centerX,
-					ocY = r.Origin.y - centerY,
-					ocZ = r.Origin.z - centerZ;
-
-				float4 b = ocX * r.Direction.x + ocY * r.Direction.y + ocZ * r.Direction.z;
-				float4 c = ocX * ocX + ocY * ocY + ocZ * ocZ - *sqRadius;
-				float4 discriminant = b * b - a * c;
-
-				bool4 discriminantTest = discriminant > 0;
-
-				if (any(discriminantTest))
-				{
-					float4 sqrtDiscriminant = sqrt(discriminant);
-
-					float4 t0 = (-b - sqrtDiscriminant) / a;
-					float4 t1 = (-b + sqrtDiscriminant) / a;
-
-					float4 t = select(t1, t0, t0 > tMin);
-					bool4 mask = discriminantTest & t > tMin & t < hitT;
-
-					hitId = select(hitId, curId, mask);
-					hitT = select(hitT, t, mask);
-				}
-
-				curId += 4;
-
-#if SOA_SIMD
-				++centerFromX; ++centerFromY; ++centerFromZ;
-				++centerToX; ++centerToY; ++centerToZ;
-				++fromTime; ++toTime;
-				++sqRadius;
-#elif AOSOA_SIMD
-				blockCursor += AosoaSpheres.StreamCount;
-#endif
-			}
-
-			if (all(hitId == -1))
-				return false;
-
-			float minDistance = cmin(hitT);
-			int laneMask = bitmask(hitT == minDistance);
-			int firstLane = tzcnt(laneMask);
-			int closestId = hitId[firstLane];
-
-#if SOA_SIMD
-			float3 closestCenterFrom = float3(s.CenterFromX[closestId], s.CenterFromY[closestId], s.CenterFromZ[closestId]);
-			float3 closestCenterTo = float3(s.CenterToX[closestId], s.CenterToY[closestId], s.CenterToZ[closestId]);
-			float closestTimeStep = saturate(unlerp(s.FromTime[closestId], s.ToTime[closestId], r.Time));
-			float closestRadius = s.Radius[closestId];
-#elif AOSOA_SIMD
-			s.GetOffsets(closestId, out int blockIndex, out int lane);
-			blockCursor = s.GetReadOnlyBlockPointer(blockIndex);
-
-			float3 closestCenterFrom = float3(
-				blockCursor[(int)AosoaSpheres.Streams.CenterFromX][lane],
-				blockCursor[(int)AosoaSpheres.Streams.CenterFromY][lane],
-				blockCursor[(int)AosoaSpheres.Streams.CenterFromZ][lane]);
-			float3 closestCenterTo = float3(
-				blockCursor[(int)AosoaSpheres.Streams.CenterToX][lane],
-				blockCursor[(int)AosoaSpheres.Streams.CenterToY][lane],
-				blockCursor[(int)AosoaSpheres.Streams.CenterToZ][lane]);
-			float closestTimeStep = saturate(unlerp(
-				blockCursor[(int)AosoaSpheres.Streams.FromTime][lane],
-				blockCursor[(int)AosoaSpheres.Streams.ToTime][lane], r.Time));
-			float closestRadius = s.Radius[closestId];
-#endif
-			float3 closestCenter = lerp(closestCenterFrom, closestCenterTo, closestTimeStep);
-
-			Material closestMaterial = s.Material[closestId];
-
-			float3 point = r.GetPoint(minDistance);
-			rec = new HitRecord(minDistance, point, (point - closestCenter) / closestRadius, closestMaterial);
-			return true;
 		}
 
 #elif BVH_RECURSIVE

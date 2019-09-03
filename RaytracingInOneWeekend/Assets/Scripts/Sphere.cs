@@ -1,3 +1,4 @@
+using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -21,4 +22,13 @@ namespace RaytracerInOneWeekend
 			}
 		}
 	}
+
+#if BVH_SIMD
+	struct Sphere4
+	{
+#pragma warning disable 649
+		public float4 CenterX, CenterY, CenterZ, SquaredRadius;
+#pragma warning restore 649
+	}
+#endif
 }
