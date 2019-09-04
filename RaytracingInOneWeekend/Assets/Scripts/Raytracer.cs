@@ -604,140 +604,155 @@ namespace RaytracerInOneWeekend
 		{
 			activeEntities.Clear();
 
-			if (!scene || scene.Entities == null) return;
+			if (!scene) return;
 
-			foreach (EntityData entity in scene.Entities)
-				if (entity.Enabled)
-					activeEntities.Add(entity);
-
-			var rng = new Random(scene.RandomSeed);
-			foreach (RandomEntityGroup group in scene.RandomEntityGroups)
+			if (scene.Entities != null)
 			{
-				MaterialData GetMaterial()
+				foreach (EntityData entity in scene.Entities)
+					if (entity.Enabled)
+						activeEntities.Add(entity);
+			}
+
+			if (scene.RandomEntityGroups != null)
+			{
+				var rng = new Random(scene.RandomSeed);
+				foreach (RandomEntityGroup group in scene.RandomEntityGroups)
 				{
-					(float lambertian, float metal, float dielectric) probabilities = (
-						group.LambertChance,
-						group.MetalChance,
-						group.DieletricChance);
-
-					float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric;
-					probabilities.metal += probabilities.lambertian;
-					probabilities.dielectric += probabilities.metal;
-					probabilities.lambertian /= sum;
-					probabilities.metal /= sum;
-					probabilities.dielectric /= sum;
-
-					MaterialData material = null;
-					float randomValue = rng.NextFloat();
-					if (randomValue < probabilities.lambertian)
+					MaterialData GetMaterial()
 					{
-						Color from = group.DiffuseAlbedo.colorKeys[0].color;
-						Color to = group.DiffuseAlbedo.colorKeys[1].color;
-						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-						if (group.DoubleSampleDiffuseAlbedo)
-							color *= rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-						material = MaterialData.Lambertian(TextureData.Constant(color), 1);
-					}
-					else if (randomValue < probabilities.metal)
-					{
-						Color from = group.MetalAlbedo.colorKeys[0].color;
-						Color to = group.MetalAlbedo.colorKeys[1].color;
-						float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-						float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
-						material = MaterialData.Metal(TextureData.Constant(color), 1, fuzz);
-					}
-					else if (randomValue < probabilities.dielectric)
-					{
-						material = MaterialData.Dielectric(rng.NextFloat(
-							group.RefractiveIndex.x,
-							group.RefractiveIndex.y));
-					}
+						(float lambertian, float metal, float dielectric) probabilities = (
+							group.LambertChance,
+							group.MetalChance,
+							group.DieletricChance);
 
-					return material;
-				}
+						float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric;
+						probabilities.metal += probabilities.lambertian;
+						probabilities.dielectric += probabilities.metal;
+						probabilities.lambertian /= sum;
+						probabilities.metal /= sum;
+						probabilities.dielectric /= sum;
 
-				// TODO: fix overlap test to account for all entity types
-				bool AnyOverlap(float3 center, float radius) => activeEntities.Where(x => x.Type == EntityType.Sphere)
-					.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
-					          distance(x.Position, center) < x.SphereData.Radius + radius + group.MinDistance);
-
-				EntityData GetEntity(float3 center, float3 radius)
-				{
-					bool moving = rng.NextFloat() < group.MovementChance;
-					quaternion rotation = quaternion.Euler(group.Rotation);
-					var entityData = new EntityData
-					{
-						Type = group.Type,
-						Position = rotate(rotation, center - (float3) group.Offset) + (float3) group.Offset,
-						Rotation = rotation,
-						Material = GetMaterial()
-					};
-					switch (group.Type)
-					{
-						case EntityType.Sphere: entityData.SphereData = new SphereData(radius.x); break;
-						case EntityType.Box: entityData.BoxData = new BoxData(radius); break;
-						case EntityType.Rect: entityData.RectData = new RectData(radius.xy); break;
-					}
-
-					if (moving)
-					{
-						float3 offset = rng.NextFloat3(
-							float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
-							float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
-
-						entityData.TimeRange = new Vector2(0, 1);
-						entityData.Moving = true;
-						entityData.DestinationOffset = offset;
-					}
-
-					return entityData;
-				}
-
-				switch (group.Distribution)
-				{
-					case RandomDistribution.DartThrowing:
-						for (int i = 0; i < group.TentativeCount; i++)
+						MaterialData material = null;
+						float randomValue = rng.NextFloat();
+						if (randomValue < probabilities.lambertian)
 						{
-							float3 center = rng.NextFloat3(
-								float3(-group.SpreadX / 2, -group.SpreadY / 2, -group.SpreadZ / 2),
-								float3(group.SpreadX / 2, group.SpreadY / 2, group.SpreadZ / 2));
-
-							center += (float3) group.Offset;
-
-							float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
-
-							if (!group.SkipOverlapTest && AnyOverlap(center, radius))
-								continue;
-
-							activeEntities.Add(GetEntity(center, radius));
+							Color from = group.DiffuseAlbedo.colorKeys[0].color;
+							Color to = group.DiffuseAlbedo.colorKeys[1].color;
+							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+							if (group.DoubleSampleDiffuseAlbedo)
+								color *= rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+							material = MaterialData.Lambertian(TextureData.Constant(color), 1);
 						}
-						break;
-
-					case RandomDistribution.JitteredGrid:
-						float3 ranges = float3(group.SpreadX, group.SpreadY, group.SpreadZ);
-						float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
-
-						// correct the range so that it produces the same result as the book
-						float3 correctedRangeEnd = (float3) group.Offset + ranges / 2;
-						float3 period = max(float3(group.PeriodX, group.PeriodY, group.PeriodZ), 1);
-						correctedRangeEnd += (1 - abs(sign(ranges))) * period / 2;
-
-						for (float i = group.Offset.x - ranges.x / 2; i < correctedRangeEnd.x; i += period.x)
-						for (float j = group.Offset.y - ranges.y / 2; j < correctedRangeEnd.y; j += period.y)
-						for (float k = group.Offset.z - ranges.z / 2; k < correctedRangeEnd.z; k += period.z)
+						else if (randomValue < probabilities.metal)
 						{
-							float3 center = float3(i, j, k) + rng.NextFloat3(group.PositionVariation * cellSize);
-							float3 radius = rng.NextFloat(group.Radius.x, group.Radius.y) *
-							                float3(rng.NextFloat(group.ScaleVariationX.x, group.ScaleVariationX.y),
-								                rng.NextFloat(group.ScaleVariationY.x, group.ScaleVariationY.y),
-								                rng.NextFloat(group.ScaleVariationZ.x, group.ScaleVariationZ.y));
-
-							if (!group.SkipOverlapTest && AnyOverlap(center, radius.x))
-								continue;
-
-							activeEntities.Add(GetEntity(center, radius));
+							Color from = group.MetalAlbedo.colorKeys[0].color;
+							Color to = group.MetalAlbedo.colorKeys[1].color;
+							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+							float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
+							material = MaterialData.Metal(TextureData.Constant(color), 1, fuzz);
 						}
-						break;
+						else if (randomValue < probabilities.dielectric)
+						{
+							material = MaterialData.Dielectric(rng.NextFloat(
+								group.RefractiveIndex.x,
+								group.RefractiveIndex.y));
+						}
+
+						return material;
+					}
+
+					// TODO: fix overlap test to account for all entity types
+					bool AnyOverlap(float3 center, float radius) => activeEntities
+						.Where(x => x.Type == EntityType.Sphere)
+						.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
+						          distance(x.Position, center) < x.SphereData.Radius + radius + group.MinDistance);
+
+					EntityData GetEntity(float3 center, float3 radius)
+					{
+						bool moving = rng.NextFloat() < group.MovementChance;
+						quaternion rotation = quaternion.Euler(group.Rotation);
+						var entityData = new EntityData
+						{
+							Type = group.Type,
+							Position = rotate(rotation, center - (float3) group.Offset) + (float3) group.Offset,
+							Rotation = rotation,
+							Material = GetMaterial()
+						};
+						switch (group.Type)
+						{
+							case EntityType.Sphere:
+								entityData.SphereData = new SphereData(radius.x);
+								break;
+							case EntityType.Box:
+								entityData.BoxData = new BoxData(radius);
+								break;
+							case EntityType.Rect:
+								entityData.RectData = new RectData(radius.xy);
+								break;
+						}
+
+						if (moving)
+						{
+							float3 offset = rng.NextFloat3(
+								float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
+								float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
+
+							entityData.TimeRange = new Vector2(0, 1);
+							entityData.Moving = true;
+							entityData.DestinationOffset = offset;
+						}
+
+						return entityData;
+					}
+
+					switch (group.Distribution)
+					{
+						case RandomDistribution.DartThrowing:
+							for (int i = 0; i < group.TentativeCount; i++)
+							{
+								float3 center = rng.NextFloat3(
+									float3(-group.SpreadX / 2, -group.SpreadY / 2, -group.SpreadZ / 2),
+									float3(group.SpreadX / 2, group.SpreadY / 2, group.SpreadZ / 2));
+
+								center += (float3) group.Offset;
+
+								float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+
+								if (!group.SkipOverlapTest && AnyOverlap(center, radius))
+									continue;
+
+								activeEntities.Add(GetEntity(center, radius));
+							}
+
+							break;
+
+						case RandomDistribution.JitteredGrid:
+							float3 ranges = float3(group.SpreadX, group.SpreadY, group.SpreadZ);
+							float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
+
+							// correct the range so that it produces the same result as the book
+							float3 correctedRangeEnd = (float3) group.Offset + ranges / 2;
+							float3 period = max(float3(group.PeriodX, group.PeriodY, group.PeriodZ), 1);
+							correctedRangeEnd += (1 - abs(sign(ranges))) * period / 2;
+
+							for (float i = group.Offset.x - ranges.x / 2; i < correctedRangeEnd.x; i += period.x)
+							for (float j = group.Offset.y - ranges.y / 2; j < correctedRangeEnd.y; j += period.y)
+							for (float k = group.Offset.z - ranges.z / 2; k < correctedRangeEnd.z; k += period.z)
+							{
+								float3 center = float3(i, j, k) + rng.NextFloat3(group.PositionVariation * cellSize);
+								float3 radius = rng.NextFloat(group.Radius.x, group.Radius.y) *
+								                float3(rng.NextFloat(group.ScaleVariationX.x, group.ScaleVariationX.y),
+									                rng.NextFloat(group.ScaleVariationY.x, group.ScaleVariationY.y),
+									                rng.NextFloat(group.ScaleVariationZ.x, group.ScaleVariationZ.y));
+
+								if (!group.SkipOverlapTest && AnyOverlap(center, radius.x))
+									continue;
+
+								activeEntities.Add(GetEntity(center, radius));
+							}
+
+							break;
+					}
 				}
 			}
 
