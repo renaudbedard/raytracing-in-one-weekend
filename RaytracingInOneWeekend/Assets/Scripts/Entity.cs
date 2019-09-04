@@ -1,7 +1,9 @@
+using System;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
 #if BVH
 using System.Collections.Generic;
 #endif
@@ -15,19 +17,51 @@ namespace RaytracerInOneWeekend
 		public readonly float3 DestinationOffset;
 		public readonly float2 TimeRange;
 		public readonly Material Material;
+#if BVH
+		// TODO: this is only used in the BVH generation step, and not at runtime
+		public readonly AxisAlignedBoundingBox Bounds;
+#endif
 
 		[NativeDisableUnsafePtrRestriction] readonly void* content;
 
-		public Entity(EntityType type, void* contentPointer, RigidTransform transform, Material material,
+		public Entity(EntityType type, void* contentPointer, RigidTransform originTransform, Material material,
 			float3 destinationOffset = default, float2 timeRange = default)
 		{
 			Type = type;
-			OriginTransform = transform;
+			OriginTransform = originTransform;
 			content = contentPointer;
 			TimeRange = timeRange;
 			DestinationOffset = destinationOffset;
 			TimeRange = timeRange;
 			Material = material;
+
+#if BVH
+			switch (Type)
+			{
+				case EntityType.Sphere: Bounds = ((Sphere*) content)->Bounds; break;
+				case EntityType.Rect: Bounds = ((Rect*) content)->Bounds; break;
+				case EntityType.Box: Bounds = ((Box*) content)->Bounds; break;
+				default: throw new InvalidOperationException($"Unknown entity type : {Type}");
+			}
+
+			float3[] corners = Bounds.Corners;
+
+			float3 destinationPosition = OriginTransform.pos + DestinationOffset;
+			var minTransform =
+				new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
+			var maxTransform =
+				new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
+
+			var minimum = new float3(float.PositiveInfinity);
+			var maximum = new float3(float.NegativeInfinity);
+			foreach (float3 c in corners)
+			{
+				minimum = min(minimum, transform(minTransform, c));
+				maximum = max(maximum, transform(maxTransform, c));
+			}
+
+			Bounds = new AxisAlignedBoundingBox(minimum, maximum);
+#endif
 		}
 
 		[Pure]
@@ -91,47 +125,5 @@ namespace RaytracerInOneWeekend
 					return false;
 			}
 		}
-
-#if BVH
-		public AxisAlignedBoundingBox Bounds
-		{
-			get
-			{
-				AxisAlignedBoundingBox bounds;
-
-				switch (Type)
-				{
-					case EntityType.Sphere:
-						bounds = ((Sphere*) content)->Bounds;
-						break;
-					case EntityType.Rect:
-						bounds = ((Rect*) content)->Bounds;
-						break;
-					case EntityType.Box:
-						bounds = ((Box*) content)->Bounds;
-						break;
-					default: return default;
-				}
-
-				float3[] corners = bounds.Corners;
-
-				float3 destinationPosition = OriginTransform.pos + DestinationOffset;
-				var minTransform =
-					new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
-				var maxTransform =
-					new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
-
-				var minimum = new float3(float.PositiveInfinity);
-				var maximum = new float3(float.NegativeInfinity);
-				foreach (float3 c in corners)
-				{
-					minimum = min(minimum, transform(minTransform, c));
-					maximum = max(maximum, transform(maxTransform, c));
-				}
-
-				return new AxisAlignedBoundingBox(minimum, maximum);
-			}
-		}
-#endif
 	}
 }

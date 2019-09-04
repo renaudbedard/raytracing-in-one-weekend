@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using UnityEngine;
 using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
@@ -18,6 +17,7 @@ namespace RaytracerInOneWeekend
 		Z = 4,
 		All = X | Y | Z
 	}
+
 	static class PartitionAxisExtensions
 	{
 		public static int GetAxisId(this PartitionAxis axis)
@@ -28,16 +28,24 @@ namespace RaytracerInOneWeekend
 				case PartitionAxis.Y: return 1;
 				case PartitionAxis.Z: return 2;
 			}
+
 			Assert.IsTrue(false, "Multivalued or unset axis");
 			return -1;
 		}
 
-		public static IEnumerable<PartitionAxis> Enumerate(this PartitionAxis axis)
+		private static readonly PartitionAxis[][] Permutations =
 		{
-			if ((axis & PartitionAxis.X) != 0) yield return PartitionAxis.X;
-			if ((axis & PartitionAxis.Y) != 0) yield return PartitionAxis.Y;
-			if ((axis & PartitionAxis.Z) != 0) yield return PartitionAxis.Z;
-		}
+			new PartitionAxis[0],
+			new [] { PartitionAxis.X },
+			new [] { PartitionAxis.Y },
+			new [] { PartitionAxis.X, PartitionAxis.Y },
+			new [] { PartitionAxis.Z },
+			new [] { PartitionAxis.X, PartitionAxis.Z },
+			new [] { PartitionAxis.Y, PartitionAxis.Z },
+			new [] { PartitionAxis.X, PartitionAxis.Y, PartitionAxis.Z },
+		};
+
+		public static PartitionAxis[] Enumerate(this PartitionAxis axis) => Permutations[(int) axis];
 	}
 
 	unsafe struct BvhNode
@@ -75,6 +83,7 @@ namespace RaytracerInOneWeekend
 			}
 
 			entities.Sort(new EntityBoundsComparer(biggestPartition));
+			int biggestAxis = biggestPartition.GetAxisId();
 
 			switch (entities.Length)
 			{
@@ -85,19 +94,21 @@ namespace RaytracerInOneWeekend
 
 				default:
 					int partitionLength = 0;
-					float partitionStart = entities[0].Bounds.Min[biggestPartition.GetAxisId()];
+					float partitionStart = entities[0].Bounds.Min[biggestAxis];
 
 					// decide the size of the partition according to the size of the entities
-					foreach (Entity entity in entities)
+					for (var i = 0; i < entities.Length; i++)
 					{
+						Entity entity = entities[i];
 						partitionLength++;
 						AxisAlignedBoundingBox bounds = entity.Bounds;
-						if (bounds.Min[biggestPartition.GetAxisId()] - partitionStart > biggestPartitionSize / 2 ||
-						    bounds.Size[biggestPartition.GetAxisId()] > biggestPartitionSize / 2)
+						if (bounds.Min[biggestAxis] - partitionStart > biggestPartitionSize / 2 ||
+							bounds.Size[biggestAxis] > biggestPartitionSize / 2)
 						{
 							break;
 						}
 					}
+
 					// ensure we have at least 1 entity in each partition
 					if (partitionLength == entities.Length)
 						partitionLength--;
