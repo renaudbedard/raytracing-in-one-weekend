@@ -14,6 +14,15 @@ namespace RaytracerInOneWeekend
 			To = size / 2;
 		}
 
+		public float Area
+		{
+			get
+			{
+				float2 size = To - From;
+				return size.x * size.y;
+			}
+		}
+
 		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(
 			float3(From, -0.001f),
 			float3(To, 0.001f));

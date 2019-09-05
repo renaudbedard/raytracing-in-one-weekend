@@ -2,10 +2,12 @@ using System;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 #if BVH
 using System.Collections.Generic;
+
 #endif
 
 namespace RaytracerInOneWeekend
@@ -38,9 +40,15 @@ namespace RaytracerInOneWeekend
 #if BVH
 			switch (Type)
 			{
-				case EntityType.Sphere: Bounds = ((Sphere*) content)->Bounds; break;
-				case EntityType.Rect: Bounds = ((Rect*) content)->Bounds; break;
-				case EntityType.Box: Bounds = ((Box*) content)->Bounds; break;
+				case EntityType.Sphere:
+					Bounds = ((Sphere*) content)->Bounds;
+					break;
+				case EntityType.Rect:
+					Bounds = ((Rect*) content)->Bounds;
+					break;
+				case EntityType.Box:
+					Bounds = ((Box*) content)->Bounds;
+					break;
 				default: throw new InvalidOperationException($"Unknown entity type : {Type}");
 			}
 
@@ -123,6 +131,46 @@ namespace RaytracerInOneWeekend
 					distance = 0;
 					normal = default;
 					return false;
+			}
+		}
+
+		public float PdfValue(Ray r, ref Random rng)
+		{
+			if (Hit(r, 0.001f, float.PositiveInfinity, ref rng, out HitRecord rec))
+			{
+				switch (Type)
+				{
+					case EntityType.Rect:
+						float area = ((Rect*) content)->Area;
+						float distanceSquared = rec.Distance * rec.Distance;
+						float cosine = abs(dot(r.Direction, rec.Normal));
+						return distanceSquared / (cosine * area);
+
+					default:
+						// TODO
+						return 0;
+				}
+			}
+
+			return 0;
+		}
+
+		public float3 RandomPoint(float time, ref Random rng)
+		{
+			var transformAtTime = new RigidTransform(OriginTransform.rot,
+				OriginTransform.pos +
+				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, time), 0.0f, 1.0f));
+
+			switch (Type)
+			{
+				case EntityType.Rect:
+					var rect = (Rect*) content;
+					float3 localPoint = float3(rng.NextFloat2(rect->From, rect->To), 0);
+					return transform(transformAtTime, localPoint);
+
+				default:
+					// TODO
+					return 0;
 			}
 		}
 	}
