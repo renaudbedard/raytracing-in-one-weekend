@@ -107,6 +107,21 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
+		public float ScatteringPdf(Ray r, HitRecord rec, Ray scattered)
+		{
+			switch (Type)
+			{
+				case MaterialType.Lambertian:
+					float cosine = dot(rec.Normal, scattered.Direction);
+					return max(cosine, 0) / PI;
+
+				default:
+					// TODO
+					return 0;
+			}
+		}
+
+		[Pure]
 		public float3 Emit(float3 position, float3 normal, PerlinData perlinData)
 		{
 			switch (Type)

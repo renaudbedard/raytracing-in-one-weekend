@@ -193,13 +193,18 @@ namespace RaytracerInOneWeekend
 #endif
 					float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
 					*emissionCursor++ = emission;
-					bool didScatter = rec.Material.Scatter(r, rec, ref rng, PerlinData, out float3 attenuation, out r);
-					*attenuationCursor++ = attenuation;
+					bool didScatter = rec.Material.Scatter(r, rec, ref rng, PerlinData, out float3 attenuation,
+						out Ray scatteredRay);
+
+					float pdf = 1; // TODO: pdf from importance sampling decision
+					*attenuationCursor++ = attenuation * rec.Material.ScatteringPdf(r, rec, scatteredRay) / pdf;
+
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;
 					//diagnostics.Normal += normalize(r.Direction);
 #endif
-					if (didScatter) r = r.OffsetTowards(dot(r.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
+					if (didScatter)
+						r = scatteredRay.OffsetTowards(dot(r.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
 					else break;
 				}
 				else
