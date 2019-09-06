@@ -73,6 +73,7 @@ namespace RaytracerInOneWeekend
 		NativeArray<Rect> rectBuffer;
 		NativeArray<Box> boxBuffer;
 		NativeArray<Entity> entityBuffer;
+		NativeArray<Entity> importanceSamplingEntityBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
 #endif
@@ -169,6 +170,7 @@ namespace RaytracerInOneWeekend
 			combineJobHandle?.Complete();
 
 			entityBuffer.SafeDispose();
+			importanceSamplingEntityBuffer.SafeDispose();
 			sphereBuffer.SafeDispose();
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
@@ -401,6 +403,7 @@ namespace RaytracerInOneWeekend
 				PerlinData = perlinData.GetRuntimeData(),
 				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
+				ImportanceSampler = new ImportanceSampler { TargetEntities = importanceSamplingEntityBuffer },
 #if BVH_ITERATIVE
 				NodeCount = bvhNodeBuffer.Length,
 				EntityCount = entityBuffer.Length,
@@ -492,7 +495,11 @@ namespace RaytracerInOneWeekend
 			rectBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Rect));
 			boxBuffer.EnsureCapacity(activeEntities.Count(x => x.Type == EntityType.Box));
 
-			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0;
+			// TODO: factor in specular materials
+			importanceSamplingEntityBuffer.EnsureCapacity(activeEntities.Count(x =>
+				x.Material.Type == MaterialType.DiffuseLight));
+
+			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, importanceSamplingIndex = 0;
 			foreach (EntityData e in activeEntities)
 			{
 				Vector2 sizeFactor = Vector2.one;
@@ -530,13 +537,14 @@ namespace RaytracerInOneWeekend
 						materialData.Fuzz, materialData.RefractiveIndex, materialData.Density)
 					: default;
 
-				if (e.Moving)
-				{
-					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material,
-						e.DestinationOffset, e.TimeRange);
-				}
-				else
-					entityBuffer[entityIndex++] = new Entity(e.Type, contentPointer, rigidTransform, material);
+				Entity entity = e.Moving
+					? new Entity(e.Type, contentPointer, rigidTransform, material, e.DestinationOffset, e.TimeRange)
+					: new Entity(e.Type, contentPointer, rigidTransform, material);
+
+				entityBuffer[entityIndex++] = entity;
+
+				if (e.Material.Type == MaterialType.DiffuseLight)
+					importanceSamplingEntityBuffer[importanceSamplingIndex++] = entity;
 			}
 		}
 

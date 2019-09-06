@@ -60,6 +60,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public float3 SkyBottomColor;
 		[ReadOnly] public float3 SkyTopColor;
 		[ReadOnly] public bool SubPixelJitter;
+		[ReadOnly] public ImportanceSampler ImportanceSampler;
 
 		[ReadOnly] public NativeArray<float4> InputSamples;
 
@@ -196,8 +197,10 @@ namespace RaytracerInOneWeekend
 					bool didScatter = rec.Material.Scatter(r, rec, ref rng, PerlinData, out float3 attenuation,
 						out Ray scatteredRay);
 
-					float pdf = 1; // TODO: pdf from importance sampling decision
-					*attenuationCursor++ = attenuation * rec.Material.ScatteringPdf(r, rec, scatteredRay) / pdf;
+					float scatterPdfValue = rec.Material.ScatteringPdf(r, rec, scatteredRay);
+					float pdf;
+					(scatteredRay, pdf) = ImportanceSampler.Sample(scatteredRay, scatterPdfValue, ref rng);
+					*attenuationCursor++ = attenuation * scatterPdfValue / pdf;
 
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;
