@@ -205,7 +205,7 @@ namespace RaytracerInOneWeekend
 							*attenuationCursor++ = attenuation;
 						else
 						{
-							float scatterPdfValue = rec.Material.ScatteringPdf(r, rec, scatteredRay);
+							float scatterPdfValue = rec.Material.ScatteringPdf(rec, scatteredRay);
 							ImportanceSampler.Sample(scatteredRay, scatterPdfValue, ref rng,
 								out scatteredRay, out float pdfValue);
 

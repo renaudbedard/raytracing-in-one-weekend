@@ -23,10 +23,7 @@ namespace RaytracerInOneWeekend
 			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
 			int chosenOption = rng.NextInt(0, totalOptions);
 			if (chosenOption == TargetEntities.Length)
-			{
 				scatterRay = materialScatterRay;
-				pdfValue = materialScatteringPdfValue;
-			}
 			else
 			{
 				Entity* chosenEntity = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr() + chosenOption;
@@ -38,18 +35,10 @@ namespace RaytracerInOneWeekend
 			pdfValue = 0;
 			if (Mode == ImportanceSamplingMode.Mixture) pdfValue += materialScatteringPdfValue;
 
-			switch (Mode)
-			{
-				case ImportanceSamplingMode.None: pdfValue = materialScatteringPdfValue; break;
-
-				case ImportanceSamplingMode.LightsOnly:
-				case ImportanceSamplingMode.Mixture:
-					var basePointer = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr();
-					for (int i = 0; i < TargetEntities.Length; i++)
-						pdfValue += (basePointer + i)->PdfValue(scatterRay, ref rng);
-					pdfValue /= totalOptions;
-					break;
-			}
+			var basePointer = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr();
+			for (int i = 0; i < TargetEntities.Length; i++)
+				pdfValue += (basePointer + i)->PdfValue(scatterRay, ref rng);
+			pdfValue /= totalOptions;
 		}
 	}
 }

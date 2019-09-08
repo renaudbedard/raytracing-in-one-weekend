@@ -108,16 +108,12 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public float ScatteringPdf(Ray r, HitRecord rec, Ray scattered)
+		public float ScatteringPdf(HitRecord rec, Ray scattered)
 		{
 			switch (Type)
 			{
-				case MaterialType.Lambertian:
-					float cosine = dot(rec.Normal, scattered.Direction);
-					return max(cosine, 0) / PI;
-
-				default:
-					throw new NotImplementedException();
+				case MaterialType.Lambertian: return dot(rec.Normal, scattered.Direction) / PI;
+				default: throw new NotImplementedException();
 			}
 		}
 
@@ -126,11 +122,8 @@ namespace RaytracerInOneWeekend
 		{
 			switch (Type)
 			{
-				case MaterialType.DiffuseLight:
-					return Texture.Value(position, normal, TextureScale, perlinData);
-
-				default:
-					return 0;
+				case MaterialType.DiffuseLight: return Texture.Value(position, normal, TextureScale, perlinData);
+				default: return 0;
 			}
 		}
 
