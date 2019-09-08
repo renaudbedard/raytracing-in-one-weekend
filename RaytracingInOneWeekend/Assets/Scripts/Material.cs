@@ -1,3 +1,4 @@
+using System;
 using JetBrains.Annotations;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
@@ -116,8 +117,7 @@ namespace RaytracerInOneWeekend
 					return max(cosine, 0) / PI;
 
 				default:
-					// TODO
-					return 0;
+					throw new NotImplementedException();
 			}
 		}
 

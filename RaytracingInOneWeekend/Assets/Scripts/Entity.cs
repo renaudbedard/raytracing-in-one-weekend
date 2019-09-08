@@ -147,8 +147,7 @@ namespace RaytracerInOneWeekend
 						return distanceSquared / (cosine * area);
 
 					default:
-						// TODO
-						return 0;
+						throw new NotImplementedException();
 				}
 			}
 

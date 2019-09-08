@@ -35,6 +35,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
+		[SerializeField] ImportanceSamplingMode importanceSampling = ImportanceSamplingMode.None;
 		[SerializeField] bool subPixelJitter = true;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
@@ -403,7 +404,11 @@ namespace RaytracerInOneWeekend
 				PerlinData = perlinData.GetRuntimeData(),
 				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
-				ImportanceSampler = new ImportanceSampler { TargetEntities = importanceSamplingEntityBuffer },
+				ImportanceSampler = new ImportanceSampler
+				{
+					TargetEntities = importanceSamplingEntityBuffer,
+					Mode = importanceSampling
+				},
 #if BVH_ITERATIVE
 				NodeCount = bvhNodeBuffer.Length,
 				EntityCount = entityBuffer.Length,
