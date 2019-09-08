@@ -32,7 +32,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
   - name: 
     type: 2
     enabled: 1
@@ -48,7 +48,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
   - name: 
     type: 2
     enabled: 1
@@ -64,7 +64,7 @@ MonoBehaviour:
       size: {x: 105, y: 130}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: 0b170a1736e6a88489bdaf19d22db596, type: 2}
   - name: 
     type: 2
     enabled: 1
@@ -80,7 +80,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
   - name: 
     type: 2
     enabled: 1
@@ -96,7 +96,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
   - name: 
     type: 2
     enabled: 1
@@ -112,7 +112,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
   - name: 
     type: 3
     enabled: 1
@@ -128,7 +128,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 165, y: 165, z: 165}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
   - name: 
     type: 3
     enabled: 1
@@ -144,7 +144,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 165, y: 330, z: 165}
-    material: {fileID: 0}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
   randomSeed: 1
   randomEntityGroups: []
   skyBottomColor: {r: 0, g: 0, b: 0, a: 1}
