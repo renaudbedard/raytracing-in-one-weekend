@@ -17,22 +17,38 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<Entity> TargetEntities;
 		public ImportanceSamplingMode Mode;
 
-		public void Sample(Ray materialScatterRay, float materialScatteringPdfValue, ref Random rng,
+		public unsafe void Sample(Ray materialScatterRay, float materialScatteringPdfValue, ref Random rng,
 			out Ray scatterRay, out float pdfValue)
 		{
-			int totalOptions = TargetEntities.Length + Mode == ImportanceSamplingMode.Mixture ? 1 : 0;
+			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
 			int chosenOption = rng.NextInt(0, totalOptions);
 			if (chosenOption == TargetEntities.Length)
 			{
 				scatterRay = materialScatterRay;
 				pdfValue = materialScatteringPdfValue;
 			}
-			else unsafe
+			else
 			{
-				Entity* chosenEntity = (Entity*)TargetEntities.GetUnsafeReadOnlyPtr() + chosenOption;
+				Entity* chosenEntity = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr() + chosenOption;
 				float3 pointOnEntity = chosenEntity->RandomPoint(materialScatterRay.Time, ref rng);
-				scatterRay = new Ray(materialScatterRay.Origin, normalize(pointOnEntity - materialScatterRay.Origin));
-				pdfValue = chosenEntity->PdfValue(scatterRay, ref rng);
+				scatterRay = new Ray(materialScatterRay.Origin,
+					normalize(pointOnEntity - materialScatterRay.Origin));
+			}
+
+			pdfValue = 0;
+			if (Mode == ImportanceSamplingMode.Mixture) pdfValue += materialScatteringPdfValue;
+
+			switch (Mode)
+			{
+				case ImportanceSamplingMode.None: pdfValue = materialScatteringPdfValue; break;
+
+				case ImportanceSamplingMode.LightsOnly:
+				case ImportanceSamplingMode.Mixture:
+					var basePointer = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr();
+					for (int i = 0; i < TargetEntities.Length; i++)
+						pdfValue += (basePointer + i)->PdfValue(scatterRay, ref rng);
+					pdfValue /= totalOptions;
+					break;
 			}
 		}
 	}

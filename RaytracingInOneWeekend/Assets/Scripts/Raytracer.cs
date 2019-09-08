@@ -100,6 +100,7 @@ namespace RaytracerInOneWeekend
 		bool traceAborted;
 		bool ignoreBatchTimings;
 		int lastTraceDepth;
+		ImportanceSamplingMode lastSamplingMode;
 
 		readonly Stopwatch batchTimer = new Stopwatch();
 		readonly Stopwatch traceTimer = new Stopwatch();
@@ -205,8 +206,10 @@ namespace RaytracerInOneWeekend
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
+			bool samplingModeChanged = importanceSampling != lastSamplingMode;
 
-			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged;
+			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
+			                       samplingModeChanged;
 			bool traceNeedsKick = traceNeedsReset || !commandBufferHooked;
 
 			void RebuildDirtyComponents()
@@ -382,6 +385,7 @@ namespace RaytracerInOneWeekend
 				mraysPerSecResults.Clear();
 				AccumulatedSamples = 0;
 				lastTraceDepth = traceDepth;
+				lastSamplingMode = importanceSampling;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
 #endif

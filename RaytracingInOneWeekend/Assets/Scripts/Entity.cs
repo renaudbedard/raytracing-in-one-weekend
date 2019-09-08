@@ -5,10 +5,6 @@ using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
-#if BVH
-using System.Collections.Generic;
-
-#endif
 
 namespace RaytracerInOneWeekend
 {
@@ -40,15 +36,9 @@ namespace RaytracerInOneWeekend
 #if BVH
 			switch (Type)
 			{
-				case EntityType.Sphere:
-					Bounds = ((Sphere*) content)->Bounds;
-					break;
-				case EntityType.Rect:
-					Bounds = ((Rect*) content)->Bounds;
-					break;
-				case EntityType.Box:
-					Bounds = ((Box*) content)->Bounds;
-					break;
+				case EntityType.Sphere: Bounds = ((Sphere*) content)->Bounds; break;
+				case EntityType.Rect: Bounds = ((Rect*) content)->Bounds; break;
+				case EntityType.Box: Bounds = ((Box*) content)->Bounds; break;
 				default: throw new InvalidOperationException($"Unknown entity type : {Type}");
 			}
 
@@ -75,10 +65,7 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public bool Hit(Ray ray, float tMin, float tMax, ref Random rng, out HitRecord rec)
 		{
-			var transformAtTime = new RigidTransform(OriginTransform.rot,
-				OriginTransform.pos +
-				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, ray.Time), 0.0f, 1.0f));
-
+			RigidTransform transformAtTime = TransformAtTime(ray.Time);
 			RigidTransform inverseTransform = inverse(transformAtTime);
 
 			var entitySpaceRay = new Ray(
@@ -140,14 +127,8 @@ namespace RaytracerInOneWeekend
 			{
 				switch (Type)
 				{
-					case EntityType.Rect:
-						float area = ((Rect*) content)->Area;
-						float distanceSquared = rec.Distance * rec.Distance;
-						float cosine = abs(dot(r.Direction, rec.Normal));
-						return distanceSquared / (cosine * area);
-
-					default:
-						throw new NotImplementedException();
+					case EntityType.Rect: return ((Rect*) content)->PdfValue(r, rec);
+					default: throw new NotImplementedException();
 				}
 			}
 
@@ -156,21 +137,19 @@ namespace RaytracerInOneWeekend
 
 		public float3 RandomPoint(float time, ref Random rng)
 		{
-			var transformAtTime = new RigidTransform(OriginTransform.rot,
-				OriginTransform.pos +
-				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, time), 0.0f, 1.0f));
-
+			float3 localPoint;
 			switch (Type)
 			{
-				case EntityType.Rect:
-					var rect = (Rect*) content;
-					float3 localPoint = float3(rng.NextFloat2(rect->From, rect->To), 0);
-					return transform(transformAtTime, localPoint);
-
-				default:
-					// TODO
-					return 0;
+				case EntityType.Rect: localPoint = ((Rect*) content)->RandomPoint(ref rng); break;
+				default: throw new NotImplementedException();
 			}
+
+			return transform(TransformAtTime(time), localPoint);
 		}
+
+		public RigidTransform TransformAtTime(float t) =>
+			new RigidTransform(OriginTransform.rot,
+				OriginTransform.pos +
+				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, t), 0.0f, 1.0f));
 	}
 }

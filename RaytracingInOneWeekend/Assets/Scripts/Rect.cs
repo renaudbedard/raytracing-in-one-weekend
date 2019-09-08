@@ -23,6 +23,16 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
+		public float PdfValue(Ray r, HitRecord rec)
+		{
+			float area = Area;
+			float distanceSquared = rec.Distance * rec.Distance;
+			float cosine = abs(dot(r.Direction, rec.Normal));
+			return distanceSquared / (cosine * area);
+		}
+
+		public float3 RandomPoint(ref Random rng) => float3(rng.NextFloat2(From, To), 0);
+
 		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(
 			float3(From, -0.001f),
 			float3(To, 0.001f));

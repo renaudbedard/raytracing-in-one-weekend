@@ -17,10 +17,14 @@ MonoBehaviour:
   cameraAperture: 0
   cameraFieldOfView: 45
   entities:
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 277.5, z: 555}
     rotation: {x: 180, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -28,11 +32,15 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
-  - type: 2
+    material: {fileID: 0}
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 277.5, z: 0}
     rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -40,23 +48,31 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
-  - type: 2
+    material: {fileID: 0}
+  - name: 
+    type: 2
     enabled: 1
-    position: {x: 277.5, y: 554.998, z: 277.5}
+    position: {x: 279.5, y: 554.998, z: 278}
     rotation: {x: -90, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
     rectData:
-      size: {x: 130, y: 105}
+      size: {x: 105, y: 130}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 0b170a1736e6a88489bdaf19d22db596, type: 2}
-  - type: 2
+    material: {fileID: 0}
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 0, z: 277.5}
     rotation: {x: -90, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -64,11 +80,15 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 2
+    material: {fileID: 0}
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 555, z: 277.5}
     rotation: {x: 90, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -76,11 +96,15 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 2
+    material: {fileID: 0}
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 555, y: 277.5, z: 277.5}
     rotation: {x: 0, y: -90, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -88,11 +112,15 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 3
+    material: {fileID: 0}
+  - name: 
+    type: 3
     enabled: 1
-    position: {x: 180, y: 82.5, z: 185}
+    position: {x: 170, y: 82.5, z: 185}
     rotation: {x: 0, y: 18, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -100,11 +128,15 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 165, y: 165, z: 165}
-    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 3
+    material: {fileID: 0}
+  - name: 
+    type: 3
     enabled: 1
     position: {x: 347.5, y: 165, z: 370}
     rotation: {x: 0, y: -15, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
       excludeFromOverlapTest: 0
@@ -112,8 +144,8 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 165, y: 330, z: 165}
-    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+    material: {fileID: 0}
   randomSeed: 1
-  randomSphereGroups: []
+  randomEntityGroups: []
   skyBottomColor: {r: 0, g: 0, b: 0, a: 1}
   skyTopColor: {r: 0, g: 0, b: 0, a: 1}

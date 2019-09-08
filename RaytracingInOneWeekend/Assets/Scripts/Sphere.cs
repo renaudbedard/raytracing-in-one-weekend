@@ -1,5 +1,7 @@
+using System;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
+using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
