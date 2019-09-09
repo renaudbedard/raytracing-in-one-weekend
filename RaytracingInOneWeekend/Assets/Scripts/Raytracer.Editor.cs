@@ -321,7 +321,7 @@ namespace RaytracerInOneWeekend
 			if (previewBvh && bvhNodeBuffer.IsCreated)
 			{
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
-				(AxisAlignedBoundingBox _, int Depth)[] subBounds = World->GetAllSubBounds().ToArray();
+				(AxisAlignedBoundingBox _, int Depth)[] subBounds = BvhRoot->GetAllSubBounds().ToArray();
 				int maxDepth = subBounds.Max(x => x.Depth);
 				int shownLayer = DateTime.Now.Second % (maxDepth + 1);
 				int i = -1;

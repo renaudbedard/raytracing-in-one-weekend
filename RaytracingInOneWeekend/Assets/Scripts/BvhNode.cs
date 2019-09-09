@@ -51,11 +51,11 @@ namespace RaytracerInOneWeekend
 	unsafe struct BvhNode
 	{
 		public readonly AxisAlignedBoundingBox Bounds;
-		public readonly Entity Content;
+		public readonly int EntityId;
 		[NativeDisableUnsafePtrRestriction] public BvhNode* Left, Right;
 		public readonly BvhNodeMetadata* Metadata;
 
-		public bool IsLeaf => Content.Type != EntityType.None;
+		public bool IsLeaf => EntityId != -1;
 
 		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, NativeList<BvhNodeMetadata> metadata,
 			int depth = 0, int rank = 0, int parentNodeId = 0) : this()
@@ -88,11 +88,13 @@ namespace RaytracerInOneWeekend
 			switch (entities.Length)
 			{
 				case 1:
-					Content = entities[0];
-					Bounds = Content.Bounds;
+					EntityId = entities[0].Id;
+					Bounds = entities[0].Bounds;
 					break;
 
 				default:
+					EntityId = -1;
+
 					int partitionLength = 0;
 					float partitionStart = entities[0].Bounds.Min[biggestAxis];
 

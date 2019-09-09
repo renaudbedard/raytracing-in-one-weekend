@@ -18,18 +18,22 @@ namespace RaytracerInOneWeekend
 		public ImportanceSamplingMode Mode;
 
 		public unsafe void Sample(Ray materialScatterRay, float materialScatteringPdfValue, ref Random rng,
-			out Ray scatterRay, out float pdfValue)
+			out Ray scatterRay, out float pdfValue, out int? targetEntityId)
 		{
 			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
 			int chosenOption = rng.NextInt(0, totalOptions);
 			if (chosenOption == TargetEntities.Length)
+			{
 				scatterRay = materialScatterRay;
+				targetEntityId = null;
+			}
 			else
 			{
 				Entity* chosenEntity = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr() + chosenOption;
 				float3 pointOnEntity = chosenEntity->RandomPoint(materialScatterRay.Time, ref rng);
 				scatterRay = new Ray(materialScatterRay.Origin,
 					normalize(pointOnEntity - materialScatterRay.Origin));
+				targetEntityId = chosenEntity->Id;
 			}
 
 			pdfValue = 0;

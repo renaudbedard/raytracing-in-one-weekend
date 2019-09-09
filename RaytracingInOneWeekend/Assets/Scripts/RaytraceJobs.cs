@@ -63,20 +63,16 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public ImportanceSampler ImportanceSampler;
 
 		[ReadOnly] public NativeArray<float4> InputSamples;
+		[ReadOnly] public NativeArray<Entity> Entities;
 
-#if BASIC
-		[ReadOnly] public NativeArray<Entity> World;
-#elif BVH
-		[ReadOnly]
-		[NativeDisableUnsafePtrRestriction]
-		public BvhNode* World;
+#if BVH
+		[ReadOnly] [NativeDisableUnsafePtrRestriction] public BvhNode* BvhRoot;
 #endif
 
 		[ReadOnly] public PerlinData PerlinData;
 
 #if BVH_ITERATIVE
 		[ReadOnly] public int NodeCount;
-		[ReadOnly] public int EntityCount;
 #endif
 
 		[WriteOnly] public NativeArray<float4> OutputSamples;
@@ -106,7 +102,7 @@ namespace RaytracerInOneWeekend
 
 #if BVH_ITERATIVE
 			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
-			Entity* entities = stackalloc Entity[EntityCount];
+			Entity* entities = stackalloc Entity[Entities.Length];
 #if BVH_SIMD
 			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
 			var entityGroupCount = (int) ceil(EntityCount / 4.0f);
@@ -155,9 +151,9 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
-		bool Color(Ray r, ref Random rng, float3* emissionStack, float3* attenuationStack,
+		bool Color(Ray ray, ref Random rng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
-			WorkingArea wa,
+			WorkingArea workingArea,
 #endif
 #if PATH_DEBUGGING
 			bool doDebugPaths,
@@ -168,16 +164,17 @@ namespace RaytracerInOneWeekend
 			float3* attenuationCursor = attenuationStack;
 
 			int depth = 0;
+			int? explicitSamplingTarget = null;
 			for (; depth < TraceDepth; depth++)
 			{
 #if BVH
-				bool hit = World->Hit(
+				bool hit = BvhRoot->Hit(Entities,
 #else
-				bool hit = World.Hit(
+				bool hit = Entities.Hit(
 #endif
-					r, 0, float.PositiveInfinity, ref rng,
+					ray, 0, float.PositiveInfinity, ref rng,
 #if BVH_ITERATIVE
-					wa,
+					workingArea,
 #endif
 #if BVH && FULL_DIAGNOSTICS
 					ref diagnostics,
@@ -190,49 +187,59 @@ namespace RaytracerInOneWeekend
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths)
-						DebugPaths[depth] = new DebugPath { From = r.Origin, To = rec.Point };
+						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
-					float3 emission = rec.Material.Emit(rec.Point, rec.Normal, PerlinData);
-					*emissionCursor++ = emission;
-					bool didScatter = rec.Material.Scatter(r, rec, ref rng, PerlinData, out float3 attenuation,
-						out Ray scatteredRay);
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;
 #endif
-					if (didScatter)
+					// we explicitely sampled an entity and could not hit it -- early out of this sample
+					if (explicitSamplingTarget.HasValue && explicitSamplingTarget != rec.EntityId)
+						break;
+
+					Material material = Entities[rec.EntityId].Material;
+					*emissionCursor++ = material.Emit(rec.Point, rec.Normal, PerlinData);
+
+					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinData, out float3 attenuation,
+						out Ray scatteredRay);
+
+					if (!didScatter)
 					{
-						if (ImportanceSampler.Mode == ImportanceSamplingMode.None)
-							*attenuationCursor++ = attenuation;
-						else
-						{
-							float scatterPdfValue = rec.Material.ScatteringPdf(rec, scatteredRay);
-							ImportanceSampler.Sample(scatteredRay, scatterPdfValue, ref rng,
-								out scatteredRay, out float pdfValue);
+						attenuationCursor++;
+						break;
+					}
 
-							*attenuationCursor++ = pdfValue.AlmostEquals(0)
-								? 0
-								: attenuation * scatterPdfValue / pdfValue;
-						}
-
-						r = scatteredRay.OffsetTowards(
-							dot(scatteredRay.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
+					if (ImportanceSampler.Mode == ImportanceSamplingMode.None)
+					{
+						*attenuationCursor++ = attenuation;
+						ray = scatteredRay;
 					}
 					else
 					{
-						*attenuationCursor++ = 0;
-						break;
+						float scatterPdfValue = material.ScatteringPdf(rec, scatteredRay);
+						ImportanceSampler.Sample(scatteredRay, scatterPdfValue, ref rng,
+							out ray, out float pdfValue, out explicitSamplingTarget);
+
+						// scatter ray is likely parallel to the surface, and division would cause a NaN
+						if (pdfValue.AlmostEquals(0))
+						{
+							attenuationCursor++;
+							break;
+						}
+
+						*attenuationCursor++ = attenuation * scatterPdfValue / pdfValue;
 					}
+
+					ray = ray.OffsetTowards(dot(scatteredRay.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
 				}
 				else
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths)
-						DebugPaths[depth] = new DebugPath { From = r.Origin, To = r.Direction * 99999 };
+						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
 #endif
 					// sample the sky color
-					float t = 0.5f * (r.Direction.y + 1);
-					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, t);
-					*attenuationCursor++ = 0;
+					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, 0.5f * (ray.Direction.y + 1));
+					attenuationCursor++;
 					break;
 				}
 			}
@@ -246,9 +253,8 @@ namespace RaytracerInOneWeekend
 			// attenuate colors from the tail of the hit stack to the head
 			while (emissionCursor != emissionStack)
 			{
-				emissionCursor--;
-				attenuationCursor--;
-				color = color * *attenuationCursor + *emissionCursor;
+				color *= *--attenuationCursor;
+				color += *--emissionCursor;
 			}
 			return true;
 		}

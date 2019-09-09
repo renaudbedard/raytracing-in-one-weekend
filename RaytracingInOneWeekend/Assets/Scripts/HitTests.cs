@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
@@ -167,8 +168,8 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, ref Random rng,
-			AccumulateJob.WorkingArea wa,
+		public static unsafe bool Hit(this BvhNode n, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
+			ref Random rng, AccumulateJob.WorkingArea wa,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
@@ -193,7 +194,7 @@ namespace RaytracerInOneWeekend
 #endif
 				if (nodePtr->IsLeaf)
 				{
-					*++candidateListTail = nodePtr->Content;
+					*++candidateListTail = entities[nodePtr->EntityId];
 					candidateCount++;
 				}
 				else

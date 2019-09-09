@@ -2,19 +2,19 @@ using Unity.Mathematics;
 
 namespace RaytracerInOneWeekend
 {
-	struct HitRecord
+	unsafe struct HitRecord
 	{
 		public readonly float Distance;
 		public readonly float3 Point;
 		public readonly float3 Normal;
-		public readonly Material Material;
+		public readonly int EntityId;
 
-		public HitRecord(float distance, float3 point, float3 normal, Material material)
+		public HitRecord(float distance, float3 point, float3 normal, int entityId)
 		{
 			Distance = distance;
 			Point = point;
 			Normal = normal;
-			Material = material;
+			EntityId = entityId;
 		}
 	}
 }

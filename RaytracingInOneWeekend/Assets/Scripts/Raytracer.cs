@@ -85,7 +85,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
 		NativeList<BvhNodeMetadata> bvhNodeMetadataBuffer;
-		BvhNode* World => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
+		BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
@@ -100,6 +100,7 @@ namespace RaytracerInOneWeekend
 		bool traceAborted;
 		bool ignoreBatchTimings;
 		int lastTraceDepth;
+		uint lastSamplesPerPixel;
 		ImportanceSamplingMode lastSamplingMode;
 
 		readonly Stopwatch batchTimer = new Stopwatch();
@@ -207,9 +208,10 @@ namespace RaytracerInOneWeekend
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
+			bool samplesPerPixelDecreased = lastSamplesPerPixel > samplesPerPixel;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
-			                       samplingModeChanged;
+			                       samplingModeChanged || samplesPerPixelDecreased;
 			bool traceNeedsKick = traceNeedsReset || !commandBufferHooked;
 
 			void RebuildDirtyComponents()
@@ -283,6 +285,8 @@ namespace RaytracerInOneWeekend
 
 				traceAborted = false;
 			}
+
+			lastSamplesPerPixel = samplesPerPixel;
 		}
 
 		void CleanCamera()
@@ -404,7 +408,10 @@ namespace RaytracerInOneWeekend
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
 				TraceDepth = traceDepth,
 				SubPixelJitter = subPixelJitter,
-				World = World,
+				Entities = entityBuffer,
+#if BVH
+				BvhRoot = BvhRoot,
+#endif
 				PerlinData = perlinData.GetRuntimeData(),
 				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
@@ -415,7 +422,6 @@ namespace RaytracerInOneWeekend
 				},
 #if BVH_ITERATIVE
 				NodeCount = bvhNodeBuffer.Length,
-				EntityCount = entityBuffer.Length,
 #endif
 #if PATH_DEBUGGING
 				DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
@@ -547,8 +553,8 @@ namespace RaytracerInOneWeekend
 					: default;
 
 				Entity entity = e.Moving
-					? new Entity(e.Type, contentPointer, rigidTransform, material, e.DestinationOffset, e.TimeRange)
-					: new Entity(e.Type, contentPointer, rigidTransform, material);
+					? new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material, e.DestinationOffset, e.TimeRange)
+					: new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material);
 
 				entityBuffer[entityIndex++] = entity;
 
@@ -571,7 +577,10 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.AddNoResize(rootNode);
 
 			bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
-			World->SetupPointers(bvhNodeBuffer);
+			BvhRoot->SetupPointers(bvhNodeBuffer);
+
+			// re-sort the entity buffer so it can be indexed
+			entityBuffer.Sort(new EntityIdComparer());
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
@@ -599,9 +608,9 @@ namespace RaytracerInOneWeekend
 			var rng = new Random(scene.RandomSeed);
 #if FULL_DIAGNOSTICS
 			Diagnostics _ = default;
-			return World->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);
+			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);
 #else
-			return World->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
+			return BvhRoot->Hit(entityBuffer, r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
 #endif
 		}
 
