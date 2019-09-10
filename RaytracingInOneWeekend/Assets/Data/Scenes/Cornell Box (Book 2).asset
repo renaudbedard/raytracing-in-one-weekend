@@ -53,7 +53,7 @@ MonoBehaviour:
     type: 2
     enabled: 1
     position: {x: 279.5, y: 554.999, z: 278}
-    rotation: {x: -90, y: 0, z: 0}
+    rotation: {x: 90, y: 0, z: 0}
     moving: 0
     destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
@@ -144,6 +144,22 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 165, y: 330, z: 165}
+    material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
+  - name: 
+    type: 2
+    enabled: 0
+    position: {x: 0, y: 277.5, z: 277.5}
+    rotation: {x: 0, y: 90, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 555, y: 555}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
   randomSeed: 1
   randomEntityGroups: []

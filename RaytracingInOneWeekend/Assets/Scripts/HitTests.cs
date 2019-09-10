@@ -10,7 +10,6 @@ namespace RaytracerInOneWeekend
 {
 	static class HitTests
 	{
-		// single sphere hit test
 		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
 			float squaredRadius = s.SquaredRadius;
@@ -55,7 +54,7 @@ namespace RaytracerInOneWeekend
 			distance = 0;
 			normal = 0;
 
-			if (r.Direction.z.AlmostEquals(0)) return false;
+			if (r.Direction.z >= 0) return false;
 			float t = -r.Origin.z / r.Direction.z;
 			if (t < tMin || t > tMax) return false;
 

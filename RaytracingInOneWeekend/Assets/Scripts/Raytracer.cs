@@ -208,7 +208,7 @@ namespace RaytracerInOneWeekend
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
-			bool samplesPerPixelDecreased = lastSamplesPerPixel > samplesPerPixel;
+			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
 			                       samplingModeChanged || samplesPerPixelDecreased;

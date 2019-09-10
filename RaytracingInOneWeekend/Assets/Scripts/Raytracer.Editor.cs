@@ -122,6 +122,25 @@ namespace RaytracerInOneWeekend
 #endif
 		}
 
+		void EnsurePreviewObjectExists(PrimitiveType type, ref MeshFilter previewObject)
+		{
+			if (previewObject != null) return;
+			GameObject primitive = GameObject.CreatePrimitive(type);
+			primitive.hideFlags = HideFlags.HideAndDontSave;
+			primitive.SetActive(false);
+			previewObject = primitive.GetComponent<MeshFilter>();
+			if (type == PrimitiveType.Quad)
+			{
+				Mesh quadMesh = previewObject.sharedMesh;
+				previewObject.sharedMesh = new Mesh
+				{
+					vertices = quadMesh.vertices,
+					normals = quadMesh.normals.Select(x => -x).ToArray(),
+					triangles = quadMesh.triangles.Reverse().ToArray(),
+				};
+			}
+		}
+
 		void UpdatePreview()
 		{
 			if (!this) return;
@@ -176,15 +195,6 @@ namespace RaytracerInOneWeekend
 
 			skybox.material.SetColor("_Color1", scene.SkyBottomColor);
 			skybox.material.SetColor("_Color2", scene.SkyTopColor);
-
-			void EnsurePreviewObjectExists(PrimitiveType type, ref MeshFilter previewObject)
-			{
-				if (previewObject != null) return;
-				GameObject primitive = GameObject.CreatePrimitive(type);
-				primitive.hideFlags = HideFlags.HideAndDontSave;
-				primitive.SetActive(false);
-				previewObject = primitive.GetComponent<MeshFilter>();
-			}
 
 			EnsurePreviewObjectExists(PrimitiveType.Sphere, ref previewSphere);
 			EnsurePreviewObjectExists(PrimitiveType.Quad, ref previewRect);
@@ -249,10 +259,6 @@ namespace RaytracerInOneWeekend
 							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(Vector3.forward) * entity.Rotation,float3(r.Size, 1)),
 							material, 0,
 							material.FindPass("FORWARD"));
-						previewCommandBuffer.DrawMesh(previewRect.sharedMesh,
-							Matrix4x4.TRS(entity.Position, Quaternion.LookRotation(-Vector3.forward) * entity.Rotation,float3(r.Size, 1)),
-							material, 0,
-							material.FindPass("FORWARD"));
 						break;
 
 					case EntityType.Box:
@@ -277,6 +283,8 @@ namespace RaytracerInOneWeekend
 		{
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
 
+			EnsurePreviewObjectExists(PrimitiveType.Quad, ref previewRect);
+
 			foreach (EntityData e in activeEntities
 				.Where(x => x.Material)
 				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Position, sceneCameraTransform.forward)))
@@ -300,8 +308,8 @@ namespace RaytracerInOneWeekend
 				switch (e.Type)
 				{
 					case EntityType.Rect:
-						Gizmos.matrix = Matrix4x4.TRS(e.Position, e.Rotation, Vector3.one);
-						Gizmos.DrawCube(Vector3.zero, float3(e.RectData.Size, 0.001f));
+						Gizmos.matrix = Matrix4x4.TRS(e.Position, e.Rotation, float3(e.RectData.Size, 1));
+						Gizmos.DrawMesh(previewRect.sharedMesh, 0);
 						Gizmos.matrix = Matrix4x4.identity;
 						break;
 

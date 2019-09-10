@@ -133,19 +133,19 @@ namespace RaytracerInOneWeekend
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool AlmostEquals(this float lhs, float rhs)
         {
-            return abs(rhs - lhs) < 1e-7f;
+            return abs(rhs - lhs) < 1e-6f;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool2 AlmostEquals(this float2 lhs, float2 rhs)
         {
-            return abs(rhs - lhs) < 1e-7f;
+            return abs(rhs - lhs) < 1e-6f;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool3 AlmostEquals(this float3 lhs, float3 rhs)
         {
-            return abs(rhs - lhs) < 1e-7f;
+            return abs(rhs - lhs) < 1e-6f;
         }
     }
 }

@@ -21,7 +21,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] Vector2 textureScale = Vector2.one;
 
 		[ShowIf(nameof(Type), MaterialType.Metal)]
-		[Range(0, 10)] [SerializeField] float fuzz = 0;
+		[Range(0, 1)] [SerializeField] float fuzz = 0;
 
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;

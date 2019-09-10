@@ -199,7 +199,7 @@ namespace RaytracerInOneWeekend
 					Material material = Entities[rec.EntityId].Material;
 					*emissionCursor++ = material.Emit(rec.Point, rec.Normal, PerlinData);
 
-					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinData, out float3 attenuation,
+					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinData, out float3 albedo,
 						out Ray scatteredRay);
 
 					if (!didScatter)
@@ -210,13 +210,13 @@ namespace RaytracerInOneWeekend
 
 					if (ImportanceSampler.Mode == ImportanceSamplingMode.None)
 					{
-						*attenuationCursor++ = attenuation;
+						*attenuationCursor++ = albedo;
 						ray = scatteredRay;
 					}
 					else
 					{
 						float scatterPdfValue = material.ScatteringPdf(rec, scatteredRay);
-						ImportanceSampler.Sample(scatteredRay, scatterPdfValue, ref rng,
+						ImportanceSampler.Sample(scatteredRay, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);
 
 						// scatter ray is likely parallel to the surface, and division would cause a NaN
@@ -226,7 +226,7 @@ namespace RaytracerInOneWeekend
 							break;
 						}
 
-						*attenuationCursor++ = attenuation * scatterPdfValue / pdfValue;
+						*attenuationCursor++ = albedo * scatterPdfValue / pdfValue;
 					}
 
 					ray = ray.OffsetTowards(dot(scatteredRay.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);

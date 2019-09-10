@@ -1,6 +1,8 @@
 using System;
 using JetBrains.Annotations;
+using Unity.Burst;
 using Unity.Mathematics;
+using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -41,15 +43,14 @@ namespace RaytracerInOneWeekend
 
 		[Pure]
 		public bool Scatter(Ray r, HitRecord rec, ref Random rng, PerlinData perlinData,
-			out float3 attenuation, out Ray scattered)
+			out float3 albedo, out Ray scattered)
 		{
 			switch (Type)
 			{
 				case MaterialType.Lambertian:
 				{
-					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
-					scattered = new Ray(rec.Point, normalize(rec.Normal + rng.NextFloat3Direction()), r.Time);
-					//scattered = new Ray(rec.Point, normalize(rng.OnUniformHemisphere(rec.Normal)), r.Time);
+					albedo = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					scattered = new Ray(rec.Point, rng.OnUniformHemisphere(rec.Normal), r.Time);
 					return true;
 				}
 
@@ -57,7 +58,7 @@ namespace RaytracerInOneWeekend
 				{
 					float fuzz = Parameter;
 					float3 reflected = reflect(r.Direction, rec.Normal);
-					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					albedo = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					scattered = new Ray(rec.Point, normalize(reflected + fuzz * rng.NextFloat3Direction()), r.Time);
 					return true;
 				}
@@ -66,7 +67,7 @@ namespace RaytracerInOneWeekend
 				{
 					float refractiveIndex = Parameter;
 					float3 reflected = reflect(r.Direction, rec.Normal);
-					attenuation = 1;
+					albedo = 1;
 					float niOverNt;
 					float3 outwardNormal;
 					float cosine;
@@ -97,22 +98,32 @@ namespace RaytracerInOneWeekend
 
 				case MaterialType.Isotropic:
 					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
-					attenuation = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					albedo = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					return true;
 
 				default:
-					attenuation = default;
+					albedo = default;
 					scattered = default;
 					return false;
 			}
 		}
 
+		[BurstDiscard]
+		void Validate(Ray r, HitRecord rec)
+		{
+			Assert.IsTrue(length(r.Direction).AlmostEquals(1),
+				$"Scatter ray direction was assumed to be unit-length; length was {length(r.Direction):0.#######}");
+			Assert.IsTrue(length(rec.Normal).AlmostEquals(1),
+				$"HitRecord normal was assumed to be unit-length; length was {length(rec.Normal):0.#######}");
+		}
+
 		[Pure]
 		public float ScatteringPdf(HitRecord rec, Ray scattered)
 		{
+			Validate(scattered, rec);
 			switch (Type)
 			{
-				case MaterialType.Lambertian: return dot(rec.Normal, scattered.Direction) / PI;
+				case MaterialType.Lambertian: return max(dot(rec.Normal, scattered.Direction) / PI, 0);
 				default: throw new NotImplementedException();
 			}
 		}
