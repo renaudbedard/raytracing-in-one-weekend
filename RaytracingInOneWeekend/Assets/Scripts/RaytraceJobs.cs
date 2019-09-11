@@ -60,6 +60,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public float3 SkyTopColor;
 		[ReadOnly] public bool SubPixelJitter;
 		[ReadOnly] public ImportanceSampler ImportanceSampler;
+		[ReadOnly] public bool StratifiedSampling;
 
 		[ReadOnly] public NativeArray<float4> InputSamples;
 		[ReadOnly] public NativeArray<Entity> Entities;
@@ -200,8 +201,8 @@ namespace RaytracerInOneWeekend
 					Material material = Entities[rec.EntityId].Material;
 					*emissionCursor++ = material.Emit(rec.Point, rec.Normal, PerlinData);
 
-					bool didScatter = material.Scatter(ray, rec, ref rng, ref srng, PerlinData, depth == 0,
-						out float3 albedo, out Ray scatteredRay);
+					bool didScatter = material.Scatter(ray, rec, ref rng, ref srng, PerlinData,
+						StratifiedSampling && depth == 0, out float3 albedo, out Ray scatteredRay);
 
 					if (!didScatter)
 					{
