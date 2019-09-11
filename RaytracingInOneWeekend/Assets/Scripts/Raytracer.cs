@@ -474,7 +474,7 @@ namespace RaytracerInOneWeekend
 			bufferSize = float2(width, height);
 
 #if PATH_DEBUGGING
-			debugPaths.EnsureCapacity(traceDepth);
+			debugPaths.EnsureCapacity((int) samplesPerBatch);
 #endif
 		}
 

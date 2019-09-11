@@ -35,13 +35,13 @@ namespace RaytracerInOneWeekend
 		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(moving))] [SerializeField] Vector3 destinationOffset;
 		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(moving))] [SerializeField] [MinMaxSlider(0, 1)] Vector2 timeRange;
 
-		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(type), EntityType.Sphere)]
+		[ShowIf(nameof(type), EntityType.Sphere)]
 		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] SphereData sphereData;
 
-		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(type), EntityType.Rect)]
+		[ShowIf(nameof(type), EntityType.Rect)]
 		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] RectData rectData;
 
-		[FoldoutGroup("$EntityTitle")] [ShowIf(nameof(type), EntityType.Box)]
+		[ShowIf(nameof(type), EntityType.Box)]
 		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] BoxData boxData;
 
 		[SerializeField]

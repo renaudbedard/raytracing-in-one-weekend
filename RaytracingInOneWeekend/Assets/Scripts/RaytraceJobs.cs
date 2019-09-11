@@ -51,7 +51,6 @@ namespace RaytracerInOneWeekend
 #endif
 		}
 #endif
-
 		[ReadOnly] public float2 Size;
 		[ReadOnly] public uint Seed;
 		[ReadOnly] public Camera Camera;
@@ -100,6 +99,8 @@ namespace RaytracerInOneWeekend
 			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
 			Diagnostics diagnostics = default;
 
+			var stratifiedRng = new StratifiedRandom(rng.state, 0, (int) SampleCount);
+
 #if BVH_ITERATIVE
 			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
 			Entity* entities = stackalloc Entity[Entities.Length];
@@ -130,15 +131,15 @@ namespace RaytracerInOneWeekend
 
 			for (int s = 0; s < SampleCount; s++)
 			{
-				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0)) / Size;
+				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0.5f)) / Size;
 				Ray r = Camera.GetRay(normalizedCoordinates, ref rng);
 
-				if (Color(r, ref rng, emissionStack, attenuationStack,
+				if (Color(r, ref rng, ref stratifiedRng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE
 					workingArea,
 #endif
 #if PATH_DEBUGGING
-					doDebugPaths,
+					doDebugPaths, s,
 #endif
 					out float3 sampleColor, ref diagnostics))
 				{
@@ -151,12 +152,12 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
-		bool Color(Ray ray, ref Random rng, float3* emissionStack, float3* attenuationStack,
+		bool Color(Ray ray, ref Random rng, ref StratifiedRandom srng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
 			WorkingArea workingArea,
 #endif
 #if PATH_DEBUGGING
-			bool doDebugPaths,
+			bool doDebugPaths, int sampleIndex,
 #endif
 			out float3 color, ref Diagnostics diagnostics)
 		{
@@ -186,8 +187,8 @@ namespace RaytracerInOneWeekend
 				if (hit)
 				{
 #if PATH_DEBUGGING
-					if (doDebugPaths)
-						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
+					if (doDebugPaths && depth == 1)
+						DebugPaths[sampleIndex] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;
@@ -199,8 +200,8 @@ namespace RaytracerInOneWeekend
 					Material material = Entities[rec.EntityId].Material;
 					*emissionCursor++ = material.Emit(rec.Point, rec.Normal, PerlinData);
 
-					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinData, out float3 albedo,
-						out Ray scatteredRay);
+					bool didScatter = material.Scatter(ray, rec, ref rng, ref srng, PerlinData, depth == 0,
+						out float3 albedo, out Ray scatteredRay);
 
 					if (!didScatter)
 					{
@@ -234,8 +235,8 @@ namespace RaytracerInOneWeekend
 				else
 				{
 #if PATH_DEBUGGING
-					if (doDebugPaths)
-						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
+					if (doDebugPaths && depth == 1)
+						DebugPaths[sampleIndex] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
 #endif
 					// sample the sky color
 					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, 0.5f * (ray.Direction.y + 1));
