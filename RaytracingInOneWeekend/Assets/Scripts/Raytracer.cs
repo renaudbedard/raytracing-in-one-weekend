@@ -388,7 +388,9 @@ namespace RaytracerInOneWeekend
 			{
 				accumulationInputBuffer.SafeDispose();
 				accumulationInputBuffer = new NativeArray<float4>(totalBufferSize, Allocator.Persistent);
-
+#if PATH_DEBUGGING
+				debugPaths.EnsureCapacity((int) samplesPerBatch);
+#endif
 				mraysPerSecResults.Clear();
 				AccumulatedSamples = 0;
 				lastTraceDepth = traceDepth;
@@ -477,10 +479,6 @@ namespace RaytracerInOneWeekend
 				Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
 
 			bufferSize = float2(width, height);
-
-#if PATH_DEBUGGING
-			debugPaths.EnsureCapacity((int) samplesPerBatch);
-#endif
 		}
 
 		void RebuildWorld()
