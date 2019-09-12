@@ -611,7 +611,7 @@ namespace RaytracerInOneWeekend
 			var rng = new Random(scene.RandomSeed);
 #if FULL_DIAGNOSTICS
 			Diagnostics _ = default;
-			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);
+			return BvhRoot->Hit(entityBuffer, r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);
 #else
 			return BvhRoot->Hit(entityBuffer, r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
 #endif

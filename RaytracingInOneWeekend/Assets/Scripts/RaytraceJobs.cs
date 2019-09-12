@@ -35,6 +35,7 @@ namespace RaytracerInOneWeekend
 	struct DebugPath
 	{
 		public float3 From, To;
+		public float SolidAngle;
 	}
 #endif
 
@@ -189,7 +190,7 @@ namespace RaytracerInOneWeekend
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths && depth == 1)
-						DebugPaths[sampleIndex] = new DebugPath { From = ray.Origin, To = rec.Point };
+						DebugPaths[sampleIndex] = new DebugPath { From = ray.Origin, To = rec.Point, SolidAngle = srng.SolidAngle };
 #endif
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;

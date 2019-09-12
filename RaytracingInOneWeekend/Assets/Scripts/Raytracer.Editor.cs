@@ -1,3 +1,6 @@
+
+using Unity.Mathematics;
+using Random = Unity.Mathematics.Random;
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
@@ -347,11 +350,27 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 			if (debugPaths.IsCreated)
 			{
+				Random rng = new Random(54654);
+
 				float alpha = 1;
-				foreach (DebugPath path in debugPaths)
+				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
+				for (var pathIndex = 0; pathIndex < debugPaths.Length; pathIndex++)
 				{
-					Debug.DrawLine(path.From, path.To,
-						fadeDebugPaths ? Color.white.GetAlphaReplaced(alpha) : Color.white, debugPathDuration);
+					DebugPath path = debugPaths[pathIndex];
+					float3 n = path.To - path.From;
+					float ln = length(n);
+					float3 nn = normalize(n);
+					var c = Color.HSVToRGB(frac(pathIndex * silverRatio), 1, 1);
+					MathExtensions.GetOrthonormalBasis(nn, out float3 t, out float3 b);
+					float3x3 rotationMatrix = float3x3(t, b, n);
+
+					for (int i = 0; i < 10; i++)
+					{
+						float2 d = rng.InUnitDisk();
+						//float3 result = path.To + mul(rotationMatrix, float3(d, 0)) * ln * sin(path.SolidAngle);
+						float3 result = path.To;
+						Debug.DrawLine(path.From, result, c, debugPathDuration);
+					}
 					alpha *= 0.5f;
 				}
 			}
