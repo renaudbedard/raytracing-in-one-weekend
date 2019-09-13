@@ -1,6 +1,5 @@
 using System;
 using Unity.Mathematics;
-using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -8,12 +7,14 @@ namespace RaytracerInOneWeekend
 {
 	struct StratifiedRandom
 	{
-		enum CellSamplingMode
+		public enum CellSamplingMode
 		{
 			Random,
 			Center,
-			MinX,
-			MaxX
+			ZeroZero,
+			ZeroOne,
+			OneZero,
+			OneOne
 		}
 
 		readonly int2 divisions;
@@ -21,6 +22,18 @@ namespace RaytracerInOneWeekend
 		int index;
 		Random rng;
 		CellSamplingMode mode;
+
+		public int Index
+		{
+			get => index;
+			set => index = value;
+		}
+
+		public CellSamplingMode Mode
+		{
+			get => mode;
+			set => mode = value;
+		}
 
 		public StratifiedRandom(uint seed, int start, int period)
 		{
@@ -41,24 +54,12 @@ namespace RaytracerInOneWeekend
 			{
 				case CellSamplingMode.Random: return rng.NextFloat2(from, to);
 				case CellSamplingMode.Center: return (from + to) / 2;
-				case CellSamplingMode.MinX: return float2(from.x, (from.y + to.y) / 2);
-				case CellSamplingMode.MaxX: return float2(to.x, (from.y + to.y) / 2);
+				case CellSamplingMode.ZeroZero: return float2(from.x, from.y);
+				case CellSamplingMode.ZeroOne: return float2(from.x, to.y);
+				case CellSamplingMode.OneZero: return float2(to.x, from.y);
+				case CellSamplingMode.OneOne: return float2(to.x, to.y);
 			}
 			throw new NotSupportedException("Unsupported sampling mode");
-		}
-
-		public float SolidAngle
-		{
-			get
-			{
-				CellSamplingMode lastMode = mode;
-				--index; mode = CellSamplingMode.MinX;
-				float3 minVector = this.OnUniformHemisphere(float3(0, 1, 0));
-				--index; mode = CellSamplingMode.MaxX;
-				float3 maxVector = this.OnUniformHemisphere(float3(0, 1, 0));
-				mode = lastMode;
-				return radians(Vector3.Angle(minVector, maxVector));
-			}
 		}
 	}
 }

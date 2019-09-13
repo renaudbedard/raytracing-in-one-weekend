@@ -350,28 +350,32 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 			if (debugPaths.IsCreated)
 			{
-				Random rng = new Random(54654);
-
-				float alpha = 1;
+				// float alpha = 1;
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
 				for (var pathIndex = 0; pathIndex < debugPaths.Length; pathIndex++)
 				{
 					DebugPath path = debugPaths[pathIndex];
 					float3 n = path.To - path.From;
+					float3 sn = path.SurfaceNormal;
 					float ln = length(n);
-					float3 nn = normalize(n);
 					var c = Color.HSVToRGB(frac(pathIndex * silverRatio), 1, 1);
-					MathExtensions.GetOrthonormalBasis(nn, out float3 t, out float3 b);
-					float3x3 rotationMatrix = float3x3(t, b, n);
 
-					for (int i = 0; i < 10; i++)
+					var srng = new StratifiedRandom(1, path.Index, (int) samplesPerBatch);
+					srng.Mode = StratifiedRandom.CellSamplingMode.ZeroZero; var zz = srng.OnUniformHemisphere(sn); srng.Index--;
+					srng.Mode = StratifiedRandom.CellSamplingMode.ZeroOne; var zo = srng.OnUniformHemisphere(sn); srng.Index--;
+					srng.Mode = StratifiedRandom.CellSamplingMode.OneZero; var oz = srng.OnUniformHemisphere(sn); srng.Index--;
+					srng.Mode = StratifiedRandom.CellSamplingMode.OneOne; var oo = srng.OnUniformHemisphere(sn); srng.Index--;
+
+					for (int i = 0; i <= 10; i++)
+					for (int j = 0; j <= 10; j++)
 					{
-						float2 d = rng.InUnitDisk();
-						//float3 result = path.To + mul(rotationMatrix, float3(d, 0)) * ln * sin(path.SolidAngle);
-						float3 result = path.To;
-						Debug.DrawLine(path.From, result, c, debugPathDuration);
+						var low = Vector3.Slerp(zz, zo, (float) i / 10);
+						var high = Vector3.Slerp(oz, oo, (float) i / 10);
+						var interp = Vector3.Slerp(low, high, (float) j / 10);
+						Debug.DrawLine(path.From, path.To, c);
+						Debug.DrawLine(path.From, (Vector3) path.From + interp * ln, c.GetAlphaReplaced(0.1f));
 					}
-					alpha *= 0.5f;
+					// alpha *= 0.5f;
 				}
 			}
 #endif
