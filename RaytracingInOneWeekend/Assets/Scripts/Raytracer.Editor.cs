@@ -360,6 +360,8 @@ namespace RaytracerInOneWeekend
 					float ln = length(n);
 					var c = Color.HSVToRGB(frac(pathIndex * silverRatio), 1, 1);
 
+					Debug.DrawLine(path.From, path.To, c);
+
 					var srng = new StratifiedRandom(1, path.Index, (int) samplesPerBatch);
 					srng.Mode = StratifiedRandom.CellSamplingMode.ZeroZero; var zz = srng.OnUniformHemisphere(sn); srng.Index--;
 					srng.Mode = StratifiedRandom.CellSamplingMode.ZeroOne; var zo = srng.OnUniformHemisphere(sn); srng.Index--;
@@ -372,7 +374,6 @@ namespace RaytracerInOneWeekend
 						var low = Vector3.Slerp(zz, zo, (float) i / 10);
 						var high = Vector3.Slerp(oz, oo, (float) i / 10);
 						var interp = Vector3.Slerp(low, high, (float) j / 10);
-						Debug.DrawLine(path.From, path.To, c);
 						Debug.DrawLine(path.From, (Vector3) path.From + interp * ln, c.GetAlphaReplaced(0.1f));
 					}
 					// alpha *= 0.5f;
