@@ -35,14 +35,18 @@ namespace RaytracerInOneWeekend
 			set => mode = value;
 		}
 
+		public int2 Divisions => divisions;
+
 		public StratifiedRandom(uint seed, int start, int period)
 		{
-			float d = sqrt(period);
-			divisions = int2(ceil(float2(d / 2.0f, period / (d / 2.0f))));
+			// https://www.wolframalpha.com/input/?i=n+%3D+a+*+b%2C+b+%3D+2+*+a%2C+solve+for+a%2Cb
+			float sqrtPeriod = sqrt(period);
+			float sqrt2 = sqrt(2.0f);
+			divisions = int2(ceil(float2(sqrtPeriod / sqrt2, sqrt2 * sqrtPeriod)));
 			regionSize = float2(1.0f) / divisions;
 			rng = new Random(seed);
 			index = start;
-			mode = CellSamplingMode.Center;
+			mode = CellSamplingMode.Random;
 		}
 
 		public float2 NextFloat2()

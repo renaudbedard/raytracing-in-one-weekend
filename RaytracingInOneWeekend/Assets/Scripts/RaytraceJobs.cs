@@ -167,6 +167,10 @@ namespace RaytracerInOneWeekend
 			float3* emissionCursor = emissionStack;
 			float3* attenuationCursor = attenuationStack;
 
+#if PATH_DEBUGGING
+			float3 lastNormal = default;
+#endif
+
 			int depth = 0;
 			int? explicitSamplingTarget = null;
 			for (; depth < TraceDepth; depth++)
@@ -191,7 +195,8 @@ namespace RaytracerInOneWeekend
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths && depth == 1)
-						DebugPaths[sampleIndex] = new DebugPath { From = ray.Origin, To = rec.Point, Index = srng.Index - 1, SurfaceNormal = rec.Normal };
+						DebugPaths[sampleIndex] = new DebugPath { From = ray.Origin, To = rec.Point, Index = srng.Index - 1, SurfaceNormal = lastNormal };
+					lastNormal = rec.Normal;
 #endif
 #if !BVH && FULL_DIAGNOSTICS
 					diagnostics.Normal += rec.Normal;
