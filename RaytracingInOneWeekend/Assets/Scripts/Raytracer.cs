@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
+using OpenImageDenoise;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -66,15 +67,13 @@ namespace RaytracerInOneWeekend
 
 		// TODO: allocation order of all these buffers is probably pretty crucial for cache locality
 
-		NativeArray<RGBA32> frontBuffer;
+		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer, combineOutputBuffer, frontBuffer;
 		NativeArray<Diagnostics> diagnosticsBuffer;
-		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
 
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Rect> rectBuffer;
 		NativeArray<Box> boxBuffer;
-		NativeArray<Entity> entityBuffer;
-		NativeArray<Entity> importanceSamplingEntityBuffer;
+		NativeArray<Entity> entityBuffer, importanceSamplingEntityBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
 #endif
@@ -90,21 +89,18 @@ namespace RaytracerInOneWeekend
 
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
 
-		JobHandle? accumulateJobHandle;
-		JobHandle? combineJobHandle;
+		Denoise.Device denoiseDevice;
+		Denoise.Filter denoiseFilter;
 
-		bool commandBufferHooked;
-		bool worldNeedsRebuild;
-		bool initialized;
+		JobHandle? accumulateJobHandle, combineJobHandle, denoiseJobHandle;
+
+		bool commandBufferHooked, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
 		float focusDistance;
-		bool traceAborted;
-		bool ignoreBatchTimings;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
 		ImportanceSamplingMode lastSamplingMode;
 
-		readonly Stopwatch batchTimer = new Stopwatch();
-		readonly Stopwatch traceTimer = new Stopwatch();
+		readonly Stopwatch batchTimer = new Stopwatch(), traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
 
 		internal readonly List<EntityData> activeEntities = new List<EntityData>();
@@ -112,7 +108,7 @@ namespace RaytracerInOneWeekend
 
 		float2 bufferSize;
 
-		bool TraceActive => accumulateJobHandle.HasValue || combineJobHandle.HasValue;
+		bool TraceActive => accumulateJobHandle.HasValue || combineJobHandle.HasValue || denoiseJobHandle.HasValue;
 
 		enum BufferView
 		{
@@ -138,7 +134,8 @@ namespace RaytracerInOneWeekend
 			commandBuffer = new CommandBuffer { name = "Raytracer" };
 
 			const HideFlags flags = HideFlags.HideAndDontSave;
-			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
+			//frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
+			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBAFloat, false) { hideFlags = flags };
 #if FULL_DIAGNOSTICS
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RGBAFloat, false) { hideFlags = flags };
 #else
@@ -162,8 +159,24 @@ namespace RaytracerInOneWeekend
 			RebuildWorld();
 			EnsureBuffersBuilt();
 			CleanCamera();
+			InitDenoiser();
 
 			ScheduleAccumulate(true);
+		}
+
+		void InitDenoiser()
+		{
+			denoiseDevice = Denoise.Device.New(Denoise.Device.Type.Default);
+			default(Denoise.Device).LogErrors();
+            Denoise.Device.Commit(denoiseDevice);
+            denoiseDevice.LogErrors();
+
+            denoiseFilter = Denoise.Filter.New(denoiseDevice, "RT");
+            denoiseDevice.LogErrors();
+            Denoise.Filter.Set(denoiseFilter, "hdr", true);
+            denoiseDevice.LogErrors();
+            Denoise.Filter.Commit(denoiseFilter);
+            denoiseDevice.LogErrors();
 		}
 
 		void OnDestroy()
@@ -171,6 +184,7 @@ namespace RaytracerInOneWeekend
 			// if there is a running job, let it know it needs to cancel and wait for completion
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
+			denoiseJobHandle?.Complete();
 
 			entityBuffer.SafeDispose();
 			importanceSamplingEntityBuffer.SafeDispose();
@@ -180,6 +194,7 @@ namespace RaytracerInOneWeekend
 
 			accumulationInputBuffer.SafeDispose();
 			accumulationOutputBuffer.SafeDispose();
+			combineOutputBuffer.SafeDispose();
 #if BVH
 			bvhNodeBuffer.SafeDispose();
 			bvhNodeMetadataBuffer.SafeDispose();
@@ -188,6 +203,8 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 			debugPaths.SafeDispose();
 #endif
+			Denoise.Filter.Release(denoiseFilter);
+			Denoise.Device.Release(denoiseDevice);
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -244,13 +261,15 @@ namespace RaytracerInOneWeekend
 				ScheduleAccumulate(traceNeedsReset);
 			}
 
-			if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
+			if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted &&
+			    denoiseJobHandle.HasValue && denoiseJobHandle.Value.IsCompleted)
 			{
 				if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
 					CompleteAccumulate();
 
 				combineJobHandle.Value.Complete();
-				combineJobHandle = null;
+				denoiseJobHandle.Value.Complete();
+				combineJobHandle = denoiseJobHandle = null;
 
 				bool traceCompleted = false;
 				if (AccumulatedSamples >= samplesPerPixel)
@@ -272,7 +291,8 @@ namespace RaytracerInOneWeekend
 			}
 
 			// only when preview is disabled
-			if (!combineJobHandle.HasValue && accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
+			if (!combineJobHandle.HasValue && !denoiseJobHandle.HasValue &&
+			    accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
 			{
 				CompleteAccumulate();
 #if UNITY_EDITOR
@@ -435,8 +455,19 @@ namespace RaytracerInOneWeekend
 
 			if (AccumulatedSamples + samplesPerBatch >= samplesPerPixel || previewAfterBatch)
 			{
-				var combineJob = new CombineJob { Input = accumulationOutputBuffer, Output = frontBuffer };
+				var combineJob = new CombineJob
+				{
+					Input = accumulationOutputBuffer,
+					Output = combineOutputBuffer,
+				};
 				combineJobHandle = combineJob.Schedule(totalBufferSize, 128, accumulateJobHandle.Value);
+
+				var denoiseJob = new DenoiseJob
+				{
+					DenoiseDevice = denoiseDevice,
+					DenoiseFilter = denoiseFilter
+				};
+				denoiseJobHandle = denoiseJob.Schedule(combineJobHandle.Value);
 			}
 
 			batchTimer.Restart();
@@ -448,6 +479,9 @@ namespace RaytracerInOneWeekend
 		{
 			int width = (int) ceil(targetCamera.pixelWidth * resolutionScaling);
 			int height = (int) ceil(targetCamera.pixelHeight * resolutionScaling);
+
+			if (combineOutputBuffer.EnsureCapacity(width * height))
+				Debug.Log($"Rebuilt combine output buffer (now {width} x {height})");
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height)
 			{
@@ -466,6 +500,12 @@ namespace RaytracerInOneWeekend
 
 				PrepareTexture(frontBufferTexture, out frontBuffer);
 				PrepareTexture(diagnosticsTexture, out diagnosticsBuffer);
+
+				Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combineOutputBuffer.GetUnsafeReadOnlyPtr()),
+					Denoise.Buffer.Format.Float4, (ulong) width, (ulong) height, 0, 0, 0);
+				Denoise.Filter.SetSharedImage(denoiseFilter, "output", new IntPtr(frontBuffer.GetUnsafeReadOnlyPtr()),
+					Denoise.Buffer.Format.Float4, (ulong) width, (ulong) height, 0, 0, 0);
+				Denoise.Filter.Commit(denoiseFilter);
 
 				Debug.Log($"Rebuilt front buffer (now {width} x {height})");
 			}

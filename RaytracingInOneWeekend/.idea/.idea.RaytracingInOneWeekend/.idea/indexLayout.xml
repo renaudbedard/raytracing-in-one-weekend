@@ -15,7 +15,6 @@
       <Path>Library/PackageCache/com.unity.mathematics@1.1.0</Path>
       <Path>Library/PackageCache/com.unity.test-framework@1.0.18</Path>
       <Path>Library/PackageCache/com.unity.textmeshpro@2.0.1</Path>
-      <Path>Packages</Path>
       <Path>ProjectSettings</Path>
     </explicitIncludes>
     <explicitExcludes>
@@ -25,6 +24,7 @@
       <Path>Logs</Path>
       <Path>Media</Path>
       <Path>MemoryCaptures</Path>
+      <Path>Temp</Path>
       <Path>obj</Path>
     </explicitExcludes>
   </component>

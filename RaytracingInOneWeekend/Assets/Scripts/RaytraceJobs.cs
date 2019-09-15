@@ -1,9 +1,13 @@
 using System;
+using System.Runtime.InteropServices;
+using OpenImageDenoise;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEditor.PackageManager;
+using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -65,7 +69,8 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<Entity> Entities;
 
 #if BVH
-		[ReadOnly] [NativeDisableUnsafePtrRestriction] public BvhNode* BvhRoot;
+		[ReadOnly] [NativeDisableUnsafePtrRestriction]
+		public BvhNode* BvhRoot;
 #endif
 
 		[ReadOnly] public PerlinData PerlinData;
@@ -87,7 +92,7 @@ namespace RaytracerInOneWeekend
 			// ReSharper disable once PossibleLossOfFraction
 			float2 coordinates = float2(
 				index % Size.x, // column
-				index / Size.x  // row
+				index / Size.x // row
 			);
 
 			float4 lastValue = InputSamples[index];
@@ -260,6 +265,7 @@ namespace RaytracerInOneWeekend
 				color *= *--attenuationCursor;
 				color += *--emissionCursor;
 			}
+
 			return true;
 		}
 	}
@@ -271,7 +277,7 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NaNColor = new float3(0, 1, 1);
 
 		[ReadOnly] public NativeArray<float4> Input;
-		[WriteOnly] public NativeArray<RGBA32> Output;
+		[WriteOnly] public NativeArray<float4> Output;
 
 		public void Execute(int index)
 		{
@@ -288,15 +294,28 @@ namespace RaytracerInOneWeekend
 				finalColor = inputSample.xyz / realSampleCount;
 
 			// TODO: tone-mapping
-			float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
+			// float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
+			// Output[index] = new RGBA32
+			// {
+			// 	r = (byte) outputColor.x,
+			// 	g = (byte) outputColor.y,
+			// 	b = (byte) outputColor.z,
+			// 	a = 255
+			// };
 
-			Output[index] = new RGBA32
-			{
-				r = (byte) outputColor.x,
-				g = (byte) outputColor.y,
-				b = (byte) outputColor.z,
-				a = 255
-			};
+			Output[index] = float4(finalColor.xyz.LinearToGamma(), 1);
+		}
+	}
+
+	struct DenoiseJob : IJob
+	{
+		public Denoise.Device DenoiseDevice;
+		public Denoise.Filter DenoiseFilter;
+
+		public void Execute()
+		{
+			Denoise.Filter.Execute(DenoiseFilter);
+			DenoiseDevice.LogErrors();
 		}
 	}
 }
