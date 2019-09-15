@@ -43,4 +43,4 @@ sysinfo.txt
 *.unitypackage
 
 # Non-redistributable packages
-*/Assets/Plugins/Sirenix
+*/Assets/ThirdParty/Sirenix
