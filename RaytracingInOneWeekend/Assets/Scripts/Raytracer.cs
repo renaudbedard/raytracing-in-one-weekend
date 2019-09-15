@@ -36,7 +36,6 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
 		[SerializeField] ImportanceSamplingMode importanceSampling = ImportanceSamplingMode.None;
-		[SerializeField] bool stratifiedSampling = true;
 		[SerializeField] bool subPixelJitter = true;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
@@ -103,7 +102,6 @@ namespace RaytracerInOneWeekend
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
 		ImportanceSamplingMode lastSamplingMode;
-		bool lastStratifiedSampling;
 
 		readonly Stopwatch batchTimer = new Stopwatch();
 		readonly Stopwatch traceTimer = new Stopwatch();
@@ -210,11 +208,10 @@ namespace RaytracerInOneWeekend
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
-			bool stratifiedModeChanged = stratifiedSampling != lastStratifiedSampling;
 			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
-			                       samplingModeChanged || samplesPerPixelDecreased || stratifiedModeChanged;
+			                       samplingModeChanged || samplesPerPixelDecreased;
 			bool traceNeedsKick = traceNeedsReset || !commandBufferHooked;
 
 			void RebuildDirtyComponents()
@@ -389,13 +386,12 @@ namespace RaytracerInOneWeekend
 				accumulationInputBuffer.SafeDispose();
 				accumulationInputBuffer = new NativeArray<float4>(totalBufferSize, Allocator.Persistent);
 #if PATH_DEBUGGING
-				debugPaths.EnsureCapacity((int) samplesPerBatch);
+				debugPaths.EnsureCapacity((int) traceDepth);
 #endif
 				mraysPerSecResults.Clear();
 				AccumulatedSamples = 0;
 				lastTraceDepth = traceDepth;
 				lastSamplingMode = importanceSampling;
-				lastStratifiedSampling = stratifiedSampling;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
 #endif
@@ -414,7 +410,6 @@ namespace RaytracerInOneWeekend
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
 				TraceDepth = traceDepth,
 				SubPixelJitter = subPixelJitter,
-				StratifiedSampling = stratifiedSampling,
 				Entities = entityBuffer,
 #if BVH
 				BvhRoot = BvhRoot,

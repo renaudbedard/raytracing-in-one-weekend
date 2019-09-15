@@ -42,17 +42,15 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Scatter(Ray r, HitRecord rec, ref Random rng, ref StratifiedRandom srng, PerlinData perlinData,
-			bool useStratified, out float3 albedo, out Ray scattered)
+		public bool Scatter(Ray r, HitRecord rec, ref Random rng, PerlinData perlinData, 
+			out float3 albedo, out Ray scattered)
 		{
 			switch (Type)
 			{
 				case MaterialType.Lambertian:
 				{
 					albedo = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
-					var randomDirection = useStratified
-						? srng.OnUniformHemisphere(rec.Normal)
-						: rng.OnUniformHemisphere(rec.Normal);
+					float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, r.Time);
 					return true;
 				}

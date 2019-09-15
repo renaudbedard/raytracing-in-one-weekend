@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -9,8 +8,6 @@ namespace RaytracerInOneWeekend
 {
     static class MathExtensions
     {
-        // TODO : stratified sampling
-
         public static float2 InUnitDisk(this ref Random rng)
         {
             // from : https://programming.guide/random-point-within-circle.html
@@ -35,11 +32,6 @@ namespace RaytracerInOneWeekend
         public static float3 OnUniformHemisphere(this ref Random rng, float3 normal)
         {
             return OnUniformHemisphere(rng.NextFloat2(), normal);
-        }
-
-        public static float3 OnUniformHemisphere(this ref StratifiedRandom srng, float3 normal)
-        {
-            return OnUniformHemisphere(srng.NextFloat2(), normal);
         }
 
         // where uv are uniform random variables between 0 and 1

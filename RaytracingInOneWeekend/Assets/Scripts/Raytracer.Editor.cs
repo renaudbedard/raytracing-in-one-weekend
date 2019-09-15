@@ -350,44 +350,12 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 			if (debugPaths.IsCreated)
 			{
-				const int sqRays = 50;
-
 				float alpha = 1;
-				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
-				var shownLayer = (int)(Time.time % debugPaths.Length);
-				for (var pathIndex = 0; pathIndex < debugPaths.Length; pathIndex++)
+				foreach (DebugPath path in debugPaths)
 				{
-					if (pathIndex != shownLayer)
-						alpha = 0.001f;
-					else
-						alpha = 0.25f;
-
-					DebugPath path = debugPaths[pathIndex];
-					float3 n = path.To - path.From;
-					float3 sn = path.SurfaceNormal;
-					float ln = length(n);
-					var c = Color.HSVToRGB(frac(pathIndex * silverRatio), 1, 1);
-
-					Debug.DrawLine(path.From, path.To, c);
-
-					var srng = new StratifiedRandom(1, path.Index, (int) samplesPerBatch);
-
-					// Debug.Log(srng.Divisions);
-
-					srng.Mode = StratifiedRandom.CellSamplingMode.ZeroZero; var zz = srng.OnUniformHemisphere(sn); srng.Index--;
-					srng.Mode = StratifiedRandom.CellSamplingMode.ZeroOne; var zo = srng.OnUniformHemisphere(sn); srng.Index--;
-					srng.Mode = StratifiedRandom.CellSamplingMode.OneZero; var oz = srng.OnUniformHemisphere(sn); srng.Index--;
-					srng.Mode = StratifiedRandom.CellSamplingMode.OneOne; var oo = srng.OnUniformHemisphere(sn); srng.Index--;
-
-					for (int i = 0; i <= sqRays; i++)
-					for (int j = 0; j <= sqRays; j++)
-					{
-						float3 low = Vector3.Slerp(zz, zo, (float) i / sqRays);
-						float3 high = Vector3.Slerp(oz, oo, (float) i / sqRays);
-						float3 interp = Vector3.Slerp(low, high, (float) j / sqRays);
-						Debug.DrawLine(path.From, path.From + interp * 500, c.GetAlphaReplaced(alpha));
-					}
-					// alpha *= 0.5f;
+					Debug.DrawLine(path.From, path.To,
+						fadeDebugPaths ? Color.white.GetAlphaReplaced(alpha) : Color.white, debugPathDuration);
+					alpha *= 0.5f;
 				}
 			}
 #endif
