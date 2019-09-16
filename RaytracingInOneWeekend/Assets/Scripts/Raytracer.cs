@@ -69,8 +69,15 @@ namespace RaytracerInOneWeekend
 
 		// TODO: allocation order of all these buffers is probably pretty crucial for cache locality
 
-		NativeArray<float4> accumulationInputBuffer, accumulationOutputBuffer;
-		NativeArray<float3> combineOutputBuffer, denoiseOutputBuffer;
+		NativeArray<float4> colorAccumulationInputBuffer, colorAccumulationOutputBuffer;
+		NativeArray<float3> normalAccumulationInputBuffer, normalAccumulationOutputBuffer;
+		NativeArray<float3> albedoAccumulationInputBuffer, albedoAccumulationOutputBuffer;
+
+		private NativeArray<float3> combinedColorOutputBuffer,
+			combinedNormalOutputBuffer,
+			combinedAlbedoOutputBuffer,
+			denoiseOutputBuffer;
+
 		NativeArray<RGBA32> frontBuffer;
 		NativeArray<Diagnostics> diagnosticsBuffer;
 
@@ -201,9 +208,18 @@ namespace RaytracerInOneWeekend
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
 
-			accumulationInputBuffer.SafeDispose();
-			accumulationOutputBuffer.SafeDispose();
-			combineOutputBuffer.SafeDispose();
+			colorAccumulationInputBuffer.SafeDispose();
+			normalAccumulationInputBuffer.SafeDispose();
+			albedoAccumulationInputBuffer.SafeDispose();
+
+			colorAccumulationOutputBuffer.SafeDispose();
+			normalAccumulationOutputBuffer.SafeDispose();
+			albedoAccumulationOutputBuffer.SafeDispose();
+
+			combinedColorOutputBuffer.SafeDispose();
+			combinedNormalOutputBuffer.SafeDispose();
+			combinedAlbedoOutputBuffer.SafeDispose();
+
 			denoiseOutputBuffer.SafeDispose();
 #if BVH
 			bvhNodeBuffer.SafeDispose();
@@ -413,8 +429,10 @@ namespace RaytracerInOneWeekend
 
 			if (firstBatch)
 			{
-				accumulationInputBuffer.SafeDispose();
-				accumulationInputBuffer = new NativeArray<float4>(totalBufferSize, Allocator.Persistent);
+				UnsafeUtility.MemClear(colorAccumulationInputBuffer.GetUnsafePtr(), colorAccumulationInputBuffer.Length);
+				UnsafeUtility.MemClear(normalAccumulationInputBuffer.GetUnsafePtr(), normalAccumulationInputBuffer.Length);
+				UnsafeUtility.MemClear(albedoAccumulationInputBuffer.GetUnsafePtr(), albedoAccumulationInputBuffer.Length);
+
 #if PATH_DEBUGGING
 				debugPaths.EnsureCapacity((int) traceDepth);
 #endif
@@ -427,15 +445,26 @@ namespace RaytracerInOneWeekend
 #endif
 			}
 			else
-				Util.Swap(ref accumulationInputBuffer, ref accumulationOutputBuffer);
+			{
+				Util.Swap(ref colorAccumulationInputBuffer, ref colorAccumulationOutputBuffer);
+				Util.Swap(ref normalAccumulationInputBuffer, ref normalAccumulationOutputBuffer);
+				Util.Swap(ref albedoAccumulationInputBuffer, ref albedoAccumulationOutputBuffer);
+			}
 
 			var accumulateJob = new AccumulateJob
 			{
+				InputColor = colorAccumulationInputBuffer,
+				InputNormal = normalAccumulationInputBuffer,
+				InputAlbedo = albedoAccumulationInputBuffer,
+
+				OutputColor = colorAccumulationOutputBuffer,
+				OutputNormal = normalAccumulationOutputBuffer,
+				OutputAlbedo = albedoAccumulationOutputBuffer,
+
 				Size = bufferSize,
 				Camera = raytracingCamera,
 				SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
 				SkyTopColor = scene.SkyTopColor.ToFloat3(),
-				InputSamples = accumulationInputBuffer,
 				Seed = (uint) Time.frameCount + 1,
 				SampleCount = min(samplesPerPixel, samplesPerBatch),
 				TraceDepth = traceDepth,
@@ -445,7 +474,6 @@ namespace RaytracerInOneWeekend
 				BvhRoot = BvhRoot,
 #endif
 				PerlinData = perlinData.GetRuntimeData(),
-				OutputSamples = accumulationOutputBuffer,
 				OutputDiagnostics = diagnosticsBuffer,
 				ImportanceSampler = new ImportanceSampler
 				{
@@ -467,8 +495,13 @@ namespace RaytracerInOneWeekend
 			{
 				var combineJob = new CombineJob
 				{
-					Input = accumulationOutputBuffer,
-					Output = combineOutputBuffer,
+					InputColor = colorAccumulationOutputBuffer,
+					InputNormal = normalAccumulationOutputBuffer,
+					InputAlbedo = albedoAccumulationOutputBuffer,
+
+					OutputColor = combinedColorOutputBuffer,
+					OutputNormal = combinedNormalOutputBuffer,
+					OutputAlbedo = combinedAlbedoOutputBuffer
 				};
 				combineJobHandle = combineJob.Schedule(totalBufferSize, 128, accumulateJobHandle.Value);
 
@@ -480,7 +513,7 @@ namespace RaytracerInOneWeekend
 
 				var gammaCorrectJob = new GammaCorrectJob
 				{
-					Input = denoise ? denoiseOutputBuffer : combineOutputBuffer,
+					Input = denoise ? denoiseOutputBuffer : combinedColorOutputBuffer,
 					Output = frontBuffer
 				};
 				gammaCorrectJobHandle = gammaCorrectJob.Schedule(totalBufferSize, 128,
@@ -496,10 +529,28 @@ namespace RaytracerInOneWeekend
 		{
 			int width = (int) ceil(targetCamera.pixelWidth * resolutionScaling);
 			int height = (int) ceil(targetCamera.pixelHeight * resolutionScaling);
+			bufferSize = float2(width, height);
 
-			if (combineOutputBuffer.EnsureCapacity(width * height))
-				Debug.Log($"Rebuilt combine output buffer (now {width} x {height})");
-			if (denoiseOutputBuffer.EnsureCapacity(width * height))
+			int bufferLength = width * height;
+
+			if (colorAccumulationInputBuffer.EnsureCapacity(bufferLength) ||
+				normalAccumulationInputBuffer.EnsureCapacity(bufferLength) ||
+				albedoAccumulationInputBuffer.EnsureCapacity(bufferLength) ||
+				colorAccumulationOutputBuffer.EnsureCapacity(bufferLength) ||
+				normalAccumulationOutputBuffer.EnsureCapacity(bufferLength) ||
+				albedoAccumulationOutputBuffer.EnsureCapacity(bufferLength))
+			{
+				Debug.Log($"Rebuilt accumulation buffers (now {width} x {height})");
+			}
+
+			if (combinedColorOutputBuffer.EnsureCapacity(bufferLength) ||
+				combinedNormalOutputBuffer.EnsureCapacity(bufferLength) ||
+				combinedAlbedoOutputBuffer.EnsureCapacity(bufferLength))
+			{
+				Debug.Log($"Rebuilt combine output buffers (now {width} x {height})");
+			}
+
+			if (denoiseOutputBuffer.EnsureCapacity(bufferLength))
 				Debug.Log($"Rebuilt denoise output buffer (now {width} x {height})");
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height)
@@ -520,7 +571,11 @@ namespace RaytracerInOneWeekend
 				PrepareTexture(frontBufferTexture, out frontBuffer);
 				PrepareTexture(diagnosticsTexture, out diagnosticsBuffer);
 
-				Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combineOutputBuffer.GetUnsafePtr()),
+				Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combinedColorOutputBuffer.GetUnsafePtr()),
+					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+				Denoise.Filter.SetSharedImage(denoiseFilter, "normal", new IntPtr(combinedNormalOutputBuffer.GetUnsafePtr()),
+					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+				Denoise.Filter.SetSharedImage(denoiseFilter, "albedo", new IntPtr(combinedAlbedoOutputBuffer.GetUnsafePtr()),
 					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
 				Denoise.Filter.SetSharedImage(denoiseFilter, "output", new IntPtr(denoiseOutputBuffer.GetUnsafePtr()),
 					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
@@ -528,11 +583,6 @@ namespace RaytracerInOneWeekend
 
 				Debug.Log($"Rebuilt front buffer (now {width} x {height})");
 			}
-
-			if (accumulationOutputBuffer.EnsureCapacity(width * height))
-				Debug.Log($"Rebuilt accumulation output buffer (now {width} x {height})");
-
-			bufferSize = float2(width, height);
 		}
 
 		void RebuildWorld()

@@ -32,7 +32,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
+    material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
   - name: Right Wall
     type: 2
     enabled: 1
@@ -48,7 +48,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
+    material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
   - name: Light Shaft
     type: 2
     enabled: 1

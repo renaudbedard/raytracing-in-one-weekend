@@ -64,22 +64,24 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public float3 SkyTopColor;
 		[ReadOnly] public bool SubPixelJitter;
 		[ReadOnly] public ImportanceSampler ImportanceSampler;
-
-		[ReadOnly] public NativeArray<float4> InputSamples;
 		[ReadOnly] public NativeArray<Entity> Entities;
-
 #if BVH
 		[ReadOnly] [NativeDisableUnsafePtrRestriction]
 		public BvhNode* BvhRoot;
 #endif
-
 		[ReadOnly] public PerlinData PerlinData;
-
 #if BVH_ITERATIVE
 		[ReadOnly] public int NodeCount;
 #endif
 
-		[WriteOnly] public NativeArray<float4> OutputSamples;
+		[ReadOnly] public NativeArray<float4> InputColor;
+		[ReadOnly] public NativeArray<float3> InputNormal;
+		[ReadOnly] public NativeArray<float3> InputAlbedo;
+
+		[WriteOnly] public NativeArray<float4> OutputColor;
+		[WriteOnly] public NativeArray<float3> OutputNormal;
+		[WriteOnly] public NativeArray<float3> OutputAlbedo;
+
 		[WriteOnly] public NativeArray<Diagnostics> OutputDiagnostics;
 
 #if PATH_DEBUGGING
@@ -95,10 +97,10 @@ namespace RaytracerInOneWeekend
 				index / Size.x // row
 			);
 
-			float4 lastValue = InputSamples[index];
+			float4 lastColor = InputColor[index];
 
-			float3 colorAcc = lastValue.xyz;
-			int sampleCount = (int) lastValue.w;
+			float3 colorAcc = lastColor.xyz;
+			int sampleCount = (int) lastColor.w;
 
 			// big primes stolen from Unity's random class
 			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
@@ -151,7 +153,7 @@ namespace RaytracerInOneWeekend
 				}
 			}
 
-			OutputSamples[index] = float4(colorAcc, sampleCount);
+			OutputColor[index] = float4(colorAcc, sampleCount);
 			OutputDiagnostics[index] = diagnostics;
 		}
 
@@ -276,34 +278,26 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
 		static readonly float3 NaNColor = new float3(0, 1, 1);
 
-		[ReadOnly] public NativeArray<float4> Input;
-		[WriteOnly] public NativeArray<float3> Output;
+		[ReadOnly] public NativeArray<float4> InputColor;
+		[ReadOnly] public NativeArray<float3> InputNormal;
+		[ReadOnly] public NativeArray<float3> InputAlbedo;
+
+		[WriteOnly] public NativeArray<float3> OutputColor;
+		[WriteOnly] public NativeArray<float3> OutputNormal;
+		[WriteOnly] public NativeArray<float3> OutputAlbedo;
 
 		public void Execute(int index)
 		{
-			float4 inputSample = Input[index];
+			float4 inputColor = InputColor[index];
 
-			var realSampleCount = (int) inputSample.w;
+			var realSampleCount = (int) inputColor.w;
 
 			float3 finalColor;
-			if (realSampleCount == 0)
-				finalColor = NoSamplesColor;
-			else if (any(isnan(inputSample)))
-				finalColor = NaNColor;
-			else
-				finalColor = inputSample.xyz / realSampleCount;
+			if (realSampleCount == 0) finalColor = NoSamplesColor;
+			else if (any(isnan(inputColor))) finalColor = NaNColor;
+			else finalColor = inputColor.xyz / realSampleCount;
 
-			// TODO: tone-mapping
-			// float3 outputColor = saturate(finalColor.xyz.LinearToGamma()) * 255;
-			// Output[index] = new RGBA32
-			// {
-			// 	r = (byte) outputColor.x,
-			// 	g = (byte) outputColor.y,
-			// 	b = (byte) outputColor.z,
-			// 	a = 255
-			// };
-
-			Output[index] = finalColor.xyz;
+			OutputColor[index] = finalColor.xyz;
 		}
 	}
 
@@ -311,10 +305,7 @@ namespace RaytracerInOneWeekend
 	{
 		public Denoise.Filter DenoiseFilter;
 
-		public void Execute()
-		{
-			Denoise.Filter.Execute(DenoiseFilter);
-		}
+		public void Execute() => Denoise.Filter.Execute(DenoiseFilter);
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
