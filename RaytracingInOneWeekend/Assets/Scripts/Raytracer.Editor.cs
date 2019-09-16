@@ -159,7 +159,7 @@ namespace RaytracerInOneWeekend
 				bvhNodeBuffer.SafeDispose();
 				entityBuffer.SafeDispose();
 
-				activeEntities.Clear();
+				ActiveEntities.Clear();
 			}
 #endif // BVH
 
@@ -210,7 +210,7 @@ namespace RaytracerInOneWeekend
 			opaquePreviewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 			transparentPreviewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 
-			foreach (EntityData entity in activeEntities)
+			foreach (EntityData entity in ActiveEntities)
 			{
 				if (!entity.Material) continue;
 
@@ -288,7 +288,7 @@ namespace RaytracerInOneWeekend
 
 			EnsurePreviewObjectExists(PrimitiveType.Quad, ref previewRect);
 
-			foreach (EntityData e in activeEntities
+			foreach (EntityData e in ActiveEntities
 				.Where(x => x.Material)
 				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Position, sceneCameraTransform.forward)))
 			{

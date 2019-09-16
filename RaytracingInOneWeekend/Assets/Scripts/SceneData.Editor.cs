@@ -72,7 +72,7 @@ namespace RaytracerInOneWeekend
 				}
 
 				float minDistance = float.MaxValue;
-				foreach (EntityData entity in raytracer.activeEntities)
+				foreach (EntityData entity in raytracer.ActiveEntities)
 				{
 					float distance = HandleUtility.DistancePointLine(entity.Position, viewRay.origin, viewRay.direction * 1000);
 

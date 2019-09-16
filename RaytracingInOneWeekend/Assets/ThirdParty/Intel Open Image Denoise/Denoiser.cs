@@ -53,6 +53,11 @@ namespace OpenImageDenoise
 			Cancelled = 6
 		}
 
+		/// <summary>
+		/// Error callback function
+		/// </summary>
+		public delegate void ErrorFunction(IntPtr userPtr, Error code, string message);
+
 		public struct Device
 		{
 			[NativeDisableUnsafePtrRestriction] public IntPtr Handle;
@@ -92,40 +97,11 @@ namespace OpenImageDenoise
 			[DllImport(LibraryFilename, EntryPoint = "oidnReleaseDevice")]
 			public static extern void Release(Device device);
 
-			[DllImport(LibraryFilename)]
-			static extern Error oidnGetDeviceError(Device device, IntPtr message);
-
-			public (Error errorCode, string description) GetError()
-			{
-				IntPtr errorMessagePtrPtr = default;
-				Error errorCode;
-				while ((errorCode = oidnGetDeviceError(this, errorMessagePtrPtr)) != Error.None)
-				{
-					if (errorMessagePtrPtr != IntPtr.Zero)
-					{
-						unsafe
-						{
-							var errorMessagePtr = new IntPtr(*(long*) errorMessagePtrPtr.ToPointer());
-							return (errorCode, Marshal.PtrToStringAuto(errorMessagePtr));
-						}
-					}
-
-					return (errorCode, null);
-				}
-
-				return (Error.None, null);
-			}
-
-			public void LogErrors()
-			{
-				Error errorCode;
-				do
-				{
-					string errorText;
-					(errorCode, errorText) = new Device().GetError();
-					if (errorCode != Error.None) UnityEngine.Debug.LogError($"{errorCode} : {errorText}");
-				} while (errorCode != Error.None);
-			}
+			/// <summary>
+			/// Sets the error callback function of the device.
+			/// </summary>
+			[DllImport(LibraryFilename, EntryPoint = "oidnSetDeviceErrorFunction")]
+			public static extern void SetErrorFunction(Device device, ErrorFunction func, IntPtr userPtr);
 		}
 
 		public struct Buffer

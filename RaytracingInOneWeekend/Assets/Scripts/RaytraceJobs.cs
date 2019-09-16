@@ -277,7 +277,7 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NaNColor = new float3(0, 1, 1);
 
 		[ReadOnly] public NativeArray<float4> Input;
-		[WriteOnly] public NativeArray<float4> Output;
+		[WriteOnly] public NativeArray<float3> Output;
 
 		public void Execute(int index)
 		{
@@ -303,19 +303,39 @@ namespace RaytracerInOneWeekend
 			// 	a = 255
 			// };
 
-			Output[index] = float4(finalColor.xyz.LinearToGamma(), 1);
+			Output[index] = finalColor.xyz;
 		}
 	}
 
 	struct DenoiseJob : IJob
 	{
-		public Denoise.Device DenoiseDevice;
 		public Denoise.Filter DenoiseFilter;
 
 		public void Execute()
 		{
 			Denoise.Filter.Execute(DenoiseFilter);
-			DenoiseDevice.LogErrors();
+		}
+	}
+
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	struct GammaCorrectJob : IJobParallelFor
+	{
+		[ReadOnly] public NativeArray<float3> Input;
+		[WriteOnly] public NativeArray<RGBA32> Output;
+
+		public void Execute(int index)
+		{
+			float3 inputSample = Input[index];
+
+			// TODO: tone-mapping
+			float3 outputColor = saturate(inputSample.LinearToGamma()) * 255;
+			Output[index] = new RGBA32
+			{
+				r = (byte) outputColor.x,
+				g = (byte) outputColor.y,
+				b = (byte) outputColor.z,
+				a = 255
+			};
 		}
 	}
 }
