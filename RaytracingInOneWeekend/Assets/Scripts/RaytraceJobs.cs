@@ -1,39 +1,27 @@
-using System;
-using System.Runtime.InteropServices;
 using OpenImageDenoise;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEditor.PackageManager;
-using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-#if FULL_DIAGNOSTICS
 	struct Diagnostics
 	{
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
 		public float RayCount;
-#if BVH_ITERATIVE
 		public float BoundsHitCount;
 		public float CandidateCount;
 #pragma warning disable 649
 		public float Padding;
 #pragma warning restore 649
 #else
-		// ReSharper disable once NotAccessedField.Global
-		public float3 Normal;
-#endif
-	}
-#else
-	struct Diagnostics
-	{
 		public float RayCount;
-	}
 #endif
+	}
 
 #if PATH_DEBUGGING
 	struct DebugPath
@@ -50,9 +38,6 @@ namespace RaytracerInOneWeekend
 		{
 			public BvhNode** Nodes;
 			public Entity* Entities;
-#if BVH_SIMD
-			public float4* Vectors;
-#endif
 		}
 #endif
 		[ReadOnly] public float2 Size;
@@ -98,8 +83,10 @@ namespace RaytracerInOneWeekend
 			);
 
 			float4 lastColor = InputColor[index];
-
 			float3 colorAcc = lastColor.xyz;
+			float3 normalAcc = InputNormal[index];
+			float3 albedoAcc = InputAlbedo[index];
+
 			int sampleCount = (int) lastColor.w;
 
 			// big primes stolen from Unity's random class
@@ -109,18 +96,11 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
 			Entity* entities = stackalloc Entity[Entities.Length];
-#if BVH_SIMD
-			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
-			var entityGroupCount = (int) ceil(EntityCount / 4.0f);
-			float4* vectors = stackalloc float4[maxVectorWorkingSizePerEntity * entityGroupCount];
-#endif
+
 			var workingArea = new WorkingArea
 			{
 				Nodes = nodes,
 				Entities = entities,
-#if BVH_SIMD
-				Vectors = vectors
-#endif
 			};
 #endif
 
@@ -137,44 +117,52 @@ namespace RaytracerInOneWeekend
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0.5f)) / Size;
-				Ray r = Camera.GetRay(normalizedCoordinates, ref rng);
+				Ray eyeRay = Camera.GetRay(normalizedCoordinates, ref rng);
 
-				if (Color(r, ref rng, emissionStack, attenuationStack,
+				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE
 					workingArea,
 #endif
 #if PATH_DEBUGGING
 					doDebugPaths && s == 0, s,
 #endif
-					out float3 sampleColor, ref diagnostics))
+					out float3 sampleColor, out float3 sampleNormal, out float3 sampleAlbedo, ref diagnostics))
 				{
 					colorAcc += sampleColor;
+					normalAcc += sampleNormal;
+					albedoAcc += sampleAlbedo;
+
 					sampleCount++;
 				}
 			}
 
 			OutputColor[index] = float4(colorAcc, sampleCount);
+			OutputNormal[index] = normalAcc;
+			OutputAlbedo[index] = albedoAcc;
+
 			OutputDiagnostics[index] = diagnostics;
 		}
 
-		bool Color(Ray ray, ref Random rng, float3* emissionStack, float3* attenuationStack,
+		bool Sample(Ray eyeRay, ref Random rng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
 			WorkingArea workingArea,
 #endif
 #if PATH_DEBUGGING
 			bool doDebugPaths, int sampleIndex,
 #endif
-			out float3 color, ref Diagnostics diagnostics)
+			out float3 sampleColor, out float3 sampleNormal, out float3 sampleAlbedo, ref Diagnostics diagnostics)
 		{
 			float3* emissionCursor = emissionStack;
 			float3* attenuationCursor = attenuationStack;
 
-#if PATH_DEBUGGING
-			float3 lastNormal = default;
-#endif
-
 			int depth = 0;
 			int? explicitSamplingTarget = null;
+
+			bool firstNonSpecularHit = false;
+			sampleNormal = sampleAlbedo = default;
+
+			Ray ray = eyeRay;
+
 			for (; depth < TraceDepth; depth++)
 			{
 #if BVH
@@ -186,7 +174,7 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 					workingArea,
 #endif
-#if BVH && FULL_DIAGNOSTICS
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
 					ref diagnostics,
 #endif
 					out HitRecord rec);
@@ -198,20 +186,31 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
-					lastNormal = rec.Normal;
-#endif
-#if !BVH && FULL_DIAGNOSTICS
-					diagnostics.Normal += rec.Normal;
 #endif
 					// we explicitely sampled an entity and could not hit it -- early out of this sample
 					if (explicitSamplingTarget.HasValue && explicitSamplingTarget != rec.EntityId)
 						break;
 
 					Material material = Entities[rec.EntityId].Material;
-					*emissionCursor++ = material.Emit(rec.Point, rec.Normal, PerlinData);
+					float3 emission = material.Emit(rec.Point, rec.Normal, PerlinData);
+					*emissionCursor++ = emission;
 
 					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinData,
 						out float3 albedo, out Ray scatteredRay);
+
+					if (!firstNonSpecularHit)
+					{
+						if (material.IsPerfectSpecular)
+						{
+							// TODO: fresnel for dielectric, first diffuse bounce for metallic
+						}
+						else
+						{
+							sampleAlbedo = material.Type == MaterialType.DiffuseLight ? emission : albedo;
+							sampleNormal = rec.Normal;
+							firstNonSpecularHit = true;
+						}
+					}
 
 					if (!didScatter)
 					{
@@ -249,13 +248,20 @@ namespace RaytracerInOneWeekend
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
 #endif
 					// sample the sky color
-					*emissionCursor++ = lerp(SkyBottomColor, SkyTopColor, 0.5f * (ray.Direction.y + 1));
+					float3 hitSkyColor = lerp(SkyBottomColor, SkyTopColor, 0.5f * (ray.Direction.y + 1));
+					*emissionCursor++ = hitSkyColor;
 					attenuationCursor++;
+
+					if (!firstNonSpecularHit)
+					{
+						sampleAlbedo = hitSkyColor;
+						sampleNormal = -ray.Direction;
+					}
 					break;
 				}
 			}
 
-			color = 0;
+			sampleColor = 0;
 
 			// safety : if we don't hit an emissive surface within the trace depth limit, fail this sample
 			if (depth == TraceDepth)
@@ -264,8 +270,8 @@ namespace RaytracerInOneWeekend
 			// attenuate colors from the tail of the hit stack to the head
 			while (emissionCursor != emissionStack)
 			{
-				color *= *--attenuationCursor;
-				color += *--emissionCursor;
+				sampleColor *= *--attenuationCursor;
+				sampleColor += *--emissionCursor;
 			}
 
 			return true;
@@ -298,6 +304,8 @@ namespace RaytracerInOneWeekend
 			else finalColor = inputColor.xyz / realSampleCount;
 
 			OutputColor[index] = finalColor.xyz;
+			OutputNormal[index] = normalizesafe(InputNormal[index] / realSampleCount);
+			OutputAlbedo[index] = realSampleCount == 0 ? 0 : InputAlbedo[index] / realSampleCount;
 		}
 	}
 
@@ -311,20 +319,41 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct GammaCorrectJob : IJobParallelFor
 	{
-		[ReadOnly] public NativeArray<float3> Input;
-		[WriteOnly] public NativeArray<RGBA32> Output;
+		[ReadOnly] public NativeArray<float3> InputColor;
+		[ReadOnly] public NativeArray<float3> InputNormal;
+		[ReadOnly] public NativeArray<float3> InputAlbedo;
+
+		[WriteOnly] public NativeArray<RGBA32> OutputColor;
+		[WriteOnly] public NativeArray<RGBA32> OutputNormal;
+		[WriteOnly] public NativeArray<RGBA32> OutputAlbedo;
 
 		public void Execute(int index)
 		{
-			float3 inputSample = Input[index];
-
 			// TODO: tone-mapping
-			float3 outputColor = saturate(inputSample.LinearToGamma()) * 255;
-			Output[index] = new RGBA32
+			float3 outputColor = saturate(InputColor[index].LinearToGamma()) * 255;
+			OutputColor[index] = new RGBA32
 			{
 				r = (byte) outputColor.x,
 				g = (byte) outputColor.y,
 				b = (byte) outputColor.z,
+				a = 255
+			};
+
+			float3 outputNormal = saturate((InputNormal[index] * 0.5f + 0.5f).LinearToGamma()) * 255;
+			OutputNormal[index] = new RGBA32
+			{
+				r = (byte) outputNormal.x,
+				g = (byte) outputNormal.y,
+				b = (byte) outputNormal.z,
+				a = 255
+			};
+
+			float3 outputAlbedo = saturate(InputAlbedo[index].LinearToGamma()) * 255;
+			OutputAlbedo[index] = new RGBA32
+			{
+				r = (byte) outputAlbedo.x,
+				g = (byte) outputAlbedo.y,
+				b = (byte) outputAlbedo.z,
 				a = 255
 			};
 		}

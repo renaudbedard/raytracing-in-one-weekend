@@ -40,6 +40,11 @@ namespace RaytracerInOneWeekend
 			if (array.IsCreated) array.Dispose();
 		}
 
+		public static unsafe void ZeroMemory<T>(this ref NativeArray<T> array) where T : unmanaged
+		{
+			UnsafeUtility.MemClear(array.GetUnsafePtr(), array.Length * sizeof(T));
+		}
+
 		public static void SafeDispose<T>(this ref NativeList<T> list) where T : struct
 		{
 			if (list.IsCreated) list.Dispose();

@@ -64,7 +64,7 @@ namespace RaytracerInOneWeekend
 		public float BufferMinValue, BufferMaxValue;
 
 		UnityEngine.Material viewRangeMaterial;
-		Texture2D frontBufferTexture, diagnosticsTexture;
+		Texture2D frontBufferTexture, normalsTexture, albedoTexture, diagnosticsTexture;
 		CommandBuffer commandBuffer;
 
 		// TODO: allocation order of all these buffers is probably pretty crucial for cache locality
@@ -73,12 +73,10 @@ namespace RaytracerInOneWeekend
 		NativeArray<float3> normalAccumulationInputBuffer, normalAccumulationOutputBuffer;
 		NativeArray<float3> albedoAccumulationInputBuffer, albedoAccumulationOutputBuffer;
 
-		private NativeArray<float3> combinedColorOutputBuffer,
-			combinedNormalOutputBuffer,
-			combinedAlbedoOutputBuffer,
-			denoiseOutputBuffer;
+		NativeArray<float3> combinedColorOutputBuffer, combinedNormalOutputBuffer,
+			combinedAlbedoOutputBuffer, denoiseOutputBuffer;
 
-		NativeArray<RGBA32> frontBuffer;
+		NativeArray<RGBA32> frontBuffer, normalsBuffer, albedoBuffer;
 		NativeArray<Diagnostics> diagnosticsBuffer;
 
 		NativeArray<Sphere> sphereBuffer;
@@ -126,13 +124,11 @@ namespace RaytracerInOneWeekend
 		{
 			Front,
 			RayCount,
-#if FULL_DIAGNOSTICS
-#if BVH
+			Normals,
+			Albedo,
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
 			BvhHitCount,
 			CandidateCount
-#else
-			Normals
-#endif
 #endif
 		}
 
@@ -147,7 +143,9 @@ namespace RaytracerInOneWeekend
 
 			const HideFlags flags = HideFlags.HideAndDontSave;
 			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
-#if FULL_DIAGNOSTICS
+			normalsTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
+			albedoTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
+#if FULL_DIAGNOSTICS && BVH_ITERATIVE
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RGBAFloat, false) { hideFlags = flags };
 #else
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
@@ -379,6 +377,8 @@ namespace RaytracerInOneWeekend
 			switch (bufferView)
 			{
 				case BufferView.Front: frontBufferTexture.Apply(false); break;
+				case BufferView.Normals: normalsTexture.Apply(false); break;
+				case BufferView.Albedo: albedoTexture.Apply(false); break;
 				default:
 					BufferMinValue = bufferMin;
 					BufferMaxValue = bufferMax;
@@ -387,20 +387,16 @@ namespace RaytracerInOneWeekend
 					break;
 			}
 
-#if FULL_DIAGNOSTICS && !BVH_ITERATIVE
-			viewRangeMaterial.SetInt(normalDisplayId, bufferView == BufferView.Normals ? 1 : 0);
-#endif
-
 			if (!commandBufferHooked)
 			{
 				commandBuffer.Clear();
-
 				var blitTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget);
+
 				switch (bufferView)
 				{
-					case BufferView.Front:
-						commandBuffer.Blit(frontBufferTexture, blitTarget);
-						break;
+					case BufferView.Front: commandBuffer.Blit(frontBufferTexture, blitTarget); break;
+					case BufferView.Normals: commandBuffer.Blit(normalsTexture, blitTarget); break;
+					case BufferView.Albedo: commandBuffer.Blit(albedoTexture, blitTarget); break;
 
 					default:
 						viewRangeMaterial.SetInt(channelPropertyId, (int) bufferView - 1);
@@ -429,9 +425,9 @@ namespace RaytracerInOneWeekend
 
 			if (firstBatch)
 			{
-				UnsafeUtility.MemClear(colorAccumulationInputBuffer.GetUnsafePtr(), colorAccumulationInputBuffer.Length);
-				UnsafeUtility.MemClear(normalAccumulationInputBuffer.GetUnsafePtr(), normalAccumulationInputBuffer.Length);
-				UnsafeUtility.MemClear(albedoAccumulationInputBuffer.GetUnsafePtr(), albedoAccumulationInputBuffer.Length);
+				colorAccumulationInputBuffer.ZeroMemory();
+				normalAccumulationInputBuffer.ZeroMemory();
+				albedoAccumulationInputBuffer.ZeroMemory();
 
 #if PATH_DEBUGGING
 				debugPaths.EnsureCapacity((int) traceDepth);
@@ -513,8 +509,13 @@ namespace RaytracerInOneWeekend
 
 				var gammaCorrectJob = new GammaCorrectJob
 				{
-					Input = denoise ? denoiseOutputBuffer : combinedColorOutputBuffer,
-					Output = frontBuffer
+					InputColor = denoise ? denoiseOutputBuffer : combinedColorOutputBuffer,
+					InputNormal = combinedNormalOutputBuffer,
+					InputAlbedo = combinedAlbedoOutputBuffer,
+
+					OutputColor = frontBuffer,
+					OutputNormal = normalsBuffer,
+					OutputAlbedo = albedoBuffer
 				};
 				gammaCorrectJobHandle = gammaCorrectJob.Schedule(totalBufferSize, 128,
 					denoise ? denoiseJobHandle.Value : combineJobHandle.Value);
@@ -533,18 +534,18 @@ namespace RaytracerInOneWeekend
 
 			int bufferLength = width * height;
 
-			if (colorAccumulationInputBuffer.EnsureCapacity(bufferLength) ||
-				normalAccumulationInputBuffer.EnsureCapacity(bufferLength) ||
-				albedoAccumulationInputBuffer.EnsureCapacity(bufferLength) ||
-				colorAccumulationOutputBuffer.EnsureCapacity(bufferLength) ||
-				normalAccumulationOutputBuffer.EnsureCapacity(bufferLength) ||
+			if (colorAccumulationInputBuffer.EnsureCapacity(bufferLength) |
+				normalAccumulationInputBuffer.EnsureCapacity(bufferLength) |
+				albedoAccumulationInputBuffer.EnsureCapacity(bufferLength) |
+				colorAccumulationOutputBuffer.EnsureCapacity(bufferLength) |
+				normalAccumulationOutputBuffer.EnsureCapacity(bufferLength) |
 				albedoAccumulationOutputBuffer.EnsureCapacity(bufferLength))
 			{
 				Debug.Log($"Rebuilt accumulation buffers (now {width} x {height})");
 			}
 
-			if (combinedColorOutputBuffer.EnsureCapacity(bufferLength) ||
-				combinedNormalOutputBuffer.EnsureCapacity(bufferLength) ||
+			if (combinedColorOutputBuffer.EnsureCapacity(bufferLength) |
+				combinedNormalOutputBuffer.EnsureCapacity(bufferLength) |
 				combinedAlbedoOutputBuffer.EnsureCapacity(bufferLength))
 			{
 				Debug.Log($"Rebuilt combine output buffers (now {width} x {height})");
@@ -553,7 +554,10 @@ namespace RaytracerInOneWeekend
 			if (denoiseOutputBuffer.EnsureCapacity(bufferLength))
 				Debug.Log($"Rebuilt denoise output buffer (now {width} x {height})");
 
-			if (frontBufferTexture.width != width || frontBufferTexture.height != height)
+			if (frontBufferTexture.width != width || frontBufferTexture.height != height ||
+			    diagnosticsTexture.width != width || diagnosticsTexture.height != height ||
+			    normalsTexture.width != width || normalsTexture.height != height ||
+			    albedoTexture.width != width || albedoTexture.height != height)
 			{
 				if (commandBufferHooked)
 				{
@@ -570,6 +574,8 @@ namespace RaytracerInOneWeekend
 
 				PrepareTexture(frontBufferTexture, out frontBuffer);
 				PrepareTexture(diagnosticsTexture, out diagnosticsBuffer);
+				PrepareTexture(normalsTexture, out normalsBuffer);
+				PrepareTexture(albedoTexture, out albedoBuffer);
 
 				Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combinedColorOutputBuffer.GetUnsafePtr()),
 					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
@@ -581,7 +587,7 @@ namespace RaytracerInOneWeekend
 					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
 				Denoise.Filter.Commit(denoiseFilter);
 
-				Debug.Log($"Rebuilt front buffer (now {width} x {height})");
+				Debug.Log($"Rebuilt texture & associated buffers (now {width} x {height})");
 			}
 		}
 
@@ -698,18 +704,11 @@ namespace RaytracerInOneWeekend
 		{
 			BvhNode** nodes = stackalloc BvhNode*[bvhNodeBuffer.Length];
 			Entity* entities = stackalloc Entity[entityBuffer.Length];
-#if BVH_SIMD
-			int maxVectorWorkingSizePerEntity = sizeof(Sphere4) / sizeof(float4);
-			var entityGroupCount = (int) ceil(entityBuffer.Length / 4.0f);
-			float4* vectors = stackalloc float4[maxVectorWorkingSizePerEntity * entityGroupCount];
-#endif
+
 			var workingArea = new AccumulateJob.WorkingArea
 			{
 				Nodes = nodes,
 				Entities = entities,
-#if BVH_SIMD
-				Vectors = vectors
-#endif
 			};
 
 			var rng = new Random(scene.RandomSeed);

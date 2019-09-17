@@ -42,7 +42,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Scatter(Ray r, HitRecord rec, ref Random rng, PerlinData perlinData, 
+		public bool Scatter(Ray r, HitRecord rec, ref Random rng, PerlinData perlinData,
 			out float3 albedo, out Ray scattered)
 		{
 			switch (Type)
@@ -136,6 +136,20 @@ namespace RaytracerInOneWeekend
 			{
 				case MaterialType.DiffuseLight: return Texture.Value(position, normal, TextureScale, perlinData);
 				default: return 0;
+			}
+		}
+
+		public bool IsPerfectSpecular
+		{
+			get
+			{
+				switch (Type)
+				{
+					case MaterialType.Dielectric:
+					case MaterialType.Metal:
+						return Parameter.AlmostEquals(0);
+				}
+				return false;
 			}
 		}
 
