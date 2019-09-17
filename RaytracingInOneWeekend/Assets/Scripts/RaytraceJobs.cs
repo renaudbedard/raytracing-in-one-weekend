@@ -309,6 +309,24 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	struct CopyFloat3BufferJob : IJob
+	{
+		[ReadOnly] public NativeArray<float3> Input;
+		[WriteOnly] public NativeArray<float3> Output;
+
+		public void Execute() => NativeArray<float3>.Copy(Input, Output);
+	}
+
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	struct CopyFloat4BufferJob : IJob
+	{
+		[ReadOnly] public NativeArray<float4> Input;
+		[WriteOnly] public NativeArray<float4> Output;
+
+		public void Execute() => NativeArray<float4>.Copy(Input, Output);
+	}
+
 	struct DenoiseJob : IJob
 	{
 		public Denoise.Filter DenoiseFilter;
@@ -317,7 +335,7 @@ namespace RaytracerInOneWeekend
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
-	struct GammaCorrectJob : IJobParallelFor
+	struct FinalizeTexturesJob : IJobParallelFor
 	{
 		[ReadOnly] public NativeArray<float3> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;

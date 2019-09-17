@@ -63,20 +63,27 @@ namespace RaytracerInOneWeekend
 		[OdinReadOnly]
 		public float BufferMinValue, BufferMaxValue;
 
-		UnityEngine.Material viewRangeMaterial;
+		// accumulation
+		NativeArray<float4> accumulateColorInputBuffer, accumulateColorOutputBuffer;
+		NativeArray<float3> accumulateNormalInputBuffer, accumulateNormalOutputBuffer;
+		NativeArray<float3> accumulateAlbedoInputBuffer, accumulateAlbedoOutputBuffer;
+
+		// combination
+		NativeArray<float4> combineColorInputBuffer;
+		NativeArray<float3> combineNormalInputBuffer, combineAlbedoInputBuffer;
+		NativeArray<float3> combineColorOutputBuffer, combineNormalOutputBuffer, combineAlbedoOutputBuffer;
+
+		// denoising
+		NativeArray<float3> denoiseColorInputBuffer, denoiseNormalInputBuffer, denoiseAlbedoInputBuffer;
+		NativeArray<float3> denoiseOutputBuffer;
+
+		// finalization
 		Texture2D frontBufferTexture, normalsTexture, albedoTexture, diagnosticsTexture;
-		CommandBuffer commandBuffer;
-
-		// TODO: allocation order of all these buffers is probably pretty crucial for cache locality
-
-		NativeArray<float4> colorAccumulationInputBuffer, colorAccumulationOutputBuffer;
-		NativeArray<float3> normalAccumulationInputBuffer, normalAccumulationOutputBuffer;
-		NativeArray<float3> albedoAccumulationInputBuffer, albedoAccumulationOutputBuffer;
-
-		NativeArray<float3> combinedColorOutputBuffer, combinedNormalOutputBuffer,
-			combinedAlbedoOutputBuffer, denoiseOutputBuffer;
-
+		NativeArray<float3> finalizeColorInputBuffer, finalizeNormalInputBuffer, finalizeAlbedoInputBuffer;
 		NativeArray<RGBA32> frontBuffer, normalsBuffer, albedoBuffer;
+
+		CommandBuffer commandBuffer;
+		UnityEngine.Material viewRangeMaterial;
 		NativeArray<Diagnostics> diagnosticsBuffer;
 
 		NativeArray<Sphere> sphereBuffer;
@@ -101,13 +108,14 @@ namespace RaytracerInOneWeekend
 		Denoise.Device denoiseDevice;
 		Denoise.Filter denoiseFilter;
 
-		JobHandle? accumulateJobHandle, combineJobHandle, denoiseJobHandle, gammaCorrectJobHandle;
+		JobHandle? accumulateJobHandle, combineJobHandle, denoiseJobHandle, finalizeJobHandle;
 
 		bool commandBufferHooked, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
 		float focusDistance;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
 		ImportanceSamplingMode lastSamplingMode;
+		bool lastDenoise;
 
 		readonly Stopwatch batchTimer = new Stopwatch(), traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
@@ -118,7 +126,7 @@ namespace RaytracerInOneWeekend
 		float2 bufferSize;
 
 		bool TraceActive => accumulateJobHandle.HasValue || combineJobHandle.HasValue || denoiseJobHandle.HasValue ||
-		                    gammaCorrectJobHandle.HasValue;
+		                    finalizeJobHandle.HasValue;
 
 		enum BufferView
 		{
@@ -194,11 +202,12 @@ namespace RaytracerInOneWeekend
 
 		void OnDestroy()
 		{
-			// if there is a running job, let it know it needs to cancel and wait for completion
+			// if there is a running job, wait for completion
+			// TODO: cancellation
 			accumulateJobHandle?.Complete();
 			combineJobHandle?.Complete();
 			denoiseJobHandle?.Complete();
-			gammaCorrectJobHandle?.Complete();
+			finalizeJobHandle?.Complete();
 
 			entityBuffer.SafeDispose();
 			importanceSamplingEntityBuffer.SafeDispose();
@@ -206,19 +215,33 @@ namespace RaytracerInOneWeekend
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
 
-			colorAccumulationInputBuffer.SafeDispose();
-			normalAccumulationInputBuffer.SafeDispose();
-			albedoAccumulationInputBuffer.SafeDispose();
+			// accumulate
+			accumulateColorInputBuffer.SafeDispose();
+			accumulateNormalInputBuffer.SafeDispose();
+			accumulateAlbedoInputBuffer.SafeDispose();
+			accumulateColorOutputBuffer.SafeDispose();
+			accumulateNormalOutputBuffer.SafeDispose();
+			accumulateAlbedoOutputBuffer.SafeDispose();
 
-			colorAccumulationOutputBuffer.SafeDispose();
-			normalAccumulationOutputBuffer.SafeDispose();
-			albedoAccumulationOutputBuffer.SafeDispose();
+			// combine
+			combineColorInputBuffer.SafeDispose();
+			combineNormalInputBuffer.SafeDispose();
+			combineAlbedoInputBuffer.SafeDispose();
+			combineColorOutputBuffer.SafeDispose();
+			combineNormalOutputBuffer.SafeDispose();
+			combineAlbedoOutputBuffer.SafeDispose();
 
-			combinedColorOutputBuffer.SafeDispose();
-			combinedNormalOutputBuffer.SafeDispose();
-			combinedAlbedoOutputBuffer.SafeDispose();
-
+			// denoise
+			denoiseColorInputBuffer.SafeDispose();
+			denoiseNormalInputBuffer.SafeDispose();
+			denoiseAlbedoInputBuffer.SafeDispose();
 			denoiseOutputBuffer.SafeDispose();
+
+			// finalize
+			finalizeColorInputBuffer.SafeDispose();
+			finalizeNormalInputBuffer.SafeDispose();
+			finalizeAlbedoInputBuffer.SafeDispose();
+
 #if BVH
 			bvhNodeBuffer.SafeDispose();
 			bvhNodeMetadataBuffer.SafeDispose();
@@ -227,6 +250,7 @@ namespace RaytracerInOneWeekend
 #if PATH_DEBUGGING
 			debugPaths.SafeDispose();
 #endif
+
 			Denoise.Filter.Release(denoiseFilter);
 			Denoise.Device.Release(denoiseDevice);
 
@@ -250,10 +274,11 @@ namespace RaytracerInOneWeekend
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
 			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
+			bool denoiseChanged = lastDenoise != denoise;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
-			                       samplingModeChanged || samplesPerPixelDecreased;
-			bool traceNeedsKick = traceNeedsReset || !commandBufferHooked;
+			                       samplingModeChanged || samplesPerPixelDecreased || denoiseChanged;
+			bool traceNeedsKick = traceNeedsReset; // TODO
 
 			void RebuildDirtyComponents()
 			{
@@ -262,13 +287,12 @@ namespace RaytracerInOneWeekend
 				if (cameraDirty) CleanCamera();
 			}
 
-			void CompleteAccumulate()
+			if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
 			{
-				TimeSpan elapsedTime = batchTimer.Elapsed;
-
 				accumulateJobHandle.Value.Complete();
 				accumulateJobHandle = null;
 
+				TimeSpan elapsedTime = batchTimer.Elapsed;
 				float totalRayCount = diagnosticsBuffer.Sum(x => x.RayCount);
 
 				AccumulatedSamples += samplesPerBatch;
@@ -277,6 +301,52 @@ namespace RaytracerInOneWeekend
 				if (!ignoreBatchTimings) mraysPerSecResults.Add(MillionRaysPerSecond);
 				AvgMRaysPerSecond = mraysPerSecResults.Count == 0 ? 0 : mraysPerSecResults.Average();
 				ignoreBatchTimings = false;
+
+				if (traceAborted) { traceAborted = false; return; }
+
+				if (AccumulatedSamples >= samplesPerPixel || previewAfterBatch)
+					ScheduleCombine();
+
+				if (AccumulatedSamples < samplesPerPixel || !stopWhenCompleted)
+					ScheduleAccumulate(AccumulatedSamples >= samplesPerPixel);
+			}
+
+			if (combineJobHandle.HasValue && combineJobHandle.Value.IsCompleted)
+			{
+				combineJobHandle.Value.Complete();
+				combineJobHandle = null;
+
+				if (traceAborted) { traceAborted = false; return; }
+
+				if (denoise) ScheduleDenoise();
+				else ScheduleFinalize();
+			}
+
+			if (denoiseJobHandle.HasValue && denoiseJobHandle.Value.IsCompleted)
+			{
+				denoiseJobHandle.Value.Complete();
+				denoiseJobHandle = null;
+
+				if (traceAborted) { traceAborted = false; return; }
+
+				ScheduleFinalize();
+			}
+
+			if (finalizeJobHandle.HasValue && finalizeJobHandle.Value.IsCompleted)
+			{
+				finalizeJobHandle.Value.Complete();
+				finalizeJobHandle = null;
+
+				if (AccumulatedSamples >= samplesPerPixel)
+					LastTraceDuration = (float) traceTimer.Elapsed.TotalMilliseconds;
+
+				SwapBuffers();
+#if UNITY_EDITOR
+				ForceUpdateInspector();
+#endif
+				RebuildDirtyComponents();
+
+				traceAborted = false;
 			}
 
 			if (!TraceActive && traceNeedsKick)
@@ -285,52 +355,181 @@ namespace RaytracerInOneWeekend
 				ScheduleAccumulate(traceNeedsReset);
 			}
 
-			if (gammaCorrectJobHandle.HasValue && gammaCorrectJobHandle.Value.IsCompleted)
-			{
-				if (accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
-					CompleteAccumulate();
-
-				combineJobHandle?.Complete();
-				denoiseJobHandle?.Complete();
-				gammaCorrectJobHandle.Value.Complete();
-				combineJobHandle = denoiseJobHandle = gammaCorrectJobHandle = null;
-
-				bool traceCompleted = false;
-				if (AccumulatedSamples >= samplesPerPixel)
-				{
-					traceCompleted = true;
-					LastTraceDuration = (float) traceTimer.Elapsed.TotalMilliseconds;
-				}
-
+			if (!TraceActive && !commandBufferHooked)
 				SwapBuffers();
-#if UNITY_EDITOR
-				ForceUpdateInspector();
-#endif
-				RebuildDirtyComponents();
-
-				if ((!(traceCompleted && stopWhenCompleted) || traceNeedsReset) && !traceAborted)
-					ScheduleAccumulate(traceCompleted | traceNeedsReset);
-
-				traceAborted = false;
-			}
-
-			// only when preview is disabled
-			if (!combineJobHandle.HasValue && !denoiseJobHandle.HasValue && !gammaCorrectJobHandle.HasValue &&
-			    accumulateJobHandle.HasValue && accumulateJobHandle.Value.IsCompleted)
-			{
-				CompleteAccumulate();
-#if UNITY_EDITOR
-				ForceUpdateInspector();
-#endif
-				RebuildDirtyComponents();
-
-				if (!traceAborted)
-					ScheduleAccumulate(false);
-
-				traceAborted = false;
-			}
 
 			lastSamplesPerPixel = samplesPerPixel;
+			lastDenoise = denoise;
+		}
+
+		void ScheduleAccumulate(bool firstBatch)
+		{
+			// Debug.Log($"Scheduling accumulate (firstBatch = {firstBatch})");
+
+			Transform cameraTransform = targetCamera.transform;
+			Vector3 origin = cameraTransform.localPosition;
+			Vector3 lookAt = origin + cameraTransform.forward;
+
+			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
+				focusDistance = hitRec.Distance;
+
+			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
+				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
+
+			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
+
+			if (firstBatch)
+			{
+				accumulateColorInputBuffer.ZeroMemory();
+				accumulateNormalInputBuffer.ZeroMemory();
+				accumulateAlbedoInputBuffer.ZeroMemory();
+
+#if PATH_DEBUGGING
+				debugPaths.EnsureCapacity((int) traceDepth);
+#endif
+				mraysPerSecResults.Clear();
+				AccumulatedSamples = 0;
+				lastTraceDepth = traceDepth;
+				lastSamplingMode = importanceSampling;
+#if UNITY_EDITOR
+				ForceUpdateInspector();
+#endif
+			}
+			else
+			{
+				Util.Swap(ref accumulateColorInputBuffer, ref accumulateColorOutputBuffer);
+				Util.Swap(ref accumulateNormalInputBuffer, ref accumulateNormalOutputBuffer);
+				Util.Swap(ref accumulateAlbedoInputBuffer, ref accumulateAlbedoOutputBuffer);
+			}
+
+			var accumulateJob = new AccumulateJob
+			{
+				InputColor = accumulateColorInputBuffer,
+				InputNormal = accumulateNormalInputBuffer,
+				InputAlbedo = accumulateAlbedoInputBuffer,
+
+				OutputColor = accumulateColorOutputBuffer,
+				OutputNormal = accumulateNormalOutputBuffer,
+				OutputAlbedo = accumulateAlbedoOutputBuffer,
+
+				Size = bufferSize,
+				Camera = raytracingCamera,
+				SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
+				SkyTopColor = scene.SkyTopColor.ToFloat3(),
+				Seed = (uint) Time.frameCount + 1,
+				SampleCount = min(samplesPerPixel, samplesPerBatch),
+				TraceDepth = traceDepth,
+				SubPixelJitter = subPixelJitter,
+				Entities = entityBuffer,
+#if BVH
+				BvhRoot = BvhRoot,
+#endif
+				PerlinData = perlinData.GetRuntimeData(),
+				OutputDiagnostics = diagnosticsBuffer,
+				ImportanceSampler = new ImportanceSampler
+				{
+					TargetEntities = importanceSamplingEntityBuffer,
+					Mode = importanceSampling
+				},
+#if BVH_ITERATIVE
+				NodeCount = bvhNodeBuffer.Length,
+#endif
+#if PATH_DEBUGGING
+				DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
+				DebugCoordinates = int2(bufferSize / 2)
+#endif
+			};
+
+			accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1);
+
+			JobHandle copyDependencies = accumulateJobHandle.Value;
+			if (combineJobHandle.HasValue)
+				copyDependencies = JobHandle.CombineDependencies(copyDependencies, combineJobHandle.Value);
+
+			accumulateJobHandle = JobHandle.CombineDependencies(accumulateJobHandle.Value,
+				new CopyFloat4BufferJob { Input = accumulateColorOutputBuffer, Output = combineColorInputBuffer }
+					.Schedule(copyDependencies));
+			accumulateJobHandle = JobHandle.CombineDependencies(accumulateJobHandle.Value,
+				new CopyFloat3BufferJob { Input = accumulateNormalOutputBuffer, Output = combineNormalInputBuffer }
+					.Schedule(copyDependencies));
+			accumulateJobHandle = JobHandle.CombineDependencies(accumulateJobHandle.Value,
+					new CopyFloat3BufferJob { Input = accumulateAlbedoOutputBuffer, Output = combineAlbedoInputBuffer }
+					.Schedule(copyDependencies));
+
+			batchTimer.Restart();
+			if (firstBatch) traceTimer.Restart();
+		}
+
+		void ScheduleCombine()
+		{
+			// Debug.Log("Scheduling combine");
+
+			var combineJob = new CombineJob
+			{
+				InputColor = combineColorInputBuffer,
+				InputNormal = combineNormalInputBuffer,
+				InputAlbedo = combineAlbedoInputBuffer,
+
+				OutputColor = combineColorOutputBuffer,
+				OutputNormal = combineNormalOutputBuffer,
+				OutputAlbedo = combineAlbedoOutputBuffer
+			};
+
+			var length = (int) (bufferSize.x * bufferSize.y);
+			combineJobHandle = combineJob.Schedule(length, 128);
+
+			JobHandle copyDependencies = combineJobHandle.Value;
+			if (denoise && denoiseJobHandle.HasValue)
+				copyDependencies = JobHandle.CombineDependencies(copyDependencies, denoiseJobHandle.Value);
+			else if (!denoise && finalizeJobHandle.HasValue)
+				copyDependencies = JobHandle.CombineDependencies(copyDependencies, finalizeJobHandle.Value);
+
+			var copyJobs = new []
+			{
+				new CopyFloat3BufferJob { Input = combineColorOutputBuffer, Output = denoise ? denoiseColorInputBuffer : finalizeColorInputBuffer },
+				new CopyFloat3BufferJob { Input = combineNormalOutputBuffer, Output = denoise ? denoiseNormalInputBuffer : finalizeNormalInputBuffer },
+				new CopyFloat3BufferJob { Input = combineAlbedoOutputBuffer, Output = denoise ? denoiseAlbedoInputBuffer : finalizeAlbedoInputBuffer }
+			};
+			foreach (CopyFloat3BufferJob copyJob in copyJobs)
+				combineJobHandle = JobHandle.CombineDependencies(combineJobHandle.Value, copyJob.Schedule(copyDependencies));
+		}
+
+		void ScheduleDenoise()
+		{
+			// Debug.Log("Scheduling denoise");
+
+			var denoiseJob = new DenoiseJob { DenoiseFilter = denoiseFilter };
+			denoiseJobHandle = denoiseJob.Schedule();
+
+			JobHandle copyDependencies = denoiseJobHandle.Value;
+			if (finalizeJobHandle.HasValue)
+				copyDependencies = JobHandle.CombineDependencies(copyDependencies, finalizeJobHandle.Value);
+
+			var copyJobs = new []
+			{
+				new CopyFloat3BufferJob { Input = denoiseOutputBuffer, Output = finalizeColorInputBuffer },
+				new CopyFloat3BufferJob { Input = denoiseNormalInputBuffer, Output = finalizeNormalInputBuffer },
+				new CopyFloat3BufferJob { Input = denoiseAlbedoInputBuffer, Output = finalizeAlbedoInputBuffer }
+			};
+			foreach (CopyFloat3BufferJob copyJob in copyJobs)
+				denoiseJobHandle = JobHandle.CombineDependencies(denoiseJobHandle.Value, copyJob.Schedule(copyDependencies));
+		}
+
+		void ScheduleFinalize()
+		{
+			// Debug.Log("Scheduling finalize");
+
+			var finalizeJob = new FinalizeTexturesJob
+			{
+				InputColor = finalizeColorInputBuffer,
+				InputNormal = finalizeNormalInputBuffer,
+				InputAlbedo = finalizeAlbedoInputBuffer,
+
+				OutputColor = frontBuffer,
+				OutputNormal = normalsBuffer,
+				OutputAlbedo = albedoBuffer
+			};
+			finalizeJobHandle = finalizeJob.Schedule((int) (bufferSize.x * bufferSize.y), 128);
 		}
 
 		void CleanCamera()
@@ -409,123 +608,6 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		void ScheduleAccumulate(bool firstBatch)
-		{
-			Transform cameraTransform = targetCamera.transform;
-			Vector3 origin = cameraTransform.localPosition;
-			Vector3 lookAt = origin + cameraTransform.forward;
-
-			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
-				focusDistance = hitRec.Distance;
-
-			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
-				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
-
-			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
-
-			if (firstBatch)
-			{
-				colorAccumulationInputBuffer.ZeroMemory();
-				normalAccumulationInputBuffer.ZeroMemory();
-				albedoAccumulationInputBuffer.ZeroMemory();
-
-#if PATH_DEBUGGING
-				debugPaths.EnsureCapacity((int) traceDepth);
-#endif
-				mraysPerSecResults.Clear();
-				AccumulatedSamples = 0;
-				lastTraceDepth = traceDepth;
-				lastSamplingMode = importanceSampling;
-#if UNITY_EDITOR
-				ForceUpdateInspector();
-#endif
-			}
-			else
-			{
-				Util.Swap(ref colorAccumulationInputBuffer, ref colorAccumulationOutputBuffer);
-				Util.Swap(ref normalAccumulationInputBuffer, ref normalAccumulationOutputBuffer);
-				Util.Swap(ref albedoAccumulationInputBuffer, ref albedoAccumulationOutputBuffer);
-			}
-
-			var accumulateJob = new AccumulateJob
-			{
-				InputColor = colorAccumulationInputBuffer,
-				InputNormal = normalAccumulationInputBuffer,
-				InputAlbedo = albedoAccumulationInputBuffer,
-
-				OutputColor = colorAccumulationOutputBuffer,
-				OutputNormal = normalAccumulationOutputBuffer,
-				OutputAlbedo = albedoAccumulationOutputBuffer,
-
-				Size = bufferSize,
-				Camera = raytracingCamera,
-				SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
-				SkyTopColor = scene.SkyTopColor.ToFloat3(),
-				Seed = (uint) Time.frameCount + 1,
-				SampleCount = min(samplesPerPixel, samplesPerBatch),
-				TraceDepth = traceDepth,
-				SubPixelJitter = subPixelJitter,
-				Entities = entityBuffer,
-#if BVH
-				BvhRoot = BvhRoot,
-#endif
-				PerlinData = perlinData.GetRuntimeData(),
-				OutputDiagnostics = diagnosticsBuffer,
-				ImportanceSampler = new ImportanceSampler
-				{
-					TargetEntities = importanceSamplingEntityBuffer,
-					Mode = importanceSampling
-				},
-#if BVH_ITERATIVE
-				NodeCount = bvhNodeBuffer.Length,
-#endif
-#if PATH_DEBUGGING
-				DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
-				DebugCoordinates = int2(bufferSize / 2)
-#endif
-			};
-
-			accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1);
-
-			if (AccumulatedSamples + samplesPerBatch >= samplesPerPixel || previewAfterBatch)
-			{
-				var combineJob = new CombineJob
-				{
-					InputColor = colorAccumulationOutputBuffer,
-					InputNormal = normalAccumulationOutputBuffer,
-					InputAlbedo = albedoAccumulationOutputBuffer,
-
-					OutputColor = combinedColorOutputBuffer,
-					OutputNormal = combinedNormalOutputBuffer,
-					OutputAlbedo = combinedAlbedoOutputBuffer
-				};
-				combineJobHandle = combineJob.Schedule(totalBufferSize, 128, accumulateJobHandle.Value);
-
-				if (denoise)
-				{
-					var denoiseJob = new DenoiseJob { DenoiseFilter = denoiseFilter };
-					denoiseJobHandle = denoiseJob.Schedule(combineJobHandle.Value);
-				}
-
-				var gammaCorrectJob = new GammaCorrectJob
-				{
-					InputColor = denoise ? denoiseOutputBuffer : combinedColorOutputBuffer,
-					InputNormal = combinedNormalOutputBuffer,
-					InputAlbedo = combinedAlbedoOutputBuffer,
-
-					OutputColor = frontBuffer,
-					OutputNormal = normalsBuffer,
-					OutputAlbedo = albedoBuffer
-				};
-				gammaCorrectJobHandle = gammaCorrectJob.Schedule(totalBufferSize, 128,
-					denoise ? denoiseJobHandle.Value : combineJobHandle.Value);
-			}
-
-			batchTimer.Restart();
-			if (firstBatch) traceTimer.Restart();
-			JobHandle.ScheduleBatchedJobs();
-		}
-
 		void EnsureBuffersBuilt()
 		{
 			int width = (int) ceil(targetCamera.pixelWidth * resolutionScaling);
@@ -534,25 +616,40 @@ namespace RaytracerInOneWeekend
 
 			int bufferLength = width * height;
 
-			if (colorAccumulationInputBuffer.EnsureCapacity(bufferLength) |
-				normalAccumulationInputBuffer.EnsureCapacity(bufferLength) |
-				albedoAccumulationInputBuffer.EnsureCapacity(bufferLength) |
-				colorAccumulationOutputBuffer.EnsureCapacity(bufferLength) |
-				normalAccumulationOutputBuffer.EnsureCapacity(bufferLength) |
-				albedoAccumulationOutputBuffer.EnsureCapacity(bufferLength))
+			if (accumulateColorInputBuffer.EnsureCapacity(bufferLength) |
+				accumulateNormalInputBuffer.EnsureCapacity(bufferLength) |
+				accumulateAlbedoInputBuffer.EnsureCapacity(bufferLength) |
+				accumulateColorOutputBuffer.EnsureCapacity(bufferLength) |
+				accumulateNormalOutputBuffer.EnsureCapacity(bufferLength) |
+				accumulateAlbedoOutputBuffer.EnsureCapacity(bufferLength))
 			{
 				Debug.Log($"Rebuilt accumulation buffers (now {width} x {height})");
 			}
 
-			if (combinedColorOutputBuffer.EnsureCapacity(bufferLength) |
-				combinedNormalOutputBuffer.EnsureCapacity(bufferLength) |
-				combinedAlbedoOutputBuffer.EnsureCapacity(bufferLength))
+			if (combineColorInputBuffer.EnsureCapacity(bufferLength) |
+			    combineNormalInputBuffer.EnsureCapacity(bufferLength) |
+			    combineAlbedoInputBuffer.EnsureCapacity(bufferLength) |
+				combineColorOutputBuffer.EnsureCapacity(bufferLength) |
+				combineNormalOutputBuffer.EnsureCapacity(bufferLength) |
+				combineAlbedoOutputBuffer.EnsureCapacity(bufferLength))
 			{
-				Debug.Log($"Rebuilt combine output buffers (now {width} x {height})");
+				Debug.Log($"Rebuilt combining buffers (now {width} x {height})");
 			}
 
-			if (denoiseOutputBuffer.EnsureCapacity(bufferLength))
-				Debug.Log($"Rebuilt denoise output buffer (now {width} x {height})");
+			if (denoiseColorInputBuffer.EnsureCapacity(bufferLength) |
+			    denoiseNormalInputBuffer.EnsureCapacity(bufferLength) |
+			    denoiseAlbedoInputBuffer.EnsureCapacity(bufferLength) |
+			    denoiseOutputBuffer.EnsureCapacity(bufferLength))
+			{
+				Debug.Log($"Rebuilt denoising buffers (now {width} x {height})");
+			}
+
+			if (finalizeColorInputBuffer.EnsureCapacity(bufferLength) |
+			    finalizeNormalInputBuffer.EnsureCapacity(bufferLength) |
+			    finalizeAlbedoInputBuffer.EnsureCapacity(bufferLength))
+			{
+				Debug.Log($"Rebuilt finalization buffers (now {width} x {height})");
+			}
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height ||
 			    diagnosticsTexture.width != width || diagnosticsTexture.height != height ||
@@ -577,12 +674,12 @@ namespace RaytracerInOneWeekend
 				PrepareTexture(normalsTexture, out normalsBuffer);
 				PrepareTexture(albedoTexture, out albedoBuffer);
 
-				Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combinedColorOutputBuffer.GetUnsafePtr()),
+				Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(denoiseColorInputBuffer.GetUnsafePtr()),
 					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-				Denoise.Filter.SetSharedImage(denoiseFilter, "normal", new IntPtr(combinedNormalOutputBuffer.GetUnsafePtr()),
-					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-				Denoise.Filter.SetSharedImage(denoiseFilter, "albedo", new IntPtr(combinedAlbedoOutputBuffer.GetUnsafePtr()),
-					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+				// Denoise.Filter.SetSharedImage(denoiseFilter, "normal", new IntPtr(denoiseNormalInputBuffer.GetUnsafePtr()),
+				// 	Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+				// Denoise.Filter.SetSharedImage(denoiseFilter, "albedo", new IntPtr(denoiseAlbedoInputBuffer.GetUnsafePtr()),
+				// 	Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
 				Denoise.Filter.SetSharedImage(denoiseFilter, "output", new IntPtr(denoiseOutputBuffer.GetUnsafePtr()),
 					Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
 				Denoise.Filter.Commit(denoiseFilter);
