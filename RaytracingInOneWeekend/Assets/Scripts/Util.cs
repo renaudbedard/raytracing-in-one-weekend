@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -53,6 +54,12 @@ namespace RaytracerInOneWeekend
 		public static unsafe void AddNoResize<T>(this NativeList<T> list, T element) where T : unmanaged
 		{
 			((UnsafeList*) NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref list))->AddRangeNoResize<T>(&element, 1);
+		}
+
+		public static T PeekOrDefault<T>(this Queue<T> queue)
+		{
+			if (queue.Count > 0) return queue.Peek();
+			return default;
 		}
 	}
 }
