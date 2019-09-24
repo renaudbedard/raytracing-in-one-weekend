@@ -16,6 +16,7 @@ using float3 = Unity.Mathematics.float3;
 using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
+using OptiX;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -235,19 +236,19 @@ namespace RaytracerInOneWeekend
             OpenImageDenoise.NativeApi.Filter.Set(denoiseFilter, "hdr", true);
 
             // test for OptiX
-            var optixDeviceContext = OptiX.NativeApi.DeviceContext.Create(OnOptixError, 4);
+            var optixDeviceContext = OptixDeviceContext.Create(OnOptixError, 4);
             if (optixDeviceContext.Handle != IntPtr.Zero) Debug.Log("Successfully created OptiX Device Context!");
-            var optixDenoiseOptions = new OptiX.NativeApi.Denoiser.Options
+            var optixDenoiseOptions = new OptixDenoiserOptions
             {
-	            InputKind = OptiX.NativeApi.Denoiser.InputKind.RgbAlbedoNormal,
-	            PixelFormat = OptiX.NativeApi.OptixPixelFormat.Half3
+	            InputKind = OptixDenoiserInputKind.RgbAlbedoNormal,
+	            PixelFormat = OptixPixelFormat.Half3
             };
-            OptiX.NativeApi.Denoiser denoiser = default;
-            var status = OptiX.NativeApi.Denoiser.Create(optixDeviceContext, &optixDenoiseOptions, ref denoiser);
-            if (status == OptiX.NativeApi.OptixResult.Success) Debug.Log("Successfully created OptiX Denoiser!");
-            status = OptiX.NativeApi.Denoiser.Destroy(denoiser);
-            if (status == OptiX.NativeApi.OptixResult.Success) Debug.Log("Successfully destroyed OptiX Denoiser!");
-            OptiX.NativeApi.DeviceContext.Destroy(optixDeviceContext);
+            OptixDenoiser denoiser = default;
+            var status = OptixDenoiser.Create(optixDeviceContext, &optixDenoiseOptions, ref denoiser);
+            if (status == OptixResult.Success) Debug.Log("Successfully created OptiX Denoiser!");
+            status = OptixDenoiser.Destroy(denoiser);
+            if (status == OptixResult.Success) Debug.Log("Successfully destroyed OptiX Denoiser!");
+            OptixDeviceContext.Destroy(optixDeviceContext);
 		}
 
 		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]

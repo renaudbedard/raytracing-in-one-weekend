@@ -53,3 +53,17 @@ OPTIXDENOISER_API OptixResult destroyDenoiser(OptixDenoiser denoiser)
 {
 	return optixDenoiserDestroy(denoiser);
 }
+
+OPTIXDENOISER_API OptixResult setDenoiserModel(OptixDenoiser denoiser, OptixDenoiserModelKind kind, void* data, size_t sizeInBytes)
+{
+	return optixDenoiserSetModel(denoiser, kind, data, sizeInBytes);
+}
+
+OPTIXDENOISER_API OptixResult invokeDenoiser(
+	OptixDenoiser denoiser, CUstream stream, const OptixDenoiserParams* params, CUdeviceptr denoiserState, size_t denoiserStateSizeInBytes,
+	const OptixImage2D* inputLayers, unsigned int numInputLayers, unsigned int inputOffsetX, unsigned int inputOffsetY, const OptixImage2D* outputLayer, 
+	CUdeviceptr scratch, size_t scratchSizeInBytes)
+{
+	return invokeDenoiser(denoiser, stream, params, denoiserState, denoiserStateSizeInBytes, inputLayers, numInputLayers, inputOffsetX, inputOffsetY,
+		outputLayer, scratch, scratchSizeInBytes);
+}

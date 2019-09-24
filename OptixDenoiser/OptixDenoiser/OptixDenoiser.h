@@ -4,7 +4,7 @@
 #define OPTIXDENOISER_API __declspec(dllimport)
 #endif
 
-#ifdef __cplusplus    
+#ifdef __cplusplus
 extern "C" 
 {
 #endif
@@ -21,6 +21,16 @@ OPTIXDENOISER_API OptixResult __cdecl createDenoiser(OptixDeviceContext context,
 // Destroys the denoiser object and any associated host resources.
 OPTIXDENOISER_API OptixResult __cdecl destroyDenoiser(OptixDenoiser denoiser);
 
-#ifdef __cplusplus    
+// Sets the model of the denoiser.
+// If the kind is OPTIX_DENOISER_MODEL_KIND_USER, then the dataand sizeInByes must not be nulland zero respectively.For other kinds, these parameters must be zero.
+OPTIXDENOISER_API OptixResult __cdecl setDenoiserModel(OptixDenoiser denoiser, OptixDenoiserModelKind kind, void* data, size_t sizeInBytes);
+
+// Invokes denoiser on a set of input dataand produces one output image.Scratch memory must be available during the execution of the denoiser.
+OPTIXDENOISER_API OptixResult __cdecl invokeDenoiser(
+	OptixDenoiser denoiser, CUstream stream, const OptixDenoiserParams* params, CUdeviceptr denoiserState, size_t denoiserStateSizeInBytes,
+	const OptixImage2D* inputLayers, unsigned int numInputLayers, unsigned int inputOffsetX, unsigned int inputOffsetY, const OptixImage2D* outputLayer,
+	CUdeviceptr scratch, size_t scratchSizeInBytes);
+
+#ifdef __cplusplus
 }
 #endif
