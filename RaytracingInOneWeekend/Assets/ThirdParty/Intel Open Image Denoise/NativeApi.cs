@@ -8,7 +8,7 @@ using SizeT = System.UInt64;
 
 namespace OpenImageDenoise
 {
-	public static class Denoise
+	public static class NativeApi
 	{
 		const string LibraryFilename = "OpenImageDenoise.dll";
 

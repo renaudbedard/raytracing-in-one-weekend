@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using AOT;
 using JetBrains.Annotations;
-using OpenImageDenoise;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -28,6 +27,13 @@ using OdinReadOnly = OdinMock.ReadOnlyAttribute;
 
 namespace RaytracerInOneWeekend
 {
+	public enum DenoiseMode
+	{
+		None,
+		OpenImageDenoise,
+		NvidiaOptix
+	}
+
 	unsafe partial class Raytracer : MonoBehaviour
 	{
 		[Title("References")]
@@ -39,7 +45,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
 		[SerializeField] ImportanceSamplingMode importanceSampling = ImportanceSamplingMode.None;
-		[SerializeField] bool denoise = true;
+		[SerializeField] DenoiseMode denoiseMode = DenoiseMode.None;
 		[SerializeField] bool subPixelJitter = true;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
@@ -96,8 +102,8 @@ namespace RaytracerInOneWeekend
 
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
 
-		Denoise.Device denoiseDevice;
-		Denoise.Filter denoiseFilter;
+		OpenImageDenoise.NativeApi.Device denoiseDevice;
+		OpenImageDenoise.NativeApi.Filter denoiseFilter;
 
 		struct ActiveJobData<T>
 		{
@@ -143,7 +149,7 @@ namespace RaytracerInOneWeekend
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
 		ImportanceSamplingMode lastSamplingMode;
-		bool lastDenoise;
+		DenoiseMode lastDenoise;
 
 		readonly Stopwatch batchTimer = new Stopwatch(), traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
@@ -221,21 +227,48 @@ namespace RaytracerInOneWeekend
 
 		void InitDenoiser()
 		{
-			denoiseDevice = Denoise.Device.New(Denoise.Device.Type.Default);
-			Denoise.Device.SetErrorFunction(denoiseDevice, OnDenoiseError, IntPtr.Zero);
-            Denoise.Device.Commit(denoiseDevice);
+			denoiseDevice = OpenImageDenoise.NativeApi.Device.New(OpenImageDenoise.NativeApi.Device.Type.Default);
+			OpenImageDenoise.NativeApi.Device.SetErrorFunction(denoiseDevice, OnOidnError, IntPtr.Zero);
+			OpenImageDenoise.NativeApi.Device.Commit(denoiseDevice);
 
-            denoiseFilter = Denoise.Filter.New(denoiseDevice, "RT");
-            Denoise.Filter.Set(denoiseFilter, "hdr", true);
+            denoiseFilter = OpenImageDenoise.NativeApi.Filter.New(denoiseDevice, "RT");
+            OpenImageDenoise.NativeApi.Filter.Set(denoiseFilter, "hdr", true);
+
+            // test for OptiX
+            var optixDeviceContext = OptiX.NativeApi.DeviceContext.Create(OnOptixError, 4);
+            if (optixDeviceContext.Handle != IntPtr.Zero) Debug.Log("Successfully created OptiX Device Context!");
+            var optixDenoiseOptions = new OptiX.NativeApi.Denoiser.Options
+            {
+	            InputKind = OptiX.NativeApi.Denoiser.InputKind.RgbAlbedoNormal,
+	            PixelFormat = OptiX.NativeApi.OptixPixelFormat.Half3
+            };
+            OptiX.NativeApi.Denoiser denoiser = default;
+            var status = OptiX.NativeApi.Denoiser.Create(optixDeviceContext, &optixDenoiseOptions, ref denoiser);
+            if (status == OptiX.NativeApi.OptixResult.Success) Debug.Log("Successfully created OptiX Denoiser!");
+            status = OptiX.NativeApi.Denoiser.Destroy(denoiser);
+            if (status == OptiX.NativeApi.OptixResult.Success) Debug.Log("Successfully destroyed OptiX Denoiser!");
+            OptiX.NativeApi.DeviceContext.Destroy(optixDeviceContext);
 		}
 
-		[MonoPInvokeCallback(typeof(Denoise.ErrorFunction))]
-		static void OnDenoiseError(IntPtr userPtr, Denoise.Error code, string message)
+		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
+		static void OnOidnError(IntPtr userPtr, OpenImageDenoise.NativeApi.Error code, string message)
 		{
 			if (string.IsNullOrWhiteSpace(message))
 				Debug.LogError(code);
 			else
 				Debug.LogError($"{code} : {message}");
+		}
+
+		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
+		static void OnOptixError(uint level, string tag, string message, IntPtr cbdata)
+		{
+			switch (level)
+			{
+				case 1: Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}"); break;
+				case 2: Debug.LogError($"nVidia OptiX Error : {tag} - {message}"); break;
+				case 3: Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}"); break;
+				case 4: Debug.Log($"nVidia OptiX Trace : {tag} - {message}"); break;
+			}
 		}
 
 		void OnDestroy()
@@ -268,8 +301,8 @@ namespace RaytracerInOneWeekend
 			debugPaths.SafeDispose();
 #endif
 
-			Denoise.Filter.Release(denoiseFilter);
-			Denoise.Device.Release(denoiseDevice);
+			OpenImageDenoise.NativeApi.Filter.Release(denoiseFilter);
+			OpenImageDenoise.NativeApi.Device.Release(denoiseDevice);
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -291,7 +324,7 @@ namespace RaytracerInOneWeekend
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
 			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
-			bool denoiseChanged = lastDenoise != denoise;
+			bool denoiseChanged = lastDenoise != denoiseMode;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
 			                       samplingModeChanged || samplesPerPixelDecreased || denoiseChanged;
@@ -329,7 +362,7 @@ namespace RaytracerInOneWeekend
 			}
 
 			if (activeCombineJobs.Count > 0 && activeCombineJobs.Peek().Handle.IsCompleted &&
-			    (denoise || !activeFinalizeJob.HasValue))
+			    (denoiseMode != DenoiseMode.None || !activeFinalizeJob.HasValue))
 			{
 				ActiveJobData<PassOutputData> completedJob = activeCombineJobs.Dequeue();
 				completedJob.Complete();
@@ -342,7 +375,7 @@ namespace RaytracerInOneWeekend
 				}
 				else
 				{
-					if (denoise)
+					if (denoiseMode != DenoiseMode.None)
 						ScheduleDenoise(completedJob.OutputData);
 					else
 						ScheduleFinalize(completedJob.OutputData);
@@ -421,7 +454,7 @@ namespace RaytracerInOneWeekend
 				lastTraceDepth = traceDepth;
 				lastSamplingMode = importanceSampling;
 				lastSamplesPerPixel = samplesPerPixel;
-				lastDenoise = denoise;
+				lastDenoise = denoiseMode;
 				traceAborted = false;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
@@ -562,15 +595,15 @@ namespace RaytracerInOneWeekend
 
 			NativeArray<float3> denoiseColorOutputBuffer = float3Buffers.Take();
 
-			Denoise.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combineOutput.Color.GetUnsafePtr()),
-				Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			Denoise.Filter.SetSharedImage(denoiseFilter, "normal", new IntPtr(combineOutput.Normal.GetUnsafePtr()),
-				Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			Denoise.Filter.SetSharedImage(denoiseFilter, "albedo", new IntPtr(combineOutput.Albedo.GetUnsafePtr()),
-				Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			Denoise.Filter.SetSharedImage(denoiseFilter, "output", new IntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
-				Denoise.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			Denoise.Filter.Commit(denoiseFilter);
+			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combineOutput.Color.GetUnsafePtr()),
+				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "normal", new IntPtr(combineOutput.Normal.GetUnsafePtr()),
+				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "albedo", new IntPtr(combineOutput.Albedo.GetUnsafePtr()),
+				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "output", new IntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
+				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+			OpenImageDenoise.NativeApi.Filter.Commit(denoiseFilter);
 
 			var denoiseJob = new DenoiseJob { DenoiseFilter = denoiseFilter };
 			JobHandle denoiseJobHandle = denoiseJob.Schedule();
