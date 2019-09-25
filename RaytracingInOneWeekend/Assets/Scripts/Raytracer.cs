@@ -103,8 +103,13 @@ namespace RaytracerInOneWeekend
 
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
 
-		OpenImageDenoise.NativeApi.Device denoiseDevice;
-		OpenImageDenoise.NativeApi.Filter denoiseFilter;
+		OpenImageDenoise.NativeApi.Device oidnDevice;
+		OpenImageDenoise.NativeApi.Filter oidnFilter;
+
+		OptixDeviceContext optixDeviceContext;
+		OptixDenoiser optixDenoiser;
+		CudaStream cudaStream;
+		NativeArray<OptixImage2D> optixInputImagesArray;
 
 		struct ActiveJobData<T>
 		{
@@ -219,36 +224,37 @@ namespace RaytracerInOneWeekend
 			scene = scene.DeepClone();
 #endif
 			RebuildWorld();
-			InitDenoiser();
+			InitDenoisers();
 			EnsureBuffersBuilt();
 			CleanCamera();
 
 			ScheduleAccumulate(true);
 		}
 
-		void InitDenoiser()
+		void InitDenoisers()
 		{
-			denoiseDevice = OpenImageDenoise.NativeApi.Device.New(OpenImageDenoise.NativeApi.Device.Type.Default);
-			OpenImageDenoise.NativeApi.Device.SetErrorFunction(denoiseDevice, OnOidnError, IntPtr.Zero);
-			OpenImageDenoise.NativeApi.Device.Commit(denoiseDevice);
+			oidnDevice = OpenImageDenoise.NativeApi.Device.New(OpenImageDenoise.NativeApi.Device.Type.Default);
+			OpenImageDenoise.NativeApi.Device.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
+			OpenImageDenoise.NativeApi.Device.Commit(oidnDevice);
 
-            denoiseFilter = OpenImageDenoise.NativeApi.Filter.New(denoiseDevice, "RT");
-            OpenImageDenoise.NativeApi.Filter.Set(denoiseFilter, "hdr", true);
+            oidnFilter = OpenImageDenoise.NativeApi.Filter.New(oidnDevice, "RT");
+            OpenImageDenoise.NativeApi.Filter.Set(oidnFilter, "hdr", true);
 
-            // test for OptiX
-            var optixDeviceContext = OptixDeviceContext.Create(OnOptixError, 4);
-            if (optixDeviceContext.Handle != IntPtr.Zero) Debug.Log("Successfully created OptiX Device Context!");
-            var optixDenoiseOptions = new OptixDenoiserOptions
+            optixDeviceContext = OptixDeviceContext.Create(OnOptixError, OptixLogLevel.Print);
+            var denoiseOptions = new OptixDenoiserOptions
             {
 	            InputKind = OptixDenoiserInputKind.RgbAlbedoNormal,
 	            PixelFormat = OptixPixelFormat.Half3
             };
-            OptixDenoiser denoiser = default;
-            var status = OptixDenoiser.Create(optixDeviceContext, &optixDenoiseOptions, ref denoiser);
-            if (status == OptixResult.Success) Debug.Log("Successfully created OptiX Denoiser!");
-            status = OptixDenoiser.Destroy(denoiser);
-            if (status == OptixResult.Success) Debug.Log("Successfully destroyed OptiX Denoiser!");
-            OptixDeviceContext.Destroy(optixDeviceContext);
+
+            OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
+            OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Hdr, IntPtr.Zero, 0);
+
+            CudaError cudaError = CudaStream.Create(ref cudaStream);
+            if (cudaError == CudaError.Success) Debug.Log("Successfully created CUDA Stream");
+            else Debug.LogError($"CUDA Stream creation failed : {cudaError}");
+
+            optixInputImagesArray = new NativeArray<OptixImage2D>(3, Allocator.Persistent);
 		}
 
 		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
@@ -261,14 +267,14 @@ namespace RaytracerInOneWeekend
 		}
 
 		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
-		static void OnOptixError(uint level, string tag, string message, IntPtr cbdata)
+		static void OnOptixError(OptixLogLevel level, string tag, string message, IntPtr cbdata)
 		{
 			switch (level)
 			{
-				case 1: Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}"); break;
-				case 2: Debug.LogError($"nVidia OptiX Error : {tag} - {message}"); break;
-				case 3: Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}"); break;
-				case 4: Debug.Log($"nVidia OptiX Trace : {tag} - {message}"); break;
+				case OptixLogLevel.Fatal: Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}"); break;
+				case OptixLogLevel.Error: Debug.LogError($"nVidia OptiX Error : {tag} - {message}"); break;
+				case OptixLogLevel.Warning: Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}"); break;
+				case OptixLogLevel.Print: Debug.Log($"nVidia OptiX Trace : {tag} - {message}"); break;
 			}
 		}
 
@@ -302,8 +308,12 @@ namespace RaytracerInOneWeekend
 			debugPaths.SafeDispose();
 #endif
 
-			OpenImageDenoise.NativeApi.Filter.Release(denoiseFilter);
-			OpenImageDenoise.NativeApi.Device.Release(denoiseDevice);
+			OpenImageDenoise.NativeApi.Filter.Release(oidnFilter);
+			OpenImageDenoise.NativeApi.Device.Release(oidnDevice);
+
+			OptixDenoiser.Destroy(optixDenoiser);
+			OptixDeviceContext.Destroy(optixDeviceContext);
+			optixInputImagesArray.SafeDispose();
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -595,19 +605,73 @@ namespace RaytracerInOneWeekend
 			int width = (int) bufferSize.x, height = (int) bufferSize.y;
 
 			NativeArray<float3> denoiseColorOutputBuffer = float3Buffers.Take();
+			JobHandle denoiseJobHandle = default;
 
-			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "color", new IntPtr(combineOutput.Color.GetUnsafePtr()),
-				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "normal", new IntPtr(combineOutput.Normal.GetUnsafePtr()),
-				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "albedo", new IntPtr(combineOutput.Albedo.GetUnsafePtr()),
-				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			OpenImageDenoise.NativeApi.Filter.SetSharedImage(denoiseFilter, "output", new IntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
-				OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-			OpenImageDenoise.NativeApi.Filter.Commit(denoiseFilter);
+			switch (denoiseMode)
+			{
+				case DenoiseMode.OpenImageDenoise:
+				{
+					// TODO: cleanup API
+					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "color",
+						new IntPtr(combineOutput.Color.GetUnsafePtr()),
+						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "normal",
+						new IntPtr(combineOutput.Normal.GetUnsafePtr()),
+						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "albedo",
+						new IntPtr(combineOutput.Albedo.GetUnsafePtr()),
+						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "output",
+						new IntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
+						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OpenImageDenoise.NativeApi.Filter.Commit(oidnFilter);
 
-			var denoiseJob = new DenoiseJob { DenoiseFilter = denoiseFilter };
-			JobHandle denoiseJobHandle = denoiseJob.Schedule();
+					var denoiseJob = new OpenImageDenoiseJob { DenoiseFilter = oidnFilter };
+					denoiseJobHandle = denoiseJob.Schedule();
+					break;
+				}
+
+				case DenoiseMode.NvidiaOptix:
+				{
+					optixInputImagesArray[0] = new OptixImage2D
+					{
+						Data = new UIntPtr(combineOutput.Color.GetUnsafePtr()),
+						Format = OptixPixelFormat.Float3,
+						Width = (uint) bufferSize.x,
+						Height = (uint) bufferSize.y,
+					};
+					optixInputImagesArray[1] = new OptixImage2D
+					{
+						Data = new UIntPtr(combineOutput.Albedo.GetUnsafePtr()),
+						Format = OptixPixelFormat.Float3,
+						Width = (uint) bufferSize.x,
+						Height = (uint) bufferSize.y,
+					};
+					optixInputImagesArray[2] = new OptixImage2D
+					{
+						Data = new UIntPtr(combineOutput.Normal.GetUnsafePtr()),
+						Format = OptixPixelFormat.Float3,
+						Width = (uint) bufferSize.x,
+						Height = (uint) bufferSize.y,
+					};
+
+					var denoiseJob = new OptixDenoiseJob
+					{
+						Denoiser = optixDenoiser,
+						CudaStream = cudaStream,
+						InputImages = optixInputImagesArray,
+						OutputImage = new OptixImage2D
+						{
+							Data = new UIntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
+							Format = OptixPixelFormat.Float3,
+							Width = (uint) bufferSize.x,
+							Height = (uint) bufferSize.y,
+						}
+					};
+					denoiseJobHandle = denoiseJob.Schedule();
+					break;
+				}
+			}
 
 			var copyOutputData = new PassOutputData
 			{

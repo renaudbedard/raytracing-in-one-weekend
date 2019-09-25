@@ -27,7 +27,7 @@ OPTIXDENOISER_API OptixDeviceContext createContext(OptixLogCallback logCallbackF
 		}
 		OptixDeviceContextOptions options = {};
 		options.logCallbackFunction = logCallbackFunction;
-		options.logCallbackLevel = 4;
+		options.logCallbackLevel = logLevel;
 		result = optixDeviceContextCreate(cuCtx, &options, &context);
 		if (result != OPTIX_SUCCESS)
 		{
@@ -42,6 +42,16 @@ OPTIXDENOISER_API OptixDeviceContext createContext(OptixLogCallback logCallbackF
 OPTIXDENOISER_API OptixResult destroyContext(OptixDeviceContext context)
 {
 	return optixDeviceContextDestroy(context);
+}
+
+OPTIXDENOISER_API cudaError_t createCudaStream(cudaStream_t* stream)
+{
+	return cudaStreamCreate(stream);
+}
+
+OPTIXDENOISER_API cudaError_t destroyCudaStream(cudaStream_t stream)
+{
+	return cudaStreamDestroy(stream);
 }
 
 OPTIXDENOISER_API OptixResult createDenoiser(OptixDeviceContext context, const OptixDenoiserOptions* options, OptixDenoiser* denoiser)
@@ -59,11 +69,16 @@ OPTIXDENOISER_API OptixResult setDenoiserModel(OptixDenoiser denoiser, OptixDeno
 	return optixDenoiserSetModel(denoiser, kind, data, sizeInBytes);
 }
 
+OPTIXDENOISER_API OptixResult computeIntensity(OptixDenoiser denoiser, CUstream stream, const OptixImage2D* inputImage, CUdeviceptr outputIntensity, CUdeviceptr scratch, size_t scratchSizeInBytes)
+{
+	return optixDenoiserComputeIntensity(denoiser, stream, inputImage, outputIntensity, scratch, scratchSizeInBytes);
+}
+
 OPTIXDENOISER_API OptixResult invokeDenoiser(
 	OptixDenoiser denoiser, CUstream stream, const OptixDenoiserParams* params, CUdeviceptr denoiserState, size_t denoiserStateSizeInBytes,
 	const OptixImage2D* inputLayers, unsigned int numInputLayers, unsigned int inputOffsetX, unsigned int inputOffsetY, const OptixImage2D* outputLayer, 
 	CUdeviceptr scratch, size_t scratchSizeInBytes)
 {
-	return invokeDenoiser(denoiser, stream, params, denoiserState, denoiserStateSizeInBytes, inputLayers, numInputLayers, inputOffsetX, inputOffsetY,
+	return optixDenoiserInvoke(denoiser, stream, params, denoiserState, denoiserStateSizeInBytes, inputLayers, numInputLayers, inputOffsetX, inputOffsetY,
 		outputLayer, scratch, scratchSizeInBytes);
 }

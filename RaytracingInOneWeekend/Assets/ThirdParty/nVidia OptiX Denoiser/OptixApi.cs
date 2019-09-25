@@ -48,6 +48,21 @@ namespace OptiX
 		ErrorUnknown = 7999,
 	}
 
+	public enum OptixLogLevel
+	{
+		Disable = 0,
+		Fatal = 1,
+		Error = 2,
+		Warning = 3,
+		Print = 4
+	}
+
+	public enum CudaError
+	{
+		Success = 0,
+		ErrorInvalidValue = 1
+	}
+
 	public enum OptixPixelFormat
 	{
 		Half3  = 0x2201,
@@ -71,8 +86,32 @@ namespace OptiX
 		public OptixPixelFormat PixelFormat;
 	}
 
+	public enum OptixModelKind
+	{
+		User = 0x2321,
+		Ldr = 0x2322,
+		Hdr = 0x2323
+	}
+
+	public struct OptixDenoiserParams
+	{
+		public uint DenoiseAlpha;
+		public UIntPtr HdrIntensity;
+		public float BlendFactor;
+	}
+
+	public struct OptixImage2D
+	{
+		public UIntPtr Data;
+		public uint Width;
+		public uint Height;
+		public uint RowStrideInBytes;
+		public uint PixelStrideInBytes;
+		public OptixPixelFormat Format;
+	}
+
 	// TODO: IntPtr is actually a const char*
-	public delegate void OptixErrorFunction(uint level, string tag, string message, IntPtr cbdata);
+	public delegate void OptixErrorFunction(OptixLogLevel level, string tag, string message, IntPtr cbdata);
 
 	static class OptixApi
 	{
@@ -88,7 +127,20 @@ namespace OptiX
 		[NativeDisableUnsafePtrRestriction] public IntPtr Handle;
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "createDenoiser")]
-		public static extern unsafe OptixResult Create(OptixDeviceContext context, OptixDenoiserOptions* options, ref OptixDenoiser denoiser);
+		public static extern unsafe OptixResult Create(OptixDeviceContext context, OptixDenoiserOptions* options, ref OptixDenoiser outDenoiser);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "setDenoiserModel")]
+		public static extern OptixResult SetModel(OptixDenoiser denoiser, OptixModelKind kind, IntPtr data, SizeT sizeInBytes);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "computeIntensity")]
+		public static extern unsafe OptixResult ComputeIntensity(OptixDenoiser denoiser, CudaStream stream,
+			OptixImage2D* inputImage, UIntPtr outputIntensity, UIntPtr scratch, SizeT scratchSizeInBytes);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "invokeDenoiser")]
+		public static extern unsafe OptixResult Invoke(OptixDenoiser denoiser, CudaStream stream,
+			OptixDenoiserParams* parameters, UIntPtr denoiserState, SizeT denoiserStateSizeInBytes,
+			OptixImage2D* inputLayers, uint numInputLayers, uint inputOffsetX, uint inputOffsetY,
+			OptixImage2D* outputLayer, UIntPtr scratch, SizeT scratchSizeInBytes);
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyDenoiser")]
 		public static extern OptixResult Destroy(OptixDenoiser device);
@@ -98,10 +150,21 @@ namespace OptiX
 	{
 		[NativeDisableUnsafePtrRestriction] public IntPtr Handle;
 
-		[DllImport(OptixApi.LibraryFilename, EntryPoint = "createContext")]
-		public static extern OptixDeviceContext Create(OptixErrorFunction logCallback, int logLevel);
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "createDeviceContext")]
+		public static extern OptixDeviceContext Create(OptixErrorFunction logCallback, OptixLogLevel logLevel);
 
-		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyContext")]
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyDeviceContext")]
 		public static extern void Destroy(OptixDeviceContext device);
+	}
+
+	public struct CudaStream
+	{
+		[NativeDisableUnsafePtrRestriction] public IntPtr Handle;
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "createCudaStream")]
+		public static extern CudaError Create(ref CudaStream outStream);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyCudaStream")]
+		public static extern CudaError Destroy(CudaStream stream);
 	}
 }

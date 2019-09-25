@@ -10,10 +10,16 @@ extern "C"
 #endif
 
 // Creates an Optix device context
-OPTIXDENOISER_API OptixDeviceContext __cdecl createContext(OptixLogCallback logCallback, int logLevel);
+OPTIXDENOISER_API OptixDeviceContext __cdecl createDeviceContext(OptixLogCallback logCallback, int logLevel);
 
 // Destroys an Optix device context
-OPTIXDENOISER_API OptixResult __cdecl destroyContext(OptixDeviceContext context);
+OPTIXDENOISER_API OptixResult __cdecl destroyDeviceContext(OptixDeviceContext context);
+
+// Creates a CUDA Stream
+OPTIXDENOISER_API cudaError_t __cdecl createCudaStream(cudaStream_t* stream);
+
+// Destroys a CUDA Stream
+OPTIXDENOISER_API cudaError_t __cdecl destroyCudaStream(cudaStream_t stream);
 
 // Creates a denoiser object with the given options.
 OPTIXDENOISER_API OptixResult __cdecl createDenoiser(OptixDeviceContext context, const OptixDenoiserOptions* options, OptixDenoiser* denoiser);
@@ -22,8 +28,11 @@ OPTIXDENOISER_API OptixResult __cdecl createDenoiser(OptixDeviceContext context,
 OPTIXDENOISER_API OptixResult __cdecl destroyDenoiser(OptixDenoiser denoiser);
 
 // Sets the model of the denoiser.
-// If the kind is OPTIX_DENOISER_MODEL_KIND_USER, then the dataand sizeInByes must not be nulland zero respectively.For other kinds, these parameters must be zero.
+// If the kind is OPTIX_DENOISER_MODEL_KIND_USER, then the data and sizeInByes must not be nulland zero respectively.For other kinds, these parameters must be zero.
 OPTIXDENOISER_API OptixResult __cdecl setDenoiserModel(OptixDenoiser denoiser, OptixDenoiserModelKind kind, void* data, size_t sizeInBytes);
+
+OPTIXDENOISER_API OptixResult __cdecl computeIntensity(OptixDenoiser denoiser, CUstream stream, const OptixImage2D* inputImage, CUdeviceptr outputIntensity, 
+	CUdeviceptr scratch, size_t scratchSizeInBytes);
 
 // Invokes denoiser on a set of input dataand produces one output image.Scratch memory must be available during the execution of the denoiser.
 OPTIXDENOISER_API OptixResult __cdecl invokeDenoiser(

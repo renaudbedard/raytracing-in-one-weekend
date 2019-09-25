@@ -1,8 +1,11 @@
+using System;
+using OptiX;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -326,11 +329,43 @@ namespace RaytracerInOneWeekend
 		public void Execute() => NativeArray<float4>.Copy(Input, Output);
 	}
 
-	struct DenoiseJob : IJob
+	struct OpenImageDenoiseJob : IJob
 	{
 		public OpenImageDenoise.NativeApi.Filter DenoiseFilter;
 
 		public void Execute() => OpenImageDenoise.NativeApi.Filter.Execute(DenoiseFilter);
+	}
+
+	struct OptixDenoiseJob : IJob
+	{
+		public OptixDenoiser Denoiser;
+		public CudaStream CudaStream;
+		public NativeArray<OptixImage2D> InputImages;
+		public OptixImage2D OutputImage;
+
+		public unsafe void Execute()
+		{
+			var inputImagesPointer = (OptixImage2D*) InputImages.GetUnsafeReadOnlyPtr();
+
+			// TODO: what do we do for scratch memory?
+			float hdrIntensity = 0;
+			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, inputImagesPointer, new UIntPtr(&hdrIntensity),
+				UIntPtr.Zero, 0);
+
+			Debug.Log($"HDR Intensity is {hdrIntensity}");
+
+			var denoiserParams = new OptixDenoiserParams
+			{
+				BlendFactor = 1,
+				DenoiseAlpha = 0,
+				HdrIntensity = new UIntPtr(&hdrIntensity)
+			};
+
+			// TODO: what do we do for denoiser state & scratch memory?
+			OptixImage2D outputImage = OutputImage;
+			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, UIntPtr.Zero, 0, inputImagesPointer,
+				(uint) InputImages.Length, 0, 0, &outputImage, UIntPtr.Zero, 0);
+		}
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
