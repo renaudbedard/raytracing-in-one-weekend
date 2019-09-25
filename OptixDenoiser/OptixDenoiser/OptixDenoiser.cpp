@@ -5,7 +5,7 @@
 
 #include "OptixDenoiser.h"
 
-OPTIXDENOISER_API OptixDeviceContext createContext(OptixLogCallback logCallbackFunction, int logLevel)
+OPTIXDENOISER_API OptixDeviceContext createDeviceContext(OptixLogCallback logCallbackFunction, int logLevel)
 {
 	OptixDeviceContext context = nullptr;
 	{
@@ -39,7 +39,7 @@ OPTIXDENOISER_API OptixDeviceContext createContext(OptixLogCallback logCallbackF
 	return context;
 }
 
-OPTIXDENOISER_API OptixResult destroyContext(OptixDeviceContext context)
+OPTIXDENOISER_API OptixResult destroyDeviceContext(OptixDeviceContext context)
 {
 	return optixDeviceContextDestroy(context);
 }
