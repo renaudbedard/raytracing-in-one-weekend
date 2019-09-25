@@ -40,6 +40,10 @@ OPTIXDENOISER_API OptixResult __cdecl invokeDenoiser(
 	const OptixImage2D* inputLayers, unsigned int numInputLayers, unsigned int inputOffsetX, unsigned int inputOffsetY, const OptixImage2D* outputLayer,
 	CUdeviceptr scratch, size_t scratchSizeInBytes);
 
+// Computes the GPU memory resources required to execute the denoiser.
+OPTIXDENOISER_API OptixResult __cdecl computeMemoryResources(OptixDenoiser denoiser, unsigned int outputWidth, unsigned int outputHeight,
+	OptixDenoiserSizes* returnSizes);
+
 #ifdef __cplusplus
 }
 #endif

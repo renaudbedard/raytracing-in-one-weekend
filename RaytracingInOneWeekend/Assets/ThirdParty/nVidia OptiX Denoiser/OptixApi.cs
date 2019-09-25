@@ -110,6 +110,14 @@ namespace OptiX
 		public OptixPixelFormat Format;
 	}
 
+	public struct OptixDenoiserSizes
+	{
+		public SizeT StateSizeInBytes;
+		public SizeT MinimumScratchSizeInBytes;
+		public SizeT RecommendedScratchSizeInBytes;
+		public uint OverlapWindowSizeInPixels;
+	}
+
 	// TODO: IntPtr is actually a const char*
 	public delegate void OptixErrorFunction(OptixLogLevel level, string tag, string message, IntPtr cbdata);
 
@@ -135,6 +143,10 @@ namespace OptiX
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "computeIntensity")]
 		public static extern unsafe OptixResult ComputeIntensity(OptixDenoiser denoiser, CudaStream stream,
 			OptixImage2D* inputImage, UIntPtr outputIntensity, UIntPtr scratch, SizeT scratchSizeInBytes);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "computeMemoryResources")]
+		public static extern unsafe OptixResult ComputeMemoryResources(OptixDenoiser denoiser, uint outputWidth, uint outputHeight,
+			OptixDenoiserSizes* returnSizes);
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "invokeDenoiser")]
 		public static extern unsafe OptixResult Invoke(OptixDenoiser denoiser, CudaStream stream,

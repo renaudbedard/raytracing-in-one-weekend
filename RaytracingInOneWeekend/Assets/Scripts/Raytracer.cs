@@ -109,7 +109,7 @@ namespace RaytracerInOneWeekend
 		OptixDeviceContext optixDeviceContext;
 		OptixDenoiser optixDenoiser;
 		CudaStream cudaStream;
-		NativeArray<OptixImage2D> optixInputImagesArray;
+		NativeArray<byte> optixScratchMemory, optixDenoiserState;
 
 		struct ActiveJobData<T>
 		{
@@ -253,8 +253,6 @@ namespace RaytracerInOneWeekend
             CudaError cudaError = CudaStream.Create(ref cudaStream);
             if (cudaError == CudaError.Success) Debug.Log("Successfully created CUDA Stream");
             else Debug.LogError($"CUDA Stream creation failed : {cudaError}");
-
-            optixInputImagesArray = new NativeArray<OptixImage2D>(3, Allocator.Persistent);
 		}
 
 		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
@@ -313,7 +311,8 @@ namespace RaytracerInOneWeekend
 
 			OptixDenoiser.Destroy(optixDenoiser);
 			OptixDeviceContext.Destroy(optixDeviceContext);
-			optixInputImagesArray.SafeDispose();
+
+			// TODO: delete OptiX buffers
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -633,40 +632,17 @@ namespace RaytracerInOneWeekend
 
 				case DenoiseMode.NvidiaOptix:
 				{
-					optixInputImagesArray[0] = new OptixImage2D
-					{
-						Data = new UIntPtr(combineOutput.Color.GetUnsafePtr()),
-						Format = OptixPixelFormat.Float3,
-						Width = (uint) bufferSize.x,
-						Height = (uint) bufferSize.y,
-					};
-					optixInputImagesArray[1] = new OptixImage2D
-					{
-						Data = new UIntPtr(combineOutput.Albedo.GetUnsafePtr()),
-						Format = OptixPixelFormat.Float3,
-						Width = (uint) bufferSize.x,
-						Height = (uint) bufferSize.y,
-					};
-					optixInputImagesArray[2] = new OptixImage2D
-					{
-						Data = new UIntPtr(combineOutput.Normal.GetUnsafePtr()),
-						Format = OptixPixelFormat.Float3,
-						Width = (uint) bufferSize.x,
-						Height = (uint) bufferSize.y,
-					};
-
 					var denoiseJob = new OptixDenoiseJob
 					{
 						Denoiser = optixDenoiser,
 						CudaStream = cudaStream,
-						InputImages = optixInputImagesArray,
-						OutputImage = new OptixImage2D
-						{
-							Data = new UIntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
-							Format = OptixPixelFormat.Float3,
-							Width = (uint) bufferSize.x,
-							Height = (uint) bufferSize.y,
-						}
+						InputColor =  combineOutput.Color,
+						InputAlbedo =  combineOutput.Albedo,
+						InputNormal =  combineOutput.Normal,
+						OutputColor = denoiseColorOutputBuffer,
+						Size = (uint2) bufferSize,
+						DenoiserState = optixDenoiserState,
+						ScratchMemory = optixScratchMemory
 					};
 					denoiseJobHandle = denoiseJob.Schedule();
 					break;
@@ -811,6 +787,14 @@ namespace RaytracerInOneWeekend
 				float4Buffers.Reset();
 				colorAccumulationBuffer = default;
 				albedoAccumulationBuffer = normalAccumulationBuffer = default;
+
+				OptixDenoiserSizes sizes = default;
+				OptixDenoiser.ComputeMemoryResources(optixDenoiser, (uint) width, (uint) height, &sizes);
+
+				Debug.Log($"Sizes : State={sizes.StateSizeInBytes}, MinScratch={sizes.MinimumScratchSizeInBytes}, RecScratch={sizes.RecommendedScratchSizeInBytes}");
+
+				optixScratchMemory.EnsureCapacity((int) sizes.RecommendedScratchSizeInBytes);
+				optixDenoiserState.EnsureCapacity((int) sizes.StateSizeInBytes);
 			}
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height ||

@@ -340,17 +340,43 @@ namespace RaytracerInOneWeekend
 	{
 		public OptixDenoiser Denoiser;
 		public CudaStream CudaStream;
-		public NativeArray<OptixImage2D> InputImages;
-		public OptixImage2D OutputImage;
+
+		[ReadOnly] public NativeArray<float3> InputColor, InputAlbedo, InputNormal;
+		[ReadOnly] public uint2 Size;
+
+		[WriteOnly] public NativeArray<float3> OutputColor;
+
+		public NativeArray<byte> ScratchMemory, DenoiserState;
 
 		public unsafe void Execute()
 		{
-			var inputImagesPointer = (OptixImage2D*) InputImages.GetUnsafeReadOnlyPtr();
+			var colorImage = new OptixImage2D
+			{
+				Data = new UIntPtr(InputColor.GetUnsafePtr()),
+				Format = OptixPixelFormat.Float3,
+				Width = Size.x, Height = Size.y,
+			};
+			var albedoImage = new OptixImage2D
+			{
+				Data = new UIntPtr(InputAlbedo.GetUnsafePtr()),
+				Format = OptixPixelFormat.Float3,
+				Width = Size.x, Height = Size.y,
+			};
+			var normalImage = new OptixImage2D
+			{
+				Data = new UIntPtr(InputNormal.GetUnsafePtr()),
+				Format = OptixPixelFormat.Float3,
+				Width = Size.x, Height = Size.y,
+			};
 
-			// TODO: what do we do for scratch memory?
+			OptixImage2D* optixImages = stackalloc OptixImage2D[3];
+			optixImages[0] = colorImage;
+			optixImages[1] = albedoImage;
+			optixImages[2] = normalImage;
+
 			float hdrIntensity = 0;
-			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, inputImagesPointer, new UIntPtr(&hdrIntensity),
-				UIntPtr.Zero, 0);
+			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, &colorImage, new UIntPtr(&hdrIntensity),
+				new UIntPtr(ScratchMemory.GetUnsafePtr()), (ulong) ScratchMemory.Length);
 
 			Debug.Log($"HDR Intensity is {hdrIntensity}");
 
@@ -361,10 +387,16 @@ namespace RaytracerInOneWeekend
 				HdrIntensity = new UIntPtr(&hdrIntensity)
 			};
 
-			// TODO: what do we do for denoiser state & scratch memory?
-			OptixImage2D outputImage = OutputImage;
-			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, UIntPtr.Zero, 0, inputImagesPointer,
-				(uint) InputImages.Length, 0, 0, &outputImage, UIntPtr.Zero, 0);
+			var outputImage = new OptixImage2D
+			{
+				Data = new UIntPtr(OutputColor.GetUnsafePtr()),
+				Format = OptixPixelFormat.Float3,
+				Width = Size.x, Height = Size.y,
+			};
+
+			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, new UIntPtr(DenoiserState.GetUnsafePtr()),
+				(ulong) DenoiserState.Length, optixImages, 3, 0, 0,
+				&outputImage, new UIntPtr(ScratchMemory.GetUnsafePtr()), (ulong) ScratchMemory.Length);
 		}
 	}
 
