@@ -2,14 +2,40 @@ using System;
 using System.Runtime.InteropServices;
 using Unity.Collections.LowLevel.Unsafe;
 
-#if UNITY_64
-using SizeT = System.UInt64;
-#else
-using SizeT = System.UInt32;
-#endif
-
 namespace OptiX
 {
+	public struct SizeT
+	{
+#if UNITY_64
+		private ulong Value;
+		public static implicit operator ulong(SizeT operand) => operand.Value;
+		public static implicit operator SizeT(ulong operand) => new SizeT { Value = operand };
+		public static implicit operator SizeT(uint operand) => new SizeT { Value = operand };
+		public static implicit operator SizeT(int operand) => new SizeT { Value = (uint) operand };
+#else
+		private uint Value;
+		public static implicit operator uint(SizeT operand) => operand.Value;
+		public static implicit operator SizeT(uint operand) => new SizeT { Value = operand };
+#endif
+	}
+
+	public enum CudaError
+	{
+		Success = 0,
+		ErrorInvalidValue = 1,
+		ErrorMemoryAllocation = 2,
+		ErrorInvalidMemcpyDirection = 21,
+	}
+
+	public enum CudaMemcpyKind
+	{
+		HostToHost = 0,
+		HostToDevice = 1,
+		DeviceToHost = 2,
+		DeviceToDevice = 3,
+		Default = 4,
+	}
+
 	public enum OptixResult
 	{
 		Success = 0,
@@ -57,27 +83,21 @@ namespace OptiX
 		Print = 4
 	}
 
-	public enum CudaError
-	{
-		Success = 0,
-		ErrorInvalidValue = 1
-	}
-
 	public enum OptixPixelFormat
 	{
 		Half3  = 0x2201,
 		Half4  = 0x2202,
 		Float3 = 0x2203,
 		Float4 = 0x2204,
-		Uchar3 = 0x2205,
-		Uchar4 = 0x2206
+		Uchar3 = 0x2205, // Not implemented
+		Uchar4 = 0x2206  // Not implemented
 	}
 
 	public enum OptixDenoiserInputKind
 	{
 		Rgb = 0x2301,
 		RgbAlbedo = 0x2302,
-		RgbAlbedoNormal = 0x2303,
+		RgbAlbedoNormal = 0x2303, // Not implemented
 	}
 
 	public struct OptixDenoiserOptions
@@ -96,13 +116,13 @@ namespace OptiX
 	public struct OptixDenoiserParams
 	{
 		public uint DenoiseAlpha;
-		public UIntPtr HdrIntensity;
+		public CudaBuffer HdrIntensity;
 		public float BlendFactor;
 	}
 
 	public struct OptixImage2D
 	{
-		public UIntPtr Data;
+		public CudaBuffer Data;
 		public uint Width;
 		public uint Height;
 		public uint RowStrideInBytes;
@@ -145,7 +165,7 @@ namespace OptiX
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "computeIntensity")]
 		public static extern unsafe OptixResult ComputeIntensity(OptixDenoiser denoiser, CudaStream stream,
-			OptixImage2D* inputImage, UIntPtr outputIntensity, UIntPtr scratch, SizeT scratchSizeInBytes);
+			OptixImage2D* inputImage, CudaBuffer outputIntensity, CudaBuffer scratch, SizeT scratchSizeInBytes);
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "computeMemoryResources")]
 		public static extern unsafe OptixResult ComputeMemoryResources(OptixDenoiser denoiser, uint outputWidth, uint outputHeight,
@@ -153,9 +173,9 @@ namespace OptiX
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "invokeDenoiser")]
 		public static extern unsafe OptixResult Invoke(OptixDenoiser denoiser, CudaStream stream,
-			OptixDenoiserParams* parameters, UIntPtr denoiserState, SizeT denoiserStateSizeInBytes,
+			OptixDenoiserParams* parameters, CudaBuffer denoiserState, SizeT denoiserStateSizeInBytes,
 			OptixImage2D* inputLayers, uint numInputLayers, uint inputOffsetX, uint inputOffsetY,
-			OptixImage2D* outputLayer, UIntPtr scratch, SizeT scratchSizeInBytes);
+			OptixImage2D* outputLayer, CudaBuffer scratch, SizeT scratchSizeInBytes);
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyDenoiser")]
 		public static extern OptixResult Destroy(OptixDenoiser device);
@@ -181,5 +201,19 @@ namespace OptiX
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyCudaStream")]
 		public static extern CudaError Destroy(CudaStream stream);
+	}
+
+	public struct CudaBuffer
+	{
+		[NativeDisableUnsafePtrRestriction] public IntPtr Handle;
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "allocateCudaBuffer")]
+		public static extern CudaError Allocate(SizeT sizeInBytes, ref CudaBuffer outBuffer);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "deallocateCudaBuffer")]
+		public static extern CudaError Deallocate(CudaBuffer buffer);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "copyCudaBuffer")]
+		public static extern CudaError Copy(IntPtr source, IntPtr destination, SizeT size, CudaMemcpyKind kind);
 	}
 }

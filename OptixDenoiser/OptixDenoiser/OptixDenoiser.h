@@ -8,9 +8,7 @@
 extern "C" 
 {
 #endif
-
-OPTIXDENOISER_API void __cdecl fullTest(OptixLogCallback logCallback);
-
+	
 // Creates an Optix device context
 OPTIXDENOISER_API OptixDeviceContext __cdecl createDeviceContext(OptixLogCallback logCallback, int logLevel);
 
@@ -45,6 +43,15 @@ OPTIXDENOISER_API OptixResult __cdecl invokeDenoiser(
 // Computes the GPU memory resources required to execute the denoiser.
 OPTIXDENOISER_API OptixResult __cdecl computeMemoryResources(OptixDenoiser denoiser, unsigned int outputWidth, unsigned int outputHeight,
 	OptixDenoiserSizes* returnSizes);
+
+// Allocates a device-resident buffer for use with CUDA
+OPTIXDENOISER_API cudaError_t __cdecl allocateCudaBuffer(size_t sizeInBytes, CUdeviceptr* outPointer);
+
+// Copies a CUDA buffer from host to device or vice-versa
+OPTIXDENOISER_API cudaError_t __cdecl copyCudaBuffer(const void* source, void* destination, size_t size, cudaMemcpyKind kind);
+
+// Deallocates a CUDA buffer
+OPTIXDENOISER_API cudaError_t __cdecl deallocateCudaBuffer(CUdeviceptr buffer);
 
 #ifdef __cplusplus
 }

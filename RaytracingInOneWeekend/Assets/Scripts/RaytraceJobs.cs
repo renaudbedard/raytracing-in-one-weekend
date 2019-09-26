@@ -341,42 +341,43 @@ namespace RaytracerInOneWeekend
 		public OptixDenoiser Denoiser;
 		public CudaStream CudaStream;
 
-		[ReadOnly] public NativeArray<float3> InputColor, InputAlbedo, InputNormal;
+		[ReadOnly] public NativeArray<float3> InputColor, InputAlbedo;
 		[ReadOnly] public uint2 Size;
 
 		[WriteOnly] public NativeArray<float3> OutputColor;
 
-		public NativeArray<byte> ScratchMemory, DenoiserState;
+		public CudaBuffer InputColorBuffer, InputAlbedoBuffer, OutputColorBuffer, ScratchMemory, DenoiserState;
+		public OptixDenoiserSizes BufferSizes;
 
 		public unsafe void Execute()
 		{
+			CudaBuffer.Copy(new IntPtr(InputColor.GetUnsafeReadOnlyPtr()), InputColorBuffer.Handle,
+				InputColor.Length * sizeof(float3), CudaMemcpyKind.HostToDevice);
+			CudaBuffer.Copy(new IntPtr(InputAlbedo.GetUnsafeReadOnlyPtr()), InputAlbedoBuffer.Handle,
+				InputAlbedo.Length * sizeof(float3), CudaMemcpyKind.HostToDevice);
+
 			var colorImage = new OptixImage2D
 			{
-				Data = new UIntPtr(InputColor.GetUnsafePtr()),
+				Data = InputColorBuffer,
 				Format = OptixPixelFormat.Float3,
 				Width = Size.x, Height = Size.y,
 			};
 			var albedoImage = new OptixImage2D
 			{
-				Data = new UIntPtr(InputAlbedo.GetUnsafePtr()),
-				Format = OptixPixelFormat.Float3,
-				Width = Size.x, Height = Size.y,
-			};
-			var normalImage = new OptixImage2D
-			{
-				Data = new UIntPtr(InputNormal.GetUnsafePtr()),
+				Data = InputAlbedoBuffer,
 				Format = OptixPixelFormat.Float3,
 				Width = Size.x, Height = Size.y,
 			};
 
-			OptixImage2D* optixImages = stackalloc OptixImage2D[3];
+			OptixImage2D* optixImages = stackalloc OptixImage2D[2];
 			optixImages[0] = colorImage;
 			optixImages[1] = albedoImage;
-			optixImages[2] = normalImage;
+
+			// WIP
 
 			float hdrIntensity = 0;
 			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, &colorImage, new UIntPtr(&hdrIntensity),
-				new UIntPtr(ScratchMemory.GetUnsafePtr()), (ulong) ScratchMemory.Length);
+				ScratchMemory, BufferSizes.RecommendedScratchSizeInBytes);
 
 			Debug.Log($"HDR Intensity is {hdrIntensity}");
 
@@ -395,7 +396,7 @@ namespace RaytracerInOneWeekend
 			};
 
 			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, new UIntPtr(DenoiserState.GetUnsafePtr()),
-				(ulong) DenoiserState.Length, optixImages, 3, 0, 0,
+				(ulong) DenoiserState.Length, optixImages, 2, 0, 0,
 				&outputImage, new UIntPtr(ScratchMemory.GetUnsafePtr()), (ulong) ScratchMemory.Length);
 		}
 	}
