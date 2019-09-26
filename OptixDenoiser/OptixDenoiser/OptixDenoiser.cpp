@@ -39,6 +39,33 @@ OPTIXDENOISER_API OptixDeviceContext createDeviceContext(OptixLogCallback logCal
 	return context;
 }
 
+OPTIXDENOISER_API void fullTest(OptixLogCallback logCallback)
+{
+	cudaFree(0);
+	CUcontext cuCtx = 0;
+
+	optixInit();
+
+	OptixDeviceContextOptions contextOptions = { };
+	contextOptions.logCallbackFunction = logCallback;
+	contextOptions.logCallbackLevel = 4;
+
+	OptixDeviceContext context;
+	optixDeviceContextCreate(cuCtx, &contextOptions, &context);
+
+	OptixDenoiserOptions denoiserOptions = { };
+	denoiserOptions.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL;
+	denoiserOptions.pixelFormat = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+	OptixDenoiser denoiser;
+	optixDenoiserCreate(context, &denoiserOptions, &denoiser);
+
+	optixDenoiserSetModel(denoiser, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0);
+
+	optixDenoiserDestroy(denoiser);
+	optixDeviceContextDestroy(context);
+}
+
 OPTIXDENOISER_API OptixResult destroyDeviceContext(OptixDeviceContext context)
 {
 	return optixDeviceContextDestroy(context);

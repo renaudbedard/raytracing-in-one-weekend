@@ -121,13 +121,16 @@ namespace OptiX
 	// TODO: IntPtr is actually a const char*
 	public delegate void OptixErrorFunction(OptixLogLevel level, string tag, string message, IntPtr cbdata);
 
-	static class OptixApi
+	public static class OptixApi
 	{
 #if UNITY_64
 		public const string LibraryFilename = "OptiXDenoiser_win64.dll";
 #else
 		public const string LibraryFilename = "OptiXDenoiser_win32.dll";
 #endif
+
+		[DllImport(LibraryFilename, EntryPoint = "fullTest")]
+		public static extern void FullTest(OptixErrorFunction logCallback);
 	}
 
 	public struct OptixDenoiser

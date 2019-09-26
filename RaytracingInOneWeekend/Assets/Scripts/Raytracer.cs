@@ -253,6 +253,8 @@ namespace RaytracerInOneWeekend
             CudaError cudaError = CudaStream.Create(ref cudaStream);
             if (cudaError == CudaError.Success) Debug.Log("Successfully created CUDA Stream");
             else Debug.LogError($"CUDA Stream creation failed : {cudaError}");
+
+			// OptixApi.FullTest(OnOptixError);
 		}
 
 		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
@@ -312,7 +314,8 @@ namespace RaytracerInOneWeekend
 			OptixDenoiser.Destroy(optixDenoiser);
 			OptixDeviceContext.Destroy(optixDeviceContext);
 
-			// TODO: delete OptiX buffers
+			optixDenoiserState.SafeDispose();
+			optixScratchMemory.SafeDispose();
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)

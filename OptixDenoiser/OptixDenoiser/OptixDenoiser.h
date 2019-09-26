@@ -9,6 +9,8 @@ extern "C"
 {
 #endif
 
+OPTIXDENOISER_API void __cdecl fullTest(OptixLogCallback logCallback);
+
 // Creates an Optix device context
 OPTIXDENOISER_API OptixDeviceContext __cdecl createDeviceContext(OptixLogCallback logCallback, int logLevel);
 
