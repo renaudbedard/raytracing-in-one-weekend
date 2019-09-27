@@ -108,8 +108,15 @@ namespace RaytracerInOneWeekend
 
 		OptixDeviceContext optixDeviceContext;
 		OptixDenoiser optixDenoiser;
+		OptixDenoiserSizes optixDenoiserSizes;
 		CudaStream cudaStream;
-		CudaBuffer optixScratchMemory, optixDenoiserState, optixRgbBuffer, optixAlbedoBuffer, optixOutputBuffer;
+
+		private CudaBuffer optixScratchMemory = default,
+			optixDenoiserState = default,
+			optixColorBuffer = default,
+			optixAlbedoBuffer = default,
+			optixOutputBuffer = default,
+			optixIntensityBuffer = default;
 
 		struct ActiveJobData<T>
 		{
@@ -316,9 +323,10 @@ namespace RaytracerInOneWeekend
 
 			if (optixDenoiserState.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixDenoiserState);
 			if (optixScratchMemory.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixScratchMemory);
-			if (optixRgbBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixRgbBuffer);
+			if (optixColorBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixColorBuffer);
 			if (optixAlbedoBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixAlbedoBuffer);
 			if (optixOutputBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixOutputBuffer);
+			if (optixIntensityBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixIntensityBuffer);
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -647,7 +655,12 @@ namespace RaytracerInOneWeekend
 						OutputColor = denoiseColorOutputBuffer,
 						Size = (uint2) bufferSize,
 						DenoiserState = optixDenoiserState,
-						ScratchMemory = optixScratchMemory
+						ScratchMemory = optixScratchMemory,
+						Sizes = optixDenoiserSizes,
+						IntensityBuffer = optixIntensityBuffer,
+						InputAlbedoBuffer = optixAlbedoBuffer,
+						InputColorBuffer = optixColorBuffer,
+						OutputColorBuffer = optixOutputBuffer
 					};
 					denoiseJobHandle = denoiseJob.Schedule();
 					break;
@@ -793,7 +806,7 @@ namespace RaytracerInOneWeekend
 				colorAccumulationBuffer = default;
 				albedoAccumulationBuffer = normalAccumulationBuffer = default;
 
-				RebuildOptixBuffers();
+				RebuildOptixBuffers((uint2) lastBufferSize);
 			}
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height ||
@@ -823,15 +836,30 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		void RebuildOptixBuffers()
+		void RebuildOptixBuffers(uint2 lastBufferSize)
 		{
-			var size = (uint2) bufferSize;
+			var newBufferSize = (uint2) bufferSize;
 
-			OptixDenoiserSizes sizes = default;
-			OptixDenoiser.ComputeMemoryResources(optixDenoiser, size.x, size.y, &sizes);
+			SizeT lastSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float3);
+			SizeT newSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float3);
 
-			optixScratchMemory.EnsureCapacity((int) sizes.RecommendedScratchSizeInBytes);
-			optixDenoiserState.EnsureCapacity((int) sizes.StateSizeInBytes);
+			optixColorBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
+			optixAlbedoBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
+			optixOutputBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
+
+			lastSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float);
+			newSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float);
+
+			optixIntensityBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
+
+			OptixDenoiserSizes lastSizes = optixDenoiserSizes;
+			OptixDenoiserSizes newSizes = default;
+			OptixDenoiser.ComputeMemoryResources(optixDenoiser, newBufferSize.x, newBufferSize.y, &newSizes);
+
+			optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes, newSizes.RecommendedScratchSizeInBytes);
+			optixDenoiserState.EnsureCapacity(lastSizes.StateSizeInBytes, newSizes.StateSizeInBytes);
+
+			optixDenoiserSizes = newSizes;
 		}
 
 		void RebuildWorld()

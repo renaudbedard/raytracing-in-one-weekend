@@ -346,8 +346,8 @@ namespace RaytracerInOneWeekend
 
 		[WriteOnly] public NativeArray<float3> OutputColor;
 
-		public CudaBuffer InputColorBuffer, InputAlbedoBuffer, OutputColorBuffer, ScratchMemory, DenoiserState;
-		public OptixDenoiserSizes BufferSizes;
+		public CudaBuffer InputColorBuffer, InputAlbedoBuffer, OutputColorBuffer, ScratchMemory, DenoiserState, IntensityBuffer;
+		public OptixDenoiserSizes Sizes;
 
 		public unsafe void Execute()
 		{
@@ -373,31 +373,29 @@ namespace RaytracerInOneWeekend
 			optixImages[0] = colorImage;
 			optixImages[1] = albedoImage;
 
-			// WIP
-
-			float hdrIntensity = 0;
-			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, &colorImage, new UIntPtr(&hdrIntensity),
-				ScratchMemory, BufferSizes.RecommendedScratchSizeInBytes);
-
-			Debug.Log($"HDR Intensity is {hdrIntensity}");
+			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, &colorImage, IntensityBuffer, ScratchMemory,
+				Sizes.RecommendedScratchSizeInBytes);
 
 			var denoiserParams = new OptixDenoiserParams
 			{
-				BlendFactor = 1,
+				BlendFactor = 0, // TODO: should this be 1?
 				DenoiseAlpha = 0,
-				HdrIntensity = new UIntPtr(&hdrIntensity)
+				HdrIntensity = IntensityBuffer
 			};
 
 			var outputImage = new OptixImage2D
 			{
-				Data = new UIntPtr(OutputColor.GetUnsafePtr()),
+				Data = OutputColorBuffer,
 				Format = OptixPixelFormat.Float3,
 				Width = Size.x, Height = Size.y,
 			};
 
-			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, new UIntPtr(DenoiserState.GetUnsafePtr()),
-				(ulong) DenoiserState.Length, optixImages, 2, 0, 0,
-				&outputImage, new UIntPtr(ScratchMemory.GetUnsafePtr()), (ulong) ScratchMemory.Length);
+			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, DenoiserState, Sizes.StateSizeInBytes,
+				optixImages, 2, 0, 0,
+				&outputImage, ScratchMemory, Sizes.RecommendedScratchSizeInBytes);
+
+			CudaBuffer.Copy(OutputColorBuffer.Handle, new IntPtr(OutputColor.GetUnsafePtr()),
+				OutputColor.Length * sizeof(float3), CudaMemcpyKind.DeviceToHost);
 		}
 	}
 

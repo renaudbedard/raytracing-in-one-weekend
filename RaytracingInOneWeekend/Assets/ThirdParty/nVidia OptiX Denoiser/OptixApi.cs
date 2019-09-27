@@ -11,6 +11,7 @@ namespace OptiX
 		public static implicit operator ulong(SizeT operand) => operand.Value;
 		public static implicit operator SizeT(ulong operand) => new SizeT { Value = operand };
 		public static implicit operator SizeT(uint operand) => new SizeT { Value = operand };
+		public static implicit operator SizeT(long operand) => new SizeT { Value = (ulong) operand };
 		public static implicit operator SizeT(int operand) => new SizeT { Value = (uint) operand };
 #else
 		private uint Value;
@@ -25,6 +26,7 @@ namespace OptiX
 		ErrorInvalidValue = 1,
 		ErrorMemoryAllocation = 2,
 		ErrorInvalidMemcpyDirection = 21,
+		ErrorIllegalAddress = 700
 	}
 
 	public enum CudaMemcpyKind
@@ -215,5 +217,18 @@ namespace OptiX
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "copyCudaBuffer")]
 		public static extern CudaError Copy(IntPtr source, IntPtr destination, SizeT size, CudaMemcpyKind kind);
+
+		public CudaError EnsureCapacity(SizeT lastSizeInBytes, SizeT newSizeInBytes)
+		{
+			if (newSizeInBytes <= lastSizeInBytes && Handle != IntPtr.Zero)
+				return CudaError.Success;
+
+			if (Handle != IntPtr.Zero)
+			{
+				CudaError error = Deallocate(this);
+				if (error != CudaError.Success) return error;
+			}
+			return Allocate(newSizeInBytes, ref this);
+		}
 	}
 }

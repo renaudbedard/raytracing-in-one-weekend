@@ -10,7 +10,7 @@ OPTIXDENOISER_API OptixDeviceContext createDeviceContext(OptixLogCallback logCal
 	OptixDeviceContext context = nullptr;
 	{
 		cudaError_t error;
-		if ((error = cudaFree(0)) != cudaSuccess)
+		if ((error = cudaDeviceReset()) != cudaSuccess)
 		{
 			if (logCallbackFunction != nullptr)
 				logCallbackFunction(1, "CUDA Initialization Error", cudaGetErrorString(error), nullptr);
