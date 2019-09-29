@@ -259,6 +259,7 @@ namespace RaytracerInOneWeekend
 						sampleAlbedo = hitSkyColor;
 						sampleNormal = -ray.Direction;
 					}
+
 					break;
 				}
 			}
@@ -289,6 +290,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
+		[ReadOnly] public bool LdrMode;
 
 		[WriteOnly] public NativeArray<float3> OutputColor;
 		[WriteOnly] public NativeArray<float3> OutputNormal;
@@ -305,9 +307,17 @@ namespace RaytracerInOneWeekend
 			else if (any(isnan(inputColor))) finalColor = NaNColor;
 			else finalColor = inputColor.xyz / realSampleCount;
 
-			OutputColor[index] = finalColor.xyz;
+			float3 finalAlbedo = realSampleCount == 0 ? 0 : InputAlbedo[index] / realSampleCount;
+
+			if (LdrMode)
+			{
+				finalColor = min(finalColor, 1);
+				finalAlbedo = min(finalAlbedo, 1);
+			}
+
+			OutputColor[index] = finalColor;
 			OutputNormal[index] = normalizesafe(InputNormal[index] / realSampleCount);
-			OutputAlbedo[index] = realSampleCount == 0 ? 0 : InputAlbedo[index] / realSampleCount;
+			OutputAlbedo[index] = finalAlbedo;
 		}
 	}
 
@@ -336,66 +346,70 @@ namespace RaytracerInOneWeekend
 		public void Execute() => OpenImageDenoise.NativeApi.Filter.Execute(DenoiseFilter);
 	}
 
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct OptixDenoiseJob : IJob
 	{
-		public OptixDenoiser Denoiser;
-		public CudaStream CudaStream;
-
 		[ReadOnly] public NativeArray<float3> InputColor, InputAlbedo;
-		[ReadOnly] public uint2 Size;
+		[ReadOnly] public uint2 BufferSize;
+		[ReadOnly] public OptixDenoiserSizes DenoiserSizes;
 
 		[WriteOnly] public NativeArray<float3> OutputColor;
 
-		public CudaBuffer InputColorBuffer, InputAlbedoBuffer, OutputColorBuffer, ScratchMemory, DenoiserState, IntensityBuffer;
-		public OptixDenoiserSizes Sizes;
+		public OptixDenoiser Denoiser;
+		public CudaStream CudaStream;
+
+		public CudaBuffer InputColorBuffer,
+			InputAlbedoBuffer,
+			OutputColorBuffer,
+			ScratchMemory,
+			DenoiserState;
+
+		[BurstDiscard]
+		static void Check(CudaError cudaError)
+		{
+			if (cudaError != CudaError.Success)
+				Debug.LogError($"CUDA Error : {cudaError}");
+		}
 
 		public unsafe void Execute()
 		{
-			CudaBuffer.Copy(new IntPtr(InputColor.GetUnsafeReadOnlyPtr()), InputColorBuffer.Handle,
-				InputColor.Length * sizeof(float3), CudaMemcpyKind.HostToDevice);
-			CudaBuffer.Copy(new IntPtr(InputAlbedo.GetUnsafeReadOnlyPtr()), InputAlbedoBuffer.Handle,
-				InputAlbedo.Length * sizeof(float3), CudaMemcpyKind.HostToDevice);
+			Check(CudaBuffer.Copy(new IntPtr(InputColor.GetUnsafeReadOnlyPtr()), InputColorBuffer.Handle,
+				InputColor.Length * sizeof(float3), CudaMemcpyKind.HostToDevice));
+			Check(CudaBuffer.Copy(new IntPtr(InputAlbedo.GetUnsafeReadOnlyPtr()), InputAlbedoBuffer.Handle,
+				InputAlbedo.Length * sizeof(float3), CudaMemcpyKind.HostToDevice));
 
 			var colorImage = new OptixImage2D
 			{
 				Data = InputColorBuffer,
 				Format = OptixPixelFormat.Float3,
-				Width = Size.x, Height = Size.y,
+				Width = BufferSize.x, Height = BufferSize.y,
 			};
 			var albedoImage = new OptixImage2D
 			{
 				Data = InputAlbedoBuffer,
 				Format = OptixPixelFormat.Float3,
-				Width = Size.x, Height = Size.y,
+				Width = BufferSize.x, Height = BufferSize.y,
 			};
 
 			OptixImage2D* optixImages = stackalloc OptixImage2D[2];
 			optixImages[0] = colorImage;
 			optixImages[1] = albedoImage;
 
-			OptixDenoiser.ComputeIntensity(Denoiser, CudaStream, &colorImage, IntensityBuffer, ScratchMemory,
-				Sizes.RecommendedScratchSizeInBytes);
-
-			var denoiserParams = new OptixDenoiserParams
-			{
-				BlendFactor = 0, // TODO: should this be 1?
-				DenoiseAlpha = 0,
-				HdrIntensity = IntensityBuffer
-			};
+			OptixDenoiserParams denoiserParams = default;
 
 			var outputImage = new OptixImage2D
 			{
 				Data = OutputColorBuffer,
 				Format = OptixPixelFormat.Float3,
-				Width = Size.x, Height = Size.y,
+				Width = BufferSize.x, Height = BufferSize.y,
 			};
 
-			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, DenoiserState, Sizes.StateSizeInBytes,
+			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, DenoiserState, DenoiserSizes.StateSizeInBytes,
 				optixImages, 2, 0, 0,
-				&outputImage, ScratchMemory, Sizes.RecommendedScratchSizeInBytes);
+				&outputImage, ScratchMemory, DenoiserSizes.RecommendedScratchSizeInBytes);
 
-			CudaBuffer.Copy(OutputColorBuffer.Handle, new IntPtr(OutputColor.GetUnsafePtr()),
-				OutputColor.Length * sizeof(float3), CudaMemcpyKind.DeviceToHost);
+			Check(CudaBuffer.Copy(OutputColorBuffer.Handle, new IntPtr(OutputColor.GetUnsafePtr()),
+				OutputColor.Length * sizeof(float3), CudaMemcpyKind.DeviceToHost));
 		}
 	}
 

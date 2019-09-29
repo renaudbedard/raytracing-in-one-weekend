@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System;
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
@@ -159,3 +160,4 @@ namespace RaytracerInOneWeekend
 		}
 	}
 }
+#endif // UNITY_EDITOR

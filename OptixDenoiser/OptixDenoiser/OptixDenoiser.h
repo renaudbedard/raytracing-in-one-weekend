@@ -9,8 +9,17 @@ extern "C"
 {
 #endif
 	
+// Initializes CUDA functionalities
+OPTIXDENOISER_API cudaError_t __cdecl initializeCuda();
+
+// Resets the current CUDA device
+OPTIXDENOISER_API cudaError_t __cdecl resetCudaDevice();
+
+// Initializes the OptiX function table
+OPTIXDENOISER_API OptixResult __cdecl initializeOptix();
+
 // Creates an Optix device context
-OPTIXDENOISER_API OptixDeviceContext __cdecl createDeviceContext(OptixLogCallback logCallback, int logLevel);
+OPTIXDENOISER_API OptixResult __cdecl createDeviceContext(OptixDeviceContextOptions options, OptixDeviceContext* context);
 
 // Destroys an Optix device context
 OPTIXDENOISER_API OptixResult __cdecl destroyDeviceContext(OptixDeviceContext context);
@@ -33,6 +42,10 @@ OPTIXDENOISER_API OptixResult __cdecl setDenoiserModel(OptixDenoiser denoiser, O
 
 OPTIXDENOISER_API OptixResult __cdecl computeIntensity(OptixDenoiser denoiser, CUstream stream, const OptixImage2D* inputImage, CUdeviceptr outputIntensity, 
 	CUdeviceptr scratch, size_t scratchSizeInBytes);
+
+// Initializes the state required by the denoiser.
+OPTIXDENOISER_API OptixResult __cdecl setupDenoiser(OptixDenoiser denoiser, CUstream stream, unsigned int outputWidth, unsigned int outputHeight,
+	CUdeviceptr denoiserState, size_t denoiserStateSizeInBytes, CUdeviceptr scratch, size_t scratchSizeInBytes);
 
 // Invokes denoiser on a set of input dataand produces one output image.Scratch memory must be available during the execution of the denoiser.
 OPTIXDENOISER_API OptixResult __cdecl invokeDenoiser(

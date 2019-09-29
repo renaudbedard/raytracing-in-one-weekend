@@ -111,12 +111,11 @@ namespace RaytracerInOneWeekend
 		OptixDenoiserSizes optixDenoiserSizes;
 		CudaStream cudaStream;
 
-		private CudaBuffer optixScratchMemory = default,
+		CudaBuffer optixScratchMemory = default,
 			optixDenoiserState = default,
 			optixColorBuffer = default,
 			optixAlbedoBuffer = default,
-			optixOutputBuffer = default,
-			optixIntensityBuffer = default;
+			optixOutputBuffer = default;
 
 		struct ActiveJobData<T>
 		{
@@ -161,6 +160,7 @@ namespace RaytracerInOneWeekend
 		float focusDistance;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
+		bool queuedAccumulate;
 		ImportanceSamplingMode lastSamplingMode;
 		DenoiseMode lastDenoise;
 
@@ -240,6 +240,8 @@ namespace RaytracerInOneWeekend
 
 		void InitDenoisers()
 		{
+			// Open Image Denoise
+
 			oidnDevice = OpenImageDenoise.NativeApi.Device.New(OpenImageDenoise.NativeApi.Device.Type.Default);
 			OpenImageDenoise.NativeApi.Device.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
 			OpenImageDenoise.NativeApi.Device.Commit(oidnDevice);
@@ -247,21 +249,45 @@ namespace RaytracerInOneWeekend
             oidnFilter = OpenImageDenoise.NativeApi.Filter.New(oidnDevice, "RT");
             OpenImageDenoise.NativeApi.Filter.Set(oidnFilter, "hdr", true);
 
-            optixDeviceContext = OptixDeviceContext.Create(OnOptixError, OptixLogLevel.Print);
+            // OptiX
+
+            CudaError cudaError;
+            if ((cudaError = OptixApi.InitializeCuda()) != CudaError.Success)
+            {
+	            Debug.LogError($"CUDA initialization failed : {cudaError}");
+	            return;
+            }
+
+            OptixResult result;
+            if ((result = OptixApi.Initialize()) != OptixResult.Success)
+            {
+	            Debug.LogError($"OptiX initialization failed : {result}");
+	            return;
+            }
+
+            var options = new OptixDeviceContextOptions
+            {
+				LogCallbackFunction = OnOptixError,
+				LogCallbackLevel = OptixLogLevel.Warning
+            };
+
+            if ((result = OptixDeviceContext.Create(options, ref optixDeviceContext)) != OptixResult.Success)
+            {
+	            Debug.LogError($"Optix device creation failed : {result}");
+	            return;
+            }
+
             var denoiseOptions = new OptixDenoiserOptions
             {
 	            InputKind = OptixDenoiserInputKind.RgbAlbedo,
-	            PixelFormat = OptixPixelFormat.Half3
+	            PixelFormat = OptixPixelFormat.Float3
             };
 
             OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
-            OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Hdr, IntPtr.Zero, 0);
+            OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Ldr, IntPtr.Zero, 0);
 
-            CudaError cudaError = CudaStream.Create(ref cudaStream);
-            if (cudaError == CudaError.Success) Debug.Log("Successfully created CUDA Stream");
-            else Debug.LogError($"CUDA Stream creation failed : {cudaError}");
-
-			// OptixApi.FullTest(OnOptixError);
+            if ((cudaError = CudaStream.Create(ref cudaStream)) != CudaError.Success)
+				Debug.LogError($"CUDA Stream creation failed : {cudaError}");
 		}
 
 		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
@@ -321,12 +347,19 @@ namespace RaytracerInOneWeekend
 			OptixDenoiser.Destroy(optixDenoiser);
 			OptixDeviceContext.Destroy(optixDeviceContext);
 
-			if (optixDenoiserState.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixDenoiserState);
-			if (optixScratchMemory.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixScratchMemory);
-			if (optixColorBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixColorBuffer);
-			if (optixAlbedoBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixAlbedoBuffer);
-			if (optixOutputBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixOutputBuffer);
-			if (optixIntensityBuffer.Handle != IntPtr.Zero) CudaBuffer.Deallocate(optixIntensityBuffer);
+			void Check(CudaError cudaError)
+			{
+				if (cudaError != CudaError.Success)
+					Debug.LogError($"CUDA Error : {cudaError}");
+			}
+
+			Check(CudaStream.Destroy(cudaStream));
+
+			Check(CudaBuffer.Deallocate(optixDenoiserState));
+			Check(CudaBuffer.Deallocate(optixScratchMemory));
+			Check(CudaBuffer.Deallocate(optixColorBuffer));
+			Check(CudaBuffer.Deallocate(optixAlbedoBuffer));
+			Check(CudaBuffer.Deallocate(optixOutputBuffer));
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -381,7 +414,12 @@ namespace RaytracerInOneWeekend
 						ScheduleCombine(completedJob.OutputData);
 
 					if (AccumulatedSamples < samplesPerPixel && !traceNeedsReset)
-						ScheduleAccumulate(AccumulatedSamples >= samplesPerPixel);
+					{
+						if (float3Buffers.FreeCount < 6)
+							queuedAccumulate = true;
+						else
+							ScheduleAccumulate(AccumulatedSamples >= samplesPerPixel);
+					}
 				}
 			}
 
@@ -437,6 +475,12 @@ namespace RaytracerInOneWeekend
 				if (cameraDirty) CleanCamera();
 
 				ScheduleAccumulate(traceNeedsReset || AccumulatedSamples >= samplesPerPixel);
+			}
+
+			if (queuedAccumulate && float3Buffers.FreeCount >= 6)
+			{
+				ScheduleAccumulate(AccumulatedSamples >= samplesPerPixel);
+				queuedAccumulate = false;
 			}
 
 			// TODO: is this needed? when?
@@ -578,7 +622,9 @@ namespace RaytracerInOneWeekend
 
 				OutputColor = float3Buffers.Take(),
 				OutputNormal = float3Buffers.Take(),
-				OutputAlbedo = float3Buffers.Take()
+				OutputAlbedo = float3Buffers.Take(),
+
+				LdrMode = denoiseMode == DenoiseMode.NvidiaOptix
 			};
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
@@ -653,11 +699,10 @@ namespace RaytracerInOneWeekend
 						InputColor =  combineOutput.Color,
 						InputAlbedo = combineOutput.Albedo,
 						OutputColor = denoiseColorOutputBuffer,
-						Size = (uint2) bufferSize,
+						BufferSize = (uint2) bufferSize,
 						DenoiserState = optixDenoiserState,
 						ScratchMemory = optixScratchMemory,
-						Sizes = optixDenoiserSizes,
-						IntensityBuffer = optixIntensityBuffer,
+						DenoiserSizes = optixDenoiserSizes,
 						InputAlbedoBuffer = optixAlbedoBuffer,
 						InputColorBuffer = optixColorBuffer,
 						OutputColorBuffer = optixOutputBuffer
@@ -841,25 +886,29 @@ namespace RaytracerInOneWeekend
 			var newBufferSize = (uint2) bufferSize;
 
 			SizeT lastSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float3);
-			SizeT newSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float3);
+			SizeT newSizeInBytes = newBufferSize.x * newBufferSize.y * sizeof(float3);
 
-			optixColorBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
-			optixAlbedoBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
-			optixOutputBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
+			void Check(CudaError cudaError)
+			{
+				if (cudaError != CudaError.Success)
+					Debug.LogError($"CUDA Error : {cudaError}");
+			}
 
-			lastSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float);
-			newSizeInBytes = lastBufferSize.x * lastBufferSize.y * sizeof(float);
-
-			optixIntensityBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes);
+			Check(optixColorBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes));
+			Check(optixAlbedoBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes));
+			Check(optixOutputBuffer.EnsureCapacity(lastSizeInBytes, newSizeInBytes));
 
 			OptixDenoiserSizes lastSizes = optixDenoiserSizes;
 			OptixDenoiserSizes newSizes = default;
 			OptixDenoiser.ComputeMemoryResources(optixDenoiser, newBufferSize.x, newBufferSize.y, &newSizes);
 
-			optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes, newSizes.RecommendedScratchSizeInBytes);
-			optixDenoiserState.EnsureCapacity(lastSizes.StateSizeInBytes, newSizes.StateSizeInBytes);
+			Check(optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes, newSizes.RecommendedScratchSizeInBytes));
+			Check(optixDenoiserState.EnsureCapacity(lastSizes.StateSizeInBytes, newSizes.StateSizeInBytes));
 
 			optixDenoiserSizes = newSizes;
+
+			OptixDenoiser.Setup(optixDenoiser, cudaStream, newBufferSize.x, newBufferSize.y, optixDenoiserState,
+				newSizes.StateSizeInBytes, optixScratchMemory, newSizes.RecommendedScratchSizeInBytes);
 		}
 
 		void RebuildWorld()

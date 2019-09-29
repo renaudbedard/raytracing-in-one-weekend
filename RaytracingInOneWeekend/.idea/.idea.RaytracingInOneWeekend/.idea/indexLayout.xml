@@ -25,7 +25,6 @@
       <Path>Logs</Path>
       <Path>Media</Path>
       <Path>MemoryCaptures</Path>
-      <Path>Temp</Path>
       <Path>obj</Path>
     </explicitExcludes>
   </component>

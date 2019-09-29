@@ -1,6 +1,3 @@
-
-using Unity.Mathematics;
-using Random = Unity.Mathematics.Random;
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;

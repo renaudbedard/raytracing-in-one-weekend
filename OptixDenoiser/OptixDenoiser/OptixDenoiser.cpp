@@ -5,38 +5,25 @@
 
 #include "OptixDenoiser.h"
 
-OPTIXDENOISER_API OptixDeviceContext createDeviceContext(OptixLogCallback logCallbackFunction, int logLevel)
+OPTIXDENOISER_API cudaError_t initializeCuda()
 {
-	OptixDeviceContext context = nullptr;
-	{
-		cudaError_t error;
-		if ((error = cudaDeviceReset()) != cudaSuccess)
-		{
-			if (logCallbackFunction != nullptr)
-				logCallbackFunction(1, "CUDA Initialization Error", cudaGetErrorString(error), nullptr);
-			return nullptr;
-		}
+	return cudaFree(0);
+}
 
-		CUcontext cuCtx = 0;  // zero means take the current context
-		OptixResult result = optixInit();
-		if (result != OPTIX_SUCCESS)
-		{
-			if (logCallbackFunction != nullptr)
-				logCallbackFunction(1, optixGetErrorName(result), optixGetErrorString(result), nullptr);
-			return nullptr;
-		}
-		OptixDeviceContextOptions options = {};
-		options.logCallbackFunction = logCallbackFunction;
-		options.logCallbackLevel = logLevel;
-		result = optixDeviceContextCreate(cuCtx, &options, &context);
-		if (result != OPTIX_SUCCESS)
-		{
-			if (logCallbackFunction != nullptr)
-				logCallbackFunction(1, optixGetErrorName(result), optixGetErrorString(result), nullptr);
-			return nullptr;
-		}
-	}
-	return context;
+OPTIXDENOISER_API cudaError_t resetCudaDevice()
+{
+	return cudaDeviceReset();
+}
+
+OPTIXDENOISER_API OptixResult initializeOptix()
+{
+	return optixInit();
+}
+
+OPTIXDENOISER_API OptixResult createDeviceContext(OptixDeviceContextOptions options, OptixDeviceContext* context)
+{
+	CUcontext cuCtx = 0;  // zero means take the current context
+	return optixDeviceContextCreate(cuCtx, &options, context);
 }
 
 OPTIXDENOISER_API OptixResult destroyDeviceContext(OptixDeviceContext context)
@@ -73,6 +60,12 @@ OPTIXDENOISER_API OptixResult computeIntensity(OptixDenoiser denoiser, CUstream 
 	CUdeviceptr scratch, size_t scratchSizeInBytes)
 {
 	return optixDenoiserComputeIntensity(denoiser, stream, inputImage, outputIntensity, scratch, scratchSizeInBytes);
+}
+
+OPTIXDENOISER_API OptixResult setupDenoiser(OptixDenoiser denoiser, CUstream stream, unsigned int outputWidth, unsigned int outputHeight, 
+	CUdeviceptr denoiserState, size_t denoiserStateSizeInBytes, CUdeviceptr scratch, size_t scratchSizeInBytes)
+{
+	return optixDenoiserSetup(denoiser, stream, outputWidth, outputHeight, denoiserState, denoiserStateSizeInBytes, scratch, scratchSizeInBytes);
 }
 
 OPTIXDENOISER_API OptixResult invokeDenoiser(

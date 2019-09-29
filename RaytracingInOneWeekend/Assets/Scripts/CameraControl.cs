@@ -17,9 +17,9 @@ namespace RaytracerInOneWeekend
 
 		[SerializeField] [Range(0, 100)] float movementSpeed = 1;
 
-		Vector2 lastMousePosition;
 		Vector3 orbitCenter;
 		float dragDistance;
+		bool freeLook;
 
 		void Reset()
 		{
@@ -43,32 +43,26 @@ namespace RaytracerInOneWeekend
 			if (keyboard.qKey.isPressed) transform.Translate(dt * speed * Vector3.up, Space.Self);
 			if (keyboard.eKey.isPressed) transform.Translate(dt * speed * Vector3.down, Space.Self);
 
-			var mousePosition = mouse.position.ReadValue();
-
-			var mouseViewportPosition = camera.ScreenToViewportPoint(mousePosition);
-			if (mouseViewportPosition.x < 0 || mouseViewportPosition.x > 1 ||
-				mouseViewportPosition.y < 0 || mouseViewportPosition.y > 1)
-			{
-				return;
-			}
+			var mouseDelta = mouse.delta.ReadValue();
 
 			var scrollValue = mouse.scroll.ReadValue();
 			if (!Mathf.Approximately(scrollValue.y, 0))
 				transform.Translate(scrollValue.y / 360 * Vector3.forward, Space.Self);
 
-			if (mouse.leftButton.isPressed)
+			if (keyboard.escapeKey.wasPressedThisFrame)
+				freeLook = !freeLook;
+
+			if (freeLook || mouse.leftButton.isPressed)
 			{
-				if (mousePosition != lastMousePosition)
+				if (mouseDelta != Vector2.zero)
 				{
-					var mouseMovement = mousePosition - lastMousePosition;
+					var mouseMovement = mouseDelta;
 					mouseMovement /= Screen.dpi;
 					mouseMovement *= 5;
 
 					transform.Rotate(-mouseMovement.y, mouseMovement.x, 0, Space.Self);
 
 					ResetRoll();
-
-					lastMousePosition = mousePosition;
 				}
 			}
 			else if (mouse.rightButton.isPressed)
@@ -85,9 +79,9 @@ namespace RaytracerInOneWeekend
 					orbitCenter = origin + forward * distance;
 				}
 
-				if (mousePosition != lastMousePosition)
+				if (mouseDelta != Vector2.zero)
 				{
-					var mouseMovement = mousePosition - lastMousePosition;
+					var mouseMovement = mouseDelta;
 					mouseMovement /= Screen.dpi;
 					mouseMovement *= 10;
 
@@ -95,8 +89,6 @@ namespace RaytracerInOneWeekend
 					transform.RotateAround(orbitCenter, transform.up, mouseMovement.x);
 
 					ResetRoll();
-
-					lastMousePosition = mousePosition;
 				}
 			}
 			else if (mouse.middleButton.isPressed)
@@ -113,19 +105,15 @@ namespace RaytracerInOneWeekend
 					}
 				}
 
-				if (mousePosition != lastMousePosition)
+				if (mouseDelta != Vector2.zero)
 				{
-					var mouseMovement = mousePosition - lastMousePosition;
+					var mouseMovement = mouseDelta;
 					mouseMovement /= Screen.dpi * 15;
 					mouseMovement *= dragDistance;
 
 					transform.Translate(-mouseMovement.x, -mouseMovement.y, 0, Space.Self);
-
-					lastMousePosition = mousePosition;
 				}
 			}
-			else
-				lastMousePosition = mousePosition;
 		}
 
 		void ResetRoll()

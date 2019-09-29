@@ -29,6 +29,9 @@ namespace RaytracerInOneWeekend
 			Capacity = oldCapacity;
 		}
 
+		public int TakenCount => freeIndex;
+		public int FreeCount => Capacity - TakenCount;
+
 		public int Capacity
 		{
 			get => items.Length;

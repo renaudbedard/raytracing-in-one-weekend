@@ -141,7 +141,14 @@ namespace OptiX
 	}
 
 	// TODO: IntPtr is actually a const char*
-	public delegate void OptixErrorFunction(OptixLogLevel level, string tag, string message, IntPtr cbdata);
+	public delegate void OptixLogCallback(OptixLogLevel level, string tag, string message, IntPtr cbdata);
+
+	public struct OptixDeviceContextOptions
+	{
+		public OptixLogCallback LogCallbackFunction;
+		public IntPtr LogCallbackData;
+		public OptixLogLevel LogCallbackLevel;
+	}
 
 	public static class OptixApi
 	{
@@ -151,8 +158,14 @@ namespace OptiX
 		public const string LibraryFilename = "OptiXDenoiser_win32.dll";
 #endif
 
-		[DllImport(LibraryFilename, EntryPoint = "fullTest")]
-		public static extern void FullTest(OptixErrorFunction logCallback);
+		[DllImport(LibraryFilename, EntryPoint = "initializeOptix")]
+		public static extern OptixResult Initialize();
+
+		[DllImport(LibraryFilename, EntryPoint = "initializeCuda")]
+		public static extern CudaError InitializeCuda();
+
+		[DllImport(LibraryFilename, EntryPoint = "resetCudaDevice")]
+		public static extern CudaError ResetCudaDevice();
 	}
 
 	public struct OptixDenoiser
@@ -164,6 +177,10 @@ namespace OptiX
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "setDenoiserModel")]
 		public static extern OptixResult SetModel(OptixDenoiser denoiser, OptixModelKind kind, IntPtr data, SizeT sizeInBytes);
+
+		[DllImport(OptixApi.LibraryFilename, EntryPoint = "setupDenoiser")]
+		public static extern OptixResult Setup(OptixDenoiser denoiser, CudaStream stream, uint outputWidth, uint outputHeight,
+			CudaBuffer denoiserState, SizeT denoiserStateSizeInBytes, CudaBuffer scratch, SizeT scratchSizeInBytes);
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "computeIntensity")]
 		public static extern unsafe OptixResult ComputeIntensity(OptixDenoiser denoiser, CudaStream stream,
@@ -188,7 +205,7 @@ namespace OptiX
 		[NativeDisableUnsafePtrRestriction] public IntPtr Handle;
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "createDeviceContext")]
-		public static extern OptixDeviceContext Create(OptixErrorFunction logCallback, OptixLogLevel logLevel);
+		public static extern unsafe OptixResult Create(OptixDeviceContextOptions options, ref OptixDeviceContext outContext);
 
 		[DllImport(OptixApi.LibraryFilename, EntryPoint = "destroyDeviceContext")]
 		public static extern void Destroy(OptixDeviceContext device);

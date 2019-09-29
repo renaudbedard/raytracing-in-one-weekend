@@ -1,7 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
 using Unity.Mathematics;
-using UnityEditor;
 using UnityEngine;
 
 #if ODIN_INSPECTOR
@@ -113,6 +110,9 @@ namespace RaytracerInOneWeekend
 			return data;
 		}
 
+		bool TextureCanScale => (albedo && albedo.Type == TextureType.CheckerPattern) ||
+		                        (emission && emission.Type == TextureType.CheckerPattern);
+
 #if UNITY_EDITOR
 		bool dirty;
 		public bool Dirty => dirty || (albedo && albedo.Dirty) || (emission && emission.Dirty);
@@ -128,9 +128,6 @@ namespace RaytracerInOneWeekend
 		{
 			dirty = true;
 		}
-
-		bool TextureCanScale => (albedo && albedo.Type == TextureType.CheckerPattern) ||
-								(emission && emission.Type == TextureType.CheckerPattern);
 #endif
 	}
 }
