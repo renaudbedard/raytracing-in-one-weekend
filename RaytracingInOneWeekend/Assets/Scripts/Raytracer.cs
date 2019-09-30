@@ -616,6 +616,9 @@ namespace RaytracerInOneWeekend
 
 			var combineJob = new CombineJob
 			{
+				DebugMode = denoiseMode == DenoiseMode.None,
+				LdrMode = denoiseMode == DenoiseMode.NvidiaOptix,
+
 				InputColor = accumulateOutput.Color,
 				InputNormal = accumulateOutput.Normal,
 				InputAlbedo = accumulateOutput.Albedo,
@@ -623,8 +626,6 @@ namespace RaytracerInOneWeekend
 				OutputColor = float3Buffers.Take(),
 				OutputNormal = float3Buffers.Take(),
 				OutputAlbedo = float3Buffers.Take(),
-
-				LdrMode = denoiseMode == DenoiseMode.NvidiaOptix
 			};
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);

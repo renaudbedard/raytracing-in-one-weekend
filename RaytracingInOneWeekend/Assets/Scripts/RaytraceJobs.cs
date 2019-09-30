@@ -116,6 +116,8 @@ namespace RaytracerInOneWeekend
 			float3* emissionStack = stackalloc float3[TraceDepth];
 			float3* attenuationStack = stackalloc float3[TraceDepth];
 
+			float3 fallbackAlbedo = default, fallbackNormal = default;
+
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0.5f)) / Size;
@@ -136,11 +138,17 @@ namespace RaytracerInOneWeekend
 
 					sampleCount++;
 				}
+
+				if (s == 0)
+				{
+					fallbackNormal = sampleNormal;
+					fallbackAlbedo = sampleAlbedo;
+				}
 			}
 
 			OutputColor[index] = float4(colorAcc, sampleCount);
-			OutputNormal[index] = normalAcc;
-			OutputAlbedo[index] = albedoAcc;
+			OutputNormal[index] = sampleCount == 0 ? fallbackNormal : normalAcc;
+			OutputAlbedo[index] = sampleCount == 0 ? fallbackAlbedo : albedoAcc;
 
 			OutputDiagnostics[index] = diagnostics;
 		}
@@ -287,10 +295,12 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
 		static readonly float3 NaNColor = new float3(0, 1, 1);
 
+		public bool DebugMode;
+		public bool LdrMode;
+
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
-		[ReadOnly] public bool LdrMode;
 
 		[WriteOnly] public NativeArray<float3> OutputColor;
 		[WriteOnly] public NativeArray<float3> OutputNormal;
@@ -303,11 +313,20 @@ namespace RaytracerInOneWeekend
 			var realSampleCount = (int) inputColor.w;
 
 			float3 finalColor;
-			if (realSampleCount == 0) finalColor = NoSamplesColor;
-			else if (any(isnan(inputColor))) finalColor = NaNColor;
-			else finalColor = inputColor.xyz / realSampleCount;
+			if (!DebugMode)
+			{
+				if (realSampleCount == 0) finalColor = 0;
+				else if (any(isnan(inputColor))) finalColor = 0;
+				else finalColor = inputColor.xyz / realSampleCount;
+			}
+			else
+			{
+				if (realSampleCount == 0) finalColor = NoSamplesColor;
+				else if (any(isnan(inputColor))) finalColor = NaNColor;
+				else finalColor = inputColor.xyz / realSampleCount;
+			}
 
-			float3 finalAlbedo = realSampleCount == 0 ? 0 : InputAlbedo[index] / realSampleCount;
+			float3 finalAlbedo = InputAlbedo[index] / max(realSampleCount, 1);
 
 			if (LdrMode)
 			{
@@ -316,7 +335,7 @@ namespace RaytracerInOneWeekend
 			}
 
 			OutputColor[index] = finalColor;
-			OutputNormal[index] = normalizesafe(InputNormal[index] / realSampleCount);
+			OutputNormal[index] = normalizesafe(InputNormal[index] / max(realSampleCount, 1));
 			OutputAlbedo[index] = finalAlbedo;
 		}
 	}
