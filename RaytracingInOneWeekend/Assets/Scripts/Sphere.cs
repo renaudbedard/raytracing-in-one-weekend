@@ -13,9 +13,9 @@ namespace RaytracerInOneWeekend
 			SquaredRadius = radius * radius;
 		}
 
-		public float PdfValue(Ray r, HitRecord rec)
+		public float PdfValue(float3 entityLocalRayOrigin)
 		{
-			float cosThetaMax = sqrt(1 - SquaredRadius / lengthsq(-r.Origin));
+			float cosThetaMax = sqrt(1 - SquaredRadius / lengthsq(-entityLocalRayOrigin));
 			float solidAngle = 2 * PI * (1 - cosThetaMax);
 			return 1 / solidAngle;
 		}

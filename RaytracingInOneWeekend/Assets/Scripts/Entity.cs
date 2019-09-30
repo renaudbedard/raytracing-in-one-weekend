@@ -68,18 +68,32 @@ namespace RaytracerInOneWeekend
 		[Pure]
 		public bool Hit(Ray ray, float tMin, float tMax, ref Random rng, out HitRecord rec)
 		{
-			RigidTransform transformAtTime = TransformAtTime(ray.Time);
+			if (HitInternal(ray, tMin, tMax, ref rng, out float distance, out float3 normal,
+				out RigidTransform transformAtTime, out _))
+			{
+				// TODO: normal is disregarded for isotropic materials
+				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, normal)), Id);
+				return true;
+			}
+
+			rec = default;
+			return false;
+		}
+
+		bool HitInternal(Ray ray, float tMin, float tMax, ref Random rng,
+			out float distance, out float3 normal, out RigidTransform transformAtTime, out float3 entityLocalRayOrigin)
+		{
+			transformAtTime = TransformAtTime(ray.Time);
 			RigidTransform inverseTransform = inverse(transformAtTime);
 
 			var entitySpaceRay = new Ray(
 				transform(inverseTransform, ray.Origin),
 				rotate(inverseTransform, ray.Direction));
 
-			if (!HitContent(entitySpaceRay, tMin, tMax, out float distance, out float3 normal))
-			{
-				rec = default;
+			entityLocalRayOrigin = entitySpaceRay.Origin;
+
+			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out normal))
 				return false;
-			}
 
 			if (Material.Type == MaterialType.Isotropic)
 			{
@@ -97,15 +111,12 @@ namespace RaytracerInOneWeekend
 				if (volumeHitDistance < distanceInsideBoundary)
 				{
 					distance = entryDistance + volumeHitDistance;
-					rec = new HitRecord(distance, ray.GetPoint(distance), default, Id);
 					return true;
 				}
 
-				rec = default;
 				return false;
 			}
 
-			rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, normal)), Id);
 			return true;
 		}
 
@@ -126,19 +137,17 @@ namespace RaytracerInOneWeekend
 
 		public float PdfValue(Ray r, ref Random rng)
 		{
-			if (Hit(r, 0.001f, float.PositiveInfinity, ref rng, out HitRecord rec))
+			if (HitInternal(r, 0.001f, float.PositiveInfinity, ref rng, out float distance, out float3 normal, out _,
+				out float3 entityLocalRayOrigin))
 			{
-				RigidTransform transformAtTime = TransformAtTime(r.Time);
-				RigidTransform inverseTransform = inverse(transformAtTime);
-
-				var entitySpaceRay = new Ray(
-					transform(inverseTransform, r.Origin),
-					rotate(inverseTransform, r.Direction));
-
 				switch (Type)
 				{
-					case EntityType.Rect: return ((Rect*) content)->PdfValue(r, rec);
-					case EntityType.Sphere: return ((Sphere*) content)->PdfValue(entitySpaceRay, rec);
+					case EntityType.Rect:
+						return ((Rect*) content)->PdfValue(r.Direction, distance, normal);
+
+					case EntityType.Sphere:
+						return ((Sphere*) content)->PdfValue(entityLocalRayOrigin);
+
 					default: throw new NotImplementedException();
 				}
 			}

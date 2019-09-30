@@ -25,23 +25,11 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		[BurstDiscard]
-		void Validate(Ray r, HitRecord rec)
+		public float PdfValue(float3 rayDirection, float hitDistance, float3 hitNormal)
 		{
-			Assert.IsTrue(length(r.Direction).AlmostEquals(1),
-				$"Ray direction was assumed to be unit-length; length was {length(r.Direction):0.#######}");
-			Assert.IsTrue(length(rec.Normal).AlmostEquals(1),
-				$"HitRecord normal was assumed to be unit-length; length was {length(rec.Normal):0.#######}");
-			Assert.IsTrue( dot(r.Direction, -rec.Normal) > 0,
-				$"Cosine was assumed to be greater than 0; it was {dot(r.Direction, -rec.Normal):0.#######}");
-		}
-
-		public float PdfValue(Ray r, HitRecord rec)
-		{
-			Validate(r, rec);
 			float area = Area;
-			float distanceSquared = rec.Distance * rec.Distance;
-			float cosine = dot(r.Direction, -rec.Normal);
+			float distanceSquared = hitDistance * hitDistance;
+			float cosine = dot(rayDirection, -hitNormal);
 			return distanceSquared / (cosine * area);
 		}
 
