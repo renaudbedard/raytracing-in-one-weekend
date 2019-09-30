@@ -145,9 +145,8 @@ namespace RaytracerInOneWeekend
 			{
 				switch (Type)
 				{
-					case MaterialType.Dielectric:
-					case MaterialType.Metal:
-						return Parameter.AlmostEquals(0);
+					case MaterialType.Dielectric: return true;
+					case MaterialType.Metal: return Parameter.AlmostEquals(0);
 				}
 				return false;
 			}

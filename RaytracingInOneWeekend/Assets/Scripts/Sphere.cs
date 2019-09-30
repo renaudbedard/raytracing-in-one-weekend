@@ -1,3 +1,4 @@
+using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -11,6 +12,16 @@ namespace RaytracerInOneWeekend
 			Radius = radius;
 			SquaredRadius = radius * radius;
 		}
+
+		public float PdfValue(Ray r, HitRecord rec)
+		{
+			float cosThetaMax = sqrt(1 - SquaredRadius / lengthsq(-r.Origin));
+			float solidAngle = 2 * PI * (1 - cosThetaMax);
+			return 1 / solidAngle;
+		}
+
+		// TODO: this could (should?) be view-dependent
+		public float3 RandomPoint(ref Random rng) => rng.NextFloat3Direction() * Radius;
 
 		public AxisAlignedBoundingBox Bounds
 		{

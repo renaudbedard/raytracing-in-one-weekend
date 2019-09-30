@@ -45,10 +45,6 @@ namespace RaytracerInOneWeekend
 
 			var mouseDelta = mouse.delta.ReadValue();
 
-			var scrollValue = mouse.scroll.ReadValue();
-			if (!Mathf.Approximately(scrollValue.y, 0))
-				transform.Translate(scrollValue.y / 360 * Vector3.forward, Space.Self);
-
 			if (keyboard.escapeKey.wasPressedThisFrame)
 				freeLook = !freeLook;
 

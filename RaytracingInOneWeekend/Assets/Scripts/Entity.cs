@@ -128,9 +128,17 @@ namespace RaytracerInOneWeekend
 		{
 			if (Hit(r, 0.001f, float.PositiveInfinity, ref rng, out HitRecord rec))
 			{
+				RigidTransform transformAtTime = TransformAtTime(r.Time);
+				RigidTransform inverseTransform = inverse(transformAtTime);
+
+				var entitySpaceRay = new Ray(
+					transform(inverseTransform, r.Origin),
+					rotate(inverseTransform, r.Direction));
+
 				switch (Type)
 				{
 					case EntityType.Rect: return ((Rect*) content)->PdfValue(r, rec);
+					case EntityType.Sphere: return ((Sphere*) content)->PdfValue(entitySpaceRay, rec);
 					default: throw new NotImplementedException();
 				}
 			}
@@ -144,6 +152,7 @@ namespace RaytracerInOneWeekend
 			switch (Type)
 			{
 				case EntityType.Rect: localPoint = ((Rect*) content)->RandomPoint(ref rng); break;
+				case EntityType.Sphere: localPoint = ((Sphere*) content)->RandomPoint(ref rng); break;
 				default: throw new NotImplementedException();
 			}
 

@@ -220,7 +220,7 @@ namespace RaytracerInOneWeekend
 						break;
 					}
 
-					if (ImportanceSampler.Mode == ImportanceSamplingMode.None)
+					if (ImportanceSampler.Mode == ImportanceSamplingMode.None || material.IsPerfectSpecular)
 					{
 						*attenuationCursor++ = albedo;
 						ray = scatteredRay;
