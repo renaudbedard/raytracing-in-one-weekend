@@ -1,0 +1,103 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
+  m_Name: Metal Testbed
+  m_EditorClassIdentifier: 
+  cameraPosition: {x: 0.22, y: 2.74, z: 0.95}
+  cameraTarget: {x: 0.026493177, y: 1.9909544, z: 0.31637084}
+  cameraAperture: 0
+  cameraFieldOfView: 40.8
+  entities:
+  - name: 
+    type: 1
+    enabled: 1
+    position: {x: 0, y: -100.5, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 100
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+  - name: 
+    type: 1
+    enabled: 1
+    position: {x: 0, y: 0, z: -2}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: d5a643c2e998b418c9ca96504e5827ca, type: 2}
+  - name: 
+    type: 1
+    enabled: 1
+    position: {x: 0, y: 0, z: -1}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 67ca2b630403548e990e54f0dda310a6, type: 2}
+  - name: 
+    type: 1
+    enabled: 1
+    position: {x: -1, y: 0, z: -2}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 2b589fea2cde947bb9dd0396429df3b6, type: 2}
+  - name: 
+    type: 1
+    enabled: 1
+    position: {x: -1, y: 0, z: -1}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
+  randomSeed: 10000
+  randomEntityGroups: []
+  skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
+  skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
