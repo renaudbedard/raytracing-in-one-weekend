@@ -85,7 +85,7 @@ MonoBehaviour:
     type: 2
     enabled: 1
     position: {x: 273, y: 554, z: 279.5}
-    rotation: {x: -90, y: 0, z: 0}
+    rotation: {x: 90, y: 0, z: 0}
     moving: 0
     destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}

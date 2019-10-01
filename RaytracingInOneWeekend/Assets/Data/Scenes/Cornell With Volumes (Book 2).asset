@@ -17,12 +17,13 @@ MonoBehaviour:
   cameraAperture: 0
   cameraFieldOfView: 45
   entities:
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 277.5, z: 555}
     rotation: {x: 180, y: 0, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -32,12 +33,13 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: f850b19cf2aa8744f8708edee72ddf10, type: 2}
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 277.5, z: 0}
     rotation: {x: 0, y: 0, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -47,12 +49,13 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: bdbb1b6a19e67384e957180c081f66eb, type: 2}
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 554.998, z: 277.5}
-    rotation: {x: -90, y: 0, z: 0}
+    rotation: {x: 90, y: 0, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -62,12 +65,13 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 21917e64af32b624bb64fb3764a7a789, type: 2}
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 0, z: 277.5}
     rotation: {x: -90, y: 0, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -77,12 +81,13 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 277.5, y: 555, z: 277.5}
     rotation: {x: 90, y: 0, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -92,12 +97,13 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 2
+  - name: 
+    type: 2
     enabled: 1
     position: {x: 555, y: 277.5, z: 277.5}
     rotation: {x: 0, y: -90, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -107,12 +113,13 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 3eea7bd685e02744b880c19153bd7b89, type: 2}
-  - type: 3
+  - name: 
+    type: 3
     enabled: 1
     position: {x: 180, y: 82.5, z: 185}
     rotation: {x: 0, y: 18, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -122,12 +129,13 @@ MonoBehaviour:
     boxData:
       size: {x: 165, y: 165, z: 165}
     material: {fileID: 11400000, guid: 2f5910aade267db4f8c5c66fa0e91c9e, type: 2}
-  - type: 3
+  - name: 
+    type: 3
     enabled: 1
     position: {x: 347.5, y: 165, z: 370}
     rotation: {x: 0, y: -15, z: 0}
     moving: 0
-    destinationPosition: {x: 0, y: 0, z: 0}
+    destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
     sphereData:
       radius: 0
@@ -138,6 +146,6 @@ MonoBehaviour:
       size: {x: 165, y: 330, z: 165}
     material: {fileID: 11400000, guid: 31257c7dd76759e42b4899643c021006, type: 2}
   randomSeed: 1
-  randomSphereGroups: []
+  randomEntityGroups: []
   skyBottomColor: {r: 0, g: 0, b: 0, a: 1}
   skyTopColor: {r: 0, g: 0, b: 0, a: 1}

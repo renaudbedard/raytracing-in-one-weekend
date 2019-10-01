@@ -125,6 +125,7 @@ namespace RaytracerInOneWeekend
 			switch (Type)
 			{
 				case MaterialType.Lambertian: return max(dot(rec.Normal, scattered.Direction) / PI, 0);
+				case MaterialType.Isotropic: return 1.0f / (4.0f * PI);
 				default: throw new NotImplementedException();
 			}
 		}

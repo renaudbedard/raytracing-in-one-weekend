@@ -1,6 +1,4 @@
-using Unity.Burst;
 using Unity.Mathematics;
-using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend

@@ -560,7 +560,7 @@ namespace RaytracerInOneWeekend
 				ImportanceSampler = new ImportanceSampler
 				{
 					TargetEntities = importanceSamplingEntityBuffer,
-					Mode = importanceSampling
+					Mode = importanceSamplingEntityBuffer.Length == 0 ? ImportanceSamplingMode.None : importanceSampling
 				},
 #if BVH_ITERATIVE
 				NodeCount = bvhNodeBuffer.Length,
