@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 using UnityEngine;
-
+using UnityEngine.Serialization;
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #else
@@ -17,13 +17,14 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(TextureCanScale))]
 		[SerializeField] Vector2 textureScale = Vector2.one;
 
+		[FormerlySerializedAs("fuzz")]
 		[ShowIf(nameof(Type), MaterialType.Metal)]
-		[Range(0, 1)] [SerializeField] float fuzz = 0;
+		[Range(0, 1)] [SerializeField] float roughness = 0;
 
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
-		[ShowIf(nameof(Type), MaterialType.Isotropic)]
+		[ShowIf(nameof(Type), MaterialType.ProbabilisticVolume)]
 		[Range(0, 1)] [SerializeField] float density = 1;
 
 #if UNITY_EDITOR
@@ -42,7 +43,7 @@ namespace RaytracerInOneWeekend
 			set => albedo = value;
 		}
 		bool AlbedoSupported => type == MaterialType.Lambertian || type == MaterialType.Metal ||
-		                        type == MaterialType.Isotropic;
+		                        type == MaterialType.ProbabilisticVolume;
 #endif
 
 #if UNITY_EDITOR
@@ -63,7 +64,7 @@ namespace RaytracerInOneWeekend
 #endif
 
 		public MaterialType Type => type;
-		public float Fuzz => fuzz;
+		public float Roughness => roughness;
 		public float RefractiveIndex => refractiveIndex;
 		public Vector2 TextureScale => textureScale;
 		public float Density => density;
@@ -97,7 +98,7 @@ namespace RaytracerInOneWeekend
 			data.type = MaterialType.Metal;
 			data.albedo = albedoTexture;
 			data.textureScale = textureScale;
-			data.fuzz = fuzz;
+			data.roughness = fuzz;
 			return data;
 		}
 

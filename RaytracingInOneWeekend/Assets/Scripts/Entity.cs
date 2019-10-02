@@ -93,7 +93,7 @@ namespace RaytracerInOneWeekend
 			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
 				return false;
 
-			if (Material.Type == MaterialType.Isotropic)
+			if (Material.Type == MaterialType.ProbabilisticVolume)
 			{
 				float entryDistance = distance;
 				if (!HitContent(entitySpaceRay, entryDistance + 0.001f, tMax, out float exitDistance, out _))
@@ -104,7 +104,7 @@ namespace RaytracerInOneWeekend
 				}
 
 				float distanceInsideBoundary = exitDistance - entryDistance;
-				float volumeHitDistance = -(1 / Material.Parameter) * log(rng.NextFloat());
+				float volumeHitDistance = -(1 / Material.Density) * log(rng.NextFloat());
 
 				if (volumeHitDistance < distanceInsideBoundary)
 				{

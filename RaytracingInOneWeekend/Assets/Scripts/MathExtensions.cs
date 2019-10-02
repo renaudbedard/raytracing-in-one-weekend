@@ -31,12 +31,8 @@ namespace RaytracerInOneWeekend
 
         public static float3 OnUniformHemisphere(this ref Random rng, float3 normal)
         {
-            return OnUniformHemisphere(rng.NextFloat2(), normal);
-        }
+            float2 uv = rng.NextFloat2();
 
-        // where uv are uniform random variables between 0 and 1
-        static float3 OnUniformHemisphere(float2 uv, float3 normal)
-        {
             // uniform sampling of a hemisphere
             // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 42)
             float u = uv.x;
@@ -69,7 +65,7 @@ namespace RaytracerInOneWeekend
         public static float3 SphericalToCartesian(float theta, float phi)
         {
             sincos(float2(theta, phi), out float2 sinThetaPhi, out float2 cosThetaPhi);
-            return float3(sinThetaPhi.x * cosThetaPhi.y, cosThetaPhi.x, sinThetaPhi.x * sinThetaPhi.y);
+            return float3(sinThetaPhi.x * cosThetaPhi.y, sinThetaPhi.x * sinThetaPhi.y, cosThetaPhi.x);
         }
 
         public static float3 ToFloat3(this Color c) => float3(c.r, c.g, c.b);

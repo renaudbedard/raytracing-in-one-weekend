@@ -221,7 +221,7 @@ namespace RaytracerInOneWeekend
 
 				material.SetFloat("_Metallic", entity.Material.Type == MaterialType.Metal ? 1 : 0);
 				material.SetFloat("_Glossiness",
-					entity.Material.Type == MaterialType.Metal ? 1 - entity.Material.Fuzz : transparent ? 1 : 0);
+					entity.Material.Type == MaterialType.Metal ? 1 - entity.Material.Roughness : transparent ? 1 : 0);
 				material.SetTexture("_MainTex", entity.Material.Albedo ? entity.Material.Albedo.Image : null);
 
 				if (transparent)
@@ -296,7 +296,7 @@ namespace RaytracerInOneWeekend
 				switch (e.Material.Type)
 				{
 					case MaterialType.Dielectric: color = color.GetAlphaReplaced(0.5f); break;
-					case MaterialType.Isotropic: color = color.GetAlphaReplaced(max(e.Material.Density, 0.5f)); break;
+					case MaterialType.ProbabilisticVolume: color = color.GetAlphaReplaced(max(e.Material.Density, 0.5f)); break;
 					default: color = color.GetAlphaReplaced(1); break;
 				}
 

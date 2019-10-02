@@ -983,7 +983,7 @@ namespace RaytracerInOneWeekend
 				Material material = materialData
 					? new Material(materialData.Type, materialData.TextureScale * sizeFactor,
 						albedo.GetRuntimeData(), emission.GetRuntimeData(),
-						materialData.Fuzz, materialData.RefractiveIndex, materialData.Density)
+						materialData.Roughness, materialData.RefractiveIndex, materialData.Density)
 					: default;
 
 				Entity entity = e.Moving
