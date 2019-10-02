@@ -13,6 +13,9 @@ MonoBehaviour:
   m_Name: Mirror Brass
   m_EditorClassIdentifier: 
   type: 2
-  albedo: {fileID: 11400000, guid: 6a56cdbbd217d42d3b7b559a329b88c4, type: 2}
-  fuzz: 0
+  textureScale: {x: 1, y: 1}
+  fuzz: 0.15
   refractiveIndex: 1
+  density: 1
+  albedo: {fileID: 11400000, guid: 6a56cdbbd217d42d3b7b559a329b88c4, type: 2}
+  emission: {fileID: 0}

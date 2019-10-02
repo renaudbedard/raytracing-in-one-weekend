@@ -45,13 +45,31 @@ namespace RaytracerInOneWeekend
             sincos(theta, out float sinTheta, out float cosTheta);
             float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), 1 - u);
 
-            // build an orthonormal basis from the forward (normal) vector
+            return TangentToWorldSpace(tangentSpaceDirection, normal);
+        }
+
+        public static float3 TangentToWorldSpace(float3 tangentSpaceVector, float3 normal)
+        {
             GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
 
-            // transform from tangent-space to world-space
-            float3x3 rotationMatrix = float3x3(tangent, bitangent, normal);
-            float3 result = mul(rotationMatrix, tangentSpaceDirection);
+            float3x3 orthogonalMatrix = float3x3(tangent, bitangent, normal);
+            float3 result = mul(orthogonalMatrix, tangentSpaceVector);
             return normalize(result);
+        }
+
+        public static float3 WorldToTangentSpace(float3 worldSpaceVector, float3 normal)
+        {
+            GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
+
+            float3x3 orthogonalMatrix = float3x3(tangent, bitangent, normal);
+            float3 result = mul(transpose(orthogonalMatrix), worldSpaceVector);
+            return normalize(result);
+        }
+
+        public static float3 SphericalToCartesian(float theta, float phi)
+        {
+            sincos(float2(theta, phi), out float2 sinThetaPhi, out float2 cosThetaPhi);
+            return float3(sinThetaPhi.x * cosThetaPhi.y, cosThetaPhi.x, sinThetaPhi.x * sinThetaPhi.y);
         }
 
         public static float3 ToFloat3(this Color c) => float3(c.r, c.g, c.b);

@@ -48,7 +48,18 @@ namespace RaytracerInOneWeekend
 			if (keyboard.escapeKey.wasPressedThisFrame)
 				freeLook = !freeLook;
 
-			if (freeLook || mouse.leftButton.isPressed)
+			var lmbPressed = mouse.leftButton.isPressed;
+			var rmbPressed = mouse.rightButton.isPressed;
+			var mmbPressed = mouse.middleButton.isPressed;
+
+			var mouseViewportPosition = camera.ScreenToViewportPoint(mouse.position.ReadValue());
+			bool mouseInViewport = mouseViewportPosition.x > 0 && mouseViewportPosition.x < 1 &&
+			                       mouseViewportPosition.y > 0 && mouseViewportPosition.y < 1;
+
+			if (!mouseInViewport)
+				lmbPressed = rmbPressed = mmbPressed = false;
+
+			if (freeLook || lmbPressed)
 			{
 				if (mouseDelta != Vector2.zero)
 				{
@@ -61,20 +72,8 @@ namespace RaytracerInOneWeekend
 					ResetRoll();
 				}
 			}
-			else if (mouse.rightButton.isPressed)
+			else if (rmbPressed)
 			{
-				if (mouse.rightButton.wasPressedThisFrame)
-				{
-					var origin = transform.localPosition;
-					var forward = transform.forward;
-					float distance = 1;
-					if (raytracer.HitWorld(new Ray(origin, forward), out HitRecord hitRec))
-					{
-						distance = hitRec.Distance;
-					}
-					orbitCenter = origin + forward * distance;
-				}
-
 				if (mouseDelta != Vector2.zero)
 				{
 					var mouseMovement = mouseDelta;
@@ -87,20 +86,8 @@ namespace RaytracerInOneWeekend
 					ResetRoll();
 				}
 			}
-			else if (mouse.middleButton.isPressed)
+			else if (mmbPressed)
 			{
-				if (mouse.middleButton.wasPressedThisFrame)
-				{
-					dragDistance = 1;
-
-					var origin = transform.localPosition;
-					var forward = transform.forward;
-					if (raytracer.HitWorld(new Ray(origin, forward), out HitRecord hitRec))
-					{
-						dragDistance = hitRec.Distance;
-					}
-				}
-
 				if (mouseDelta != Vector2.zero)
 				{
 					var mouseMovement = mouseDelta;
