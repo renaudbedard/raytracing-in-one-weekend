@@ -63,12 +63,8 @@ namespace RaytracerInOneWeekend
 				case MaterialType.Metal:
 				{
 					// TODO: extract PDF so we can do explicit sampling
-					// TODO: use the "part 2" equations instead
 
 					float3 outgoingDirection = MathExtensions.WorldToTangentSpace(-ray.Direction, rec.Normal);
-
-					// if (ImportanceSampleGgxVdn(Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData),
-					// 	Roughness, ref rng, outgoingDirection, out float3 toLight, out reflectance))
 
 					if (ImportanceSampleGgxD(Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData),
 						Roughness, ref rng, outgoingDirection, out float3 toLight, out reflectance))
@@ -126,37 +122,23 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		[BurstDiscard]
-		void Validate(Ray r, HitRecord rec)
-		{
-			Assert.IsTrue(length(r.Direction).AlmostEquals(1),
-				$"Scatter ray direction was assumed to be unit-length; length was {length(r.Direction):0.#######}");
-			Assert.IsTrue(length(rec.Normal).AlmostEquals(1),
-				$"HitRecord normal was assumed to be unit-length; length was {length(rec.Normal):0.#######}");
-		}
-
 		[Pure]
-		public float ScatteringPdf(HitRecord rec, Ray scattered)
+		public float ScatteringPdf(float3 outgoingDirection, float3 scatteredDirection, float3 geometricNormal)
 		{
-			Validate(scattered, rec);
 			switch (Type)
 			{
 				case MaterialType.Lambertian:
-					return max(dot(rec.Normal, scattered.Direction) / PI, 0);
+					return max(dot(geometricNormal, scatteredDirection) / PI, 0);
 
 				case MaterialType.ProbabilisticVolume:
 					return 1.0f / (4.0f * PI);
 
-				// https://computergraphics.stackexchange.com/questions/7656/importance-sampling-microfacet-ggx
-				// case MaterialType.Metal:
-				// 	wg := geom.Up
-				// 	wm := wo.Half(wi)
-				// 	a := m.Roughness * m.Roughness
-				// 	a2 := a * a
-				// 	cosTheta := wg.Dot(wm)
-				// 	exp := (a2-1)*cosTheta*cosTheta + 1
-				// 	D := a2 / (math.Pi * exp * exp)
-				// 	return (D * wm.Dot(wg)) / (4 * wo.Dot(wm))
+				case MaterialType.Metal:
+					outgoingDirection = MathExtensions.WorldToTangentSpace(outgoingDirection, geometricNormal);
+					scatteredDirection = MathExtensions.WorldToTangentSpace(scatteredDirection, geometricNormal);
+					float3 halfVector = normalize(outgoingDirection + scatteredDirection);
+					float eoh = abs(dot(outgoingDirection, halfVector)); // TODO: no idea what EoH stands for
+					return GgxIsotropicNdf(Roughness, halfVector) * abs(halfVector.y) / (4.0f * eoh);
 
 				default: throw new NotImplementedException();
 			}
@@ -217,13 +199,23 @@ namespace RaytracerInOneWeekend
 
 		static float SmithGgxMaskingShadowing(float3 wi, float3 wo, float a2)
 		{
-			float nDotL = wi.z;
-			float nDotV = wo.z;
+			float nDotL = wi.y;
+			float nDotV = wo.y;
 
 			float denomA = nDotV * sqrt(a2 + (1 - a2) * nDotL * nDotL);
 			float denomB = nDotL * sqrt(a2 + (1 - a2) * nDotV * nDotV);
 
 			return 2 * nDotL * nDotV / (denomA + denomB);
+		}
+
+		// Probability of facet with specific normal (h)
+		static float GgxIsotropicNdf(float roughness, float3 h)
+		{
+			// from https://www.tobias-franke.eu/log/2014/03/30/notes_on_importance_sampling.html (figure 13)
+			float sqRoughness = roughness * roughness;
+			float sqCosTheta = h.y * h.y;
+			float sqrtDenomOverPi = sqCosTheta * (sqRoughness - 1) + 1;
+			return sqRoughness / (PI * sqrtDenomOverPi * sqrtDenomOverPi);
 		}
 
 		static bool ImportanceSampleGgxD(float3 specularColor, float roughness, ref Random rng, float3 wo,
@@ -239,6 +231,9 @@ namespace RaytracerInOneWeekend
 			float theta = acos(sqrt((1 - e.x) / ((a2 - 1) * e.x + 1)));
 			float phi = 2 * PI * e.y;
 
+			// alternate from : // https://agraphicsguy.wordpress.com/2015/11/01/sampling-microfacet-brdf/
+			// theta = atan( alphaU * sqrt( bs.v / ( 1.0f - bs.v )) );
+
 			// convert from spherical to Cartesian coordinates
 			float3 wm = MathExtensions.SphericalToCartesian(theta, phi);
 
@@ -247,73 +242,16 @@ namespace RaytracerInOneWeekend
 
 			// ensure our sample is in the upper hemisphere
 			// since we are in tangent space with a z-up coordinate, dot(n, wi) simply maps to wi.z
-			if (wi.z > 0 && dot(wi, wm) > 0)
+			if (wi.y > 0 && dot(wi, wm) > 0)
 			{
 				float dotWiWm = dot(wi, wm);
 
 				// calculate the reflectance to multiply by the energy retrieved in direction wi
 				float3 f = Schlick(dotWiWm, specularColor);
 				float g = SmithGgxMaskingShadowing(wi, wo, a2);
-				float weight = abs(dot(wo, wm)) / (wo.z * wm.z);
+				float weight = abs(dot(wo, wm)) / (wo.y * wm.y);
 
 				reflectance = f * g * weight;
-				return true;
-			}
-
-			reflectance = 0;
-			return false;
-		}
-
-		// ------ GGX from https://schuttejoe.github.io/post/ggximportancesamplingpart2/
-
-		static float SmithGgxMasking(float3 wo, float a2)
-		{
-			float nDotV = wo.z;
-			float denomC = sqrt(a2 + (1 - a2) * nDotV * nDotV) + nDotV;
-
-			return 2 * nDotV / denomC;
-		}
-
-		// https://hal.archives-ouvertes.fr/hal-01509746/document
-		static float3 GgxVndf(float3 wo, float roughness, float u1, float u2)
-		{
-			float3 v = normalize(float3(wo.x * roughness, wo.y * roughness, wo.z));
-
-			// build an orthonormal basis with v, t1, and t2
-			MathExtensions.GetOrthonormalBasis(v, out float3 t1, out float3 t2);
-
-			// choose a point on a disk with each half of the disk weighted proportionally to its projection onto direction v
-			float a = 1 / (1 + v.z);
-			float r = sqrt(u1);
-			float phi = u2 < a ? u2 / a * PI : PI + (u2 - a) / (1 - a) * PI;
-			sincos(phi, out float sinPhi, out float cosPhi);
-			float p1 = r * cosPhi;
-			float p2 = r * sinPhi * (u2 < a ? 1 : v.z);
-
-			// calculate the normal in this stretched tangent space
-			float3 n = p1 * t1 + p2 * t2 + sqrt(max(0, 1 - p1 * p1 - p2 * p2)) * v;
-
-			// unstretch and normalize the normal
-			return normalize(float3(roughness * n.x, roughness * n.y, max(0, n.z)));
-		}
-
-		static bool ImportanceSampleGgxVdn(float3 specularColor, float roughness, ref Random rng, float3 wo,
-			out float3 wi, out float3 reflectance)
-		{
-			float2 r = rng.NextFloat2();
-			float3 wm = GgxVndf(wo, roughness, r.x, r.y);
-
-			wi = reflect(wm, wo);
-
-			if (wi.z > 0)
-			{
-				float a2 = roughness * roughness;
-
-				float3 f = Schlick(dot(wi, wm), specularColor);
-				float g1 = SmithGgxMasking(wo, a2);
-				float g2 = SmithGgxMaskingShadowing(wi, wo, a2);
-
-				reflectance = f * (g2 / g1);
 				return true;
 			}
 

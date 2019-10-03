@@ -235,8 +235,10 @@ namespace RaytracerInOneWeekend
 					}
 					else
 					{
-						float scatterPdfValue = material.ScatteringPdf(rec, scatteredRay);
-						ImportanceSampler.Sample(scatteredRay, rec, material, ref rng,
+						float3 outgoingDirection = -ray.Direction;
+						float scatterPdfValue = material.ScatteringPdf(outgoingDirection, scatteredRay.Direction, rec.Normal);
+
+						ImportanceSampler.Sample(scatteredRay, outgoingDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);
 
 						// scatter ray is likely parallel to the surface, and division would cause a NaN

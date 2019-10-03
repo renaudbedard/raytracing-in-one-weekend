@@ -25,10 +25,9 @@ namespace RaytracerInOneWeekend
 
 		public float PdfValue(float3 rayDirection, float hitDistance, float3 hitNormal)
 		{
-			float area = Area;
 			float distanceSquared = hitDistance * hitDistance;
 			float cosine = dot(rayDirection, -hitNormal);
-			return distanceSquared / (cosine * area);
+			return distanceSquared / (cosine * Area);
 		}
 
 		public float3 RandomPoint(ref Random rng) => float3(rng.NextFloat2(From, To), 0);

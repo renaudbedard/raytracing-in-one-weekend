@@ -17,7 +17,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<Entity> TargetEntities;
 		public ImportanceSamplingMode Mode;
 
-		public unsafe void Sample(Ray materialScatterRay, HitRecord rec, Material material, ref Random rng,
+		public unsafe void Sample(Ray materialScatterRay, float3 outgoingDirection, HitRecord rec, Material material, ref Random rng,
 			out Ray scatterRay, out float pdfValue, out int? targetEntityId)
 		{
 			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
@@ -37,7 +37,8 @@ namespace RaytracerInOneWeekend
 			}
 
 			pdfValue = 0;
-			if (Mode == ImportanceSamplingMode.Mixture) pdfValue += material.ScatteringPdf(rec, scatterRay);
+			if (Mode == ImportanceSamplingMode.Mixture)
+				pdfValue += material.ScatteringPdf(outgoingDirection, scatterRay.Direction, rec.Normal);
 
 			var basePointer = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr();
 			for (int i = 0; i < TargetEntities.Length; i++)

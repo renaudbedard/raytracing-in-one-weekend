@@ -39,7 +39,8 @@ namespace RaytracerInOneWeekend
             float radius = sqrt(2 * u - u * u);
             float theta = uv.y * 2 * PI;
             sincos(theta, out float sinTheta, out float cosTheta);
-            float3 tangentSpaceDirection = float3(radius * float2(cosTheta, sinTheta), 1 - u);
+            float2 xz = radius * float2(cosTheta, sinTheta);
+            float3 tangentSpaceDirection = float3(xz.x, 1 - u, xz.y);
 
             return TangentToWorldSpace(tangentSpaceDirection, normal);
         }
@@ -48,7 +49,7 @@ namespace RaytracerInOneWeekend
         {
             GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
 
-            float3x3 orthogonalMatrix = float3x3(tangent, bitangent, normal);
+            float3x3 orthogonalMatrix = float3x3(tangent, normal, bitangent);
             float3 result = mul(orthogonalMatrix, tangentSpaceVector);
             return normalize(result);
         }
@@ -57,7 +58,7 @@ namespace RaytracerInOneWeekend
         {
             GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
 
-            float3x3 orthogonalMatrix = float3x3(tangent, bitangent, normal);
+            float3x3 orthogonalMatrix = float3x3(tangent, normal, bitangent);
             float3 result = mul(transpose(orthogonalMatrix), worldSpaceVector);
             return normalize(result);
         }
@@ -65,7 +66,7 @@ namespace RaytracerInOneWeekend
         public static float3 SphericalToCartesian(float theta, float phi)
         {
             sincos(float2(theta, phi), out float2 sinThetaPhi, out float2 cosThetaPhi);
-            return float3(sinThetaPhi.x * cosThetaPhi.y, sinThetaPhi.x * sinThetaPhi.y, cosThetaPhi.x);
+            return float3(sinThetaPhi.x * cosThetaPhi.y, cosThetaPhi.x, sinThetaPhi.x * sinThetaPhi.y);
         }
 
         public static float3 ToFloat3(this Color c) => float3(c.r, c.g, c.b);

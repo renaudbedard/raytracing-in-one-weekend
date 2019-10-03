@@ -128,7 +128,7 @@ MonoBehaviour:
       size: {x: 555, y: 555}
     boxData:
       size: {x: 165, y: 165, z: 165}
-    material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
+    material: {fileID: 11400000, guid: d5a643c2e998b418c9ca96504e5827ca, type: 2}
   - name: Tall Box
     type: 3
     enabled: 1
