@@ -23,7 +23,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		public float PdfValue(float3 rayDirection, float hitDistance, float3 hitNormal)
+		public float Pdf(float3 rayDirection, float hitDistance, float3 hitNormal)
 		{
 			float distanceSquared = hitDistance * hitDistance;
 			float cosine = dot(rayDirection, -hitNormal);

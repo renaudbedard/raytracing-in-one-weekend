@@ -133,7 +133,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		public float PdfValue(Ray r, ref Random rng)
+		public float Pdf(Ray r, ref Random rng)
 		{
 			if (HitInternal(r, 0.001f, float.PositiveInfinity, ref rng, out float distance,
 				out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
@@ -141,10 +141,10 @@ namespace RaytracerInOneWeekend
 				switch (Type)
 				{
 					case EntityType.Rect:
-						return ((Rect*) content)->PdfValue(entitySpaceRay.Direction, distance, entitySpaceNormal);
+						return ((Rect*) content)->Pdf(entitySpaceRay.Direction, distance, entitySpaceNormal);
 
 					case EntityType.Sphere:
-						return ((Sphere*) content)->PdfValue(entitySpaceRay.Origin);
+						return ((Sphere*) content)->Pdf(entitySpaceRay.Origin);
 
 					default: throw new NotImplementedException();
 				}
