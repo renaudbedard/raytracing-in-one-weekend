@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using AOT;
 using JetBrains.Annotations;
+using OpenImageDenoise;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -103,8 +104,8 @@ namespace RaytracerInOneWeekend
 
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
 
-		OpenImageDenoise.NativeApi.Device oidnDevice;
-		OpenImageDenoise.NativeApi.Filter oidnFilter;
+		OidnDevice oidnDevice;
+		OidnFilter oidnFilter;
 
 		OptixDeviceContext optixDeviceContext;
 		OptixDenoiser optixDenoiser;
@@ -192,7 +193,7 @@ namespace RaytracerInOneWeekend
 #if !UNITY_EDITOR
 		const BufferView bufferView = BufferView.Front;
 #endif
-		int channelPropertyId, minimumRangePropertyId, normalDisplayId;
+		int channelPropertyId, minimumRangePropertyId;
 
 		void Awake()
 		{
@@ -211,7 +212,6 @@ namespace RaytracerInOneWeekend
 			viewRangeMaterial = new UnityEngine.Material(viewRangeShader);
 			channelPropertyId = Shader.PropertyToID("_Channel");
 			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
-			normalDisplayId = Shader.PropertyToID("_NormalDisplay");
 
 			float3Buffers = new Pool<NativeArray<float3>>(() =>
 					new NativeArray<float3>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
@@ -242,12 +242,12 @@ namespace RaytracerInOneWeekend
 		{
 			// Open Image Denoise
 
-			oidnDevice = OpenImageDenoise.NativeApi.Device.New(OpenImageDenoise.NativeApi.Device.Type.Default);
-			OpenImageDenoise.NativeApi.Device.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
-			OpenImageDenoise.NativeApi.Device.Commit(oidnDevice);
+			oidnDevice = OidnDevice.New(OidnDevice.Type.Default);
+			OidnDevice.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
+			OidnDevice.Commit(oidnDevice);
 
-            oidnFilter = OpenImageDenoise.NativeApi.Filter.New(oidnDevice, "RT");
-            OpenImageDenoise.NativeApi.Filter.Set(oidnFilter, "hdr", true);
+            oidnFilter = OidnFilter.New(oidnDevice, "RT");
+            OidnFilter.Set(oidnFilter, "hdr", true);
 
             // OptiX
 
@@ -290,8 +290,8 @@ namespace RaytracerInOneWeekend
 				Debug.LogError($"CUDA Stream creation failed : {cudaError}");
 		}
 
-		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
-		static void OnOidnError(IntPtr userPtr, OpenImageDenoise.NativeApi.Error code, string message)
+		[MonoPInvokeCallback(typeof(OidnErrorFunction))]
+		static void OnOidnError(IntPtr userPtr, OidnError code, string message)
 		{
 			if (string.IsNullOrWhiteSpace(message))
 				Debug.LogError(code);
@@ -299,7 +299,7 @@ namespace RaytracerInOneWeekend
 				Debug.LogError($"{code} : {message}");
 		}
 
-		[MonoPInvokeCallback(typeof(OpenImageDenoise.NativeApi.ErrorFunction))]
+		[MonoPInvokeCallback(typeof(OptixLogCallback))]
 		static void OnOptixError(OptixLogLevel level, string tag, string message, IntPtr cbdata)
 		{
 			switch (level)
@@ -341,8 +341,8 @@ namespace RaytracerInOneWeekend
 			debugPaths.SafeDispose();
 #endif
 
-			OpenImageDenoise.NativeApi.Filter.Release(oidnFilter);
-			OpenImageDenoise.NativeApi.Device.Release(oidnDevice);
+			OidnFilter.Release(oidnFilter);
+			OidnDevice.Release(oidnDevice);
 
 			OptixDenoiser.Destroy(optixDenoiser);
 			OptixDeviceContext.Destroy(optixDeviceContext);
@@ -671,20 +671,16 @@ namespace RaytracerInOneWeekend
 			{
 				case DenoiseMode.OpenImageDenoise:
 				{
-					// TODO: cleanup API
-					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "color",
-						new IntPtr(combineOutput.Color.GetUnsafePtr()),
-						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "normal",
-						new IntPtr(combineOutput.Normal.GetUnsafePtr()),
-						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "albedo",
-						new IntPtr(combineOutput.Albedo.GetUnsafePtr()),
-						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-					OpenImageDenoise.NativeApi.Filter.SetSharedImage(oidnFilter, "output",
-						new IntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
-						OpenImageDenoise.NativeApi.Buffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
-					OpenImageDenoise.NativeApi.Filter.Commit(oidnFilter);
+					OidnFilter.SetSharedImage(oidnFilter, "color", new IntPtr(combineOutput.Color.GetUnsafePtr()),
+						OidnBuffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OidnFilter.SetSharedImage(oidnFilter, "normal", new IntPtr(combineOutput.Normal.GetUnsafePtr()),
+						OidnBuffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OidnFilter.SetSharedImage(oidnFilter, "albedo", new IntPtr(combineOutput.Albedo.GetUnsafePtr()),
+						OidnBuffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+					OidnFilter.SetSharedImage(oidnFilter, "output", new IntPtr(denoiseColorOutputBuffer.GetUnsafePtr()),
+						OidnBuffer.Format.Float3, (ulong) width, (ulong) height, 0, 0, 0);
+
+					OidnFilter.Commit(oidnFilter);
 
 					var denoiseJob = new OpenImageDenoiseJob { DenoiseFilter = oidnFilter };
 					denoiseJobHandle = denoiseJob.Schedule();
@@ -944,7 +940,6 @@ namespace RaytracerInOneWeekend
 			rectBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Rect));
 			boxBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Box));
 
-			// TODO: factor in specular materials
 			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x =>
 				x.Material.Type == MaterialType.DiffuseLight));
 

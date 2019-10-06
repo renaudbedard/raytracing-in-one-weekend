@@ -1,4 +1,5 @@
 using System;
+using OpenImageDenoise;
 using OptiX;
 using Unity.Burst;
 using Unity.Collections;
@@ -362,9 +363,9 @@ namespace RaytracerInOneWeekend
 
 	struct OpenImageDenoiseJob : IJob
 	{
-		public OpenImageDenoise.NativeApi.Filter DenoiseFilter;
+		public OidnFilter DenoiseFilter;
 
-		public void Execute() => OpenImageDenoise.NativeApi.Filter.Execute(DenoiseFilter);
+		public void Execute() => OidnFilter.Execute(DenoiseFilter);
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
