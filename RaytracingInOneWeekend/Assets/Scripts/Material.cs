@@ -1,10 +1,8 @@
 using System;
 using JetBrains.Annotations;
-using Unity.Burst;
 using Unity.Mathematics;
-using UnityEditor.PackageManager;
-using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
+using static RaytracerInOneWeekend.MathExtensions;
 using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
@@ -55,19 +53,19 @@ namespace RaytracerInOneWeekend
 				case MaterialType.Lambertian:
 				{
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
-					float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
+					float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, ray.Time);
 					return true;
 				}
 
 				case MaterialType.Metal:
 				{
-					float3 outgoingDirection = MathExtensions.WorldToTangentSpace(-ray.Direction, rec.Normal);
+					float3 outgoingDirection = WorldToTangentSpace(-ray.Direction, rec.Normal);
 
 					if (GgxMicrofacet.ImportanceSample(Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData),
 						Roughness, ref rng, outgoingDirection, out float3 toLight, out reflectance))
 					{
-						float3 scatterDirection = MathExtensions.TangentToWorldSpace(toLight, rec.Normal);
+						float3 scatterDirection = TangentToWorldSpace(toLight, rec.Normal);
 						scattered = new Ray(rec.Point, scatterDirection, ray.Time);
 						return true;
 					}
@@ -133,6 +131,7 @@ namespace RaytracerInOneWeekend
 
 				case MaterialType.Metal:
 					throw new NotImplementedException();
+					// Disabled because it current does not work right
 					//return GgxMicrofacet.Pdf(incomingLightDirection, outgoingLightDirection, geometricNormal, Roughness);
 
 				default: throw new NotImplementedException();
@@ -183,8 +182,5 @@ namespace RaytracerInOneWeekend
 			float exponential = pow(1 - radians, 5);
 			return r0 + (1 - r0) * exponential;
 		}
-
-		// ------ GGX from https://schuttejoe.github.io/post/ggximportancesamplingpart1/
-
 	}
 }

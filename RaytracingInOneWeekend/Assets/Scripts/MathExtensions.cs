@@ -45,6 +45,23 @@ namespace RaytracerInOneWeekend
             return TangentToWorldSpace(tangentSpaceDirection, normal);
         }
 
+        public static float3 OnCosineWeightedHemisphere(this ref Random rng, float3 normal)
+        {
+            float2 uv = rng.NextFloat2();
+
+            // uniform sampling of a cosine-weighted hemisphere
+            // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 47)
+            // same algorithm used here : http://www.rorydriscoll.com/2009/01/07/better-sampling/
+            float u = uv.x;
+            float radius = sqrt(u);
+            float theta = uv.y * 2 * PI;
+            sincos(theta, out float sinTheta, out float cosTheta);
+            float2 xz = radius * float2(cosTheta, sinTheta);
+            float3 tangentSpaceDirection = float3(xz.x, sqrt(1 - u), xz.y);
+
+            return TangentToWorldSpace(tangentSpaceDirection, normal);
+        }
+
         public static float3 TangentToWorldSpace(float3 tangentSpaceVector, float3 normal)
         {
             GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
