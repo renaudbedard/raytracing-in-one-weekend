@@ -6,12 +6,14 @@ namespace RaytracerInOneWeekend
 {
 	public static class GgxMicrofacet
 	{
+		// from https://schuttejoe.github.io/post/ggximportancesamplingpart1/
 		public static float3 Schlick(float radians, float3 r0)
 		{
 			float exponential = pow(1 - radians, 5);
 			return r0 + (1 - r0) * exponential;
 		}
 
+		// from https://schuttejoe.github.io/post/ggximportancesamplingpart1/
 		public static float G1(float3 wi, float3 wo, float a2)
 		{
 			float nDotL = wi.y;
@@ -33,6 +35,7 @@ namespace RaytracerInOneWeekend
 			return sqRoughness / (PI * sqrtDenomOverPi * sqrtDenomOverPi);
 		}
 
+		// from https://schuttejoe.github.io/post/ggximportancesamplingpart1/
 		public static bool ImportanceSample(float3 specularColor, float roughness, ref Random rng, float3 wo,
 			out float3 wi, out float3 reflectance)
 		{
@@ -76,6 +79,7 @@ namespace RaytracerInOneWeekend
 
 		public static float Pdf(float3 incomingLightDirection, float3 outgoingLightDirection, float3 geometricNormal, float roughness)
 		{
+			// inspired by SORT : https://github.com/JerryCao1985/SORT/tree/master/src/bsdf
 			float3 wi = incomingLightDirection;
 			float3 wo = outgoingLightDirection;
 
