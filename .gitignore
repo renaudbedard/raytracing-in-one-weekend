@@ -3,7 +3,7 @@
 [Oo]bj/
 [Bb]uild/
 [Bb]uilds/
-Assets/AssetStoreTools*
+*/Assets/AssetStoreTools*
 
 # Visual Studio cache directory
 .vs/
@@ -44,3 +44,6 @@ sysinfo.txt
 
 # Non-redistributable packages
 */Packages/OdinInspector
+*/Assets/Packages.meta
+*/Assets/Packages/OdinInspector
+*/Assets/Packages/OdinInspector.meta
