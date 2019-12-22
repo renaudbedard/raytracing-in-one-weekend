@@ -144,9 +144,6 @@ namespace RaytracerInOneWeekend
 					fallbackNormal = sampleNormal;
 					fallbackAlbedo = sampleAlbedo;
 				}
-
-				if (*CancellationToken)
-					break;
 			}
 
 			OutputColor[index] = float4(colorAcc, sampleCount);
@@ -275,9 +272,6 @@ namespace RaytracerInOneWeekend
 
 					break;
 				}
-
-				if (*CancellationToken)
-					break;
 			}
 
 			sampleColor = 0;
