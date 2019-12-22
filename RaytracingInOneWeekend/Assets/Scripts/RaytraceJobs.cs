@@ -61,9 +61,6 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		[ReadOnly] public int NodeCount;
 #endif
-		[NativeDisableUnsafePtrRestriction]
-		public volatile bool* CancellationToken;
-
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
