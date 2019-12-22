@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Mathematics;
-using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {

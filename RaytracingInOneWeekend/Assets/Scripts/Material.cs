@@ -54,6 +54,7 @@ namespace RaytracerInOneWeekend
 				{
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
 					float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
+					//float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, ray.Time);
 					return true;
 				}

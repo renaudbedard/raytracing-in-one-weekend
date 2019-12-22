@@ -61,6 +61,8 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		[ReadOnly] public int NodeCount;
 #endif
+		[NativeDisableUnsafePtrRestriction]
+		public volatile bool* CancellationToken;
 
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
@@ -145,6 +147,9 @@ namespace RaytracerInOneWeekend
 					fallbackNormal = sampleNormal;
 					fallbackAlbedo = sampleAlbedo;
 				}
+
+				if (*CancellationToken)
+					break;
 			}
 
 			OutputColor[index] = float4(colorAcc, sampleCount);
@@ -273,6 +278,9 @@ namespace RaytracerInOneWeekend
 
 					break;
 				}
+
+				if (*CancellationToken)
+					break;
 			}
 
 			sampleColor = 0;

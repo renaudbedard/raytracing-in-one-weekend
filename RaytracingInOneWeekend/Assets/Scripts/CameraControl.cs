@@ -13,12 +13,11 @@ namespace RaytracerInOneWeekend
 	class CameraControl : MonoBehaviour
 	{
 		[ReadOnly] [SerializeField] new UnityEngine.Camera camera = null;
-		[SerializeField] Raytracer raytracer = null;
 
 		[SerializeField] [Range(0, 100)] float movementSpeed = 1;
 
-		Vector3 orbitCenter;
-		float dragDistance;
+		Vector3 orbitCenter = default;
+		float dragDistance = 0;
 		bool freeLook;
 
 		void Reset()

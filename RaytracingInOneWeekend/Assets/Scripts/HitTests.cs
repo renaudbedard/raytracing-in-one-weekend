@@ -2,10 +2,6 @@ using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
-#if !BVH
-using Unity.Collections;
-#endif
-
 namespace RaytracerInOneWeekend
 {
 	static class HitTests
