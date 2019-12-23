@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
@@ -51,13 +52,39 @@ namespace RaytracerInOneWeekend
 
 		public static unsafe void AddNoResize<T>(this NativeList<T> list, T element) where T : unmanaged
 		{
-			((UnsafeList*) NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref list))->AddRangeNoResize<T>(&element, 1);
+			((UnsafeList*) NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref list))->AddRangeNoResize<T>(
+				&element, 1);
 		}
 
 		public static T PeekOrDefault<T>(this Queue<T> queue)
 		{
 			if (queue.Count > 0) return queue.Peek();
 			return default;
+		}
+
+		public static IEnumerable<int> SpaceFillingSeries(int length)
+		{
+			int current = 0;
+			var seen = new HashSet<int>();
+			do
+			{
+				int divider = 2;
+				do
+				{
+					int increment = (int) ceil((float) length / divider);
+					for (int i = 0; i < divider; i++)
+					{
+						current = i * increment;
+						if (!seen.Contains(current))
+							break;
+					}
+
+					divider *= 2;
+				} while (seen.Contains(current));
+
+				yield return current;
+				seen.Add(current);
+			} while (seen.Count < length);
 		}
 	}
 }

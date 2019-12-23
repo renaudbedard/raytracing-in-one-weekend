@@ -18,10 +18,10 @@ using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 using OptiX;
-
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
+
 #else
 using OdinMock;
 using OdinReadOnly = OdinMock.ReadOnlyAttribute;
@@ -38,11 +38,11 @@ namespace RaytracerInOneWeekend
 
 	unsafe partial class Raytracer : MonoBehaviour
 	{
-		[Title("References")]
-		[SerializeField] UnityEngine.Camera targetCamera = null;
+		[Title("References")] [SerializeField] UnityEngine.Camera targetCamera = null;
 
-		[Title("Settings")]
-		[SerializeField] [Range(1, 100)] int interlacing = 2;
+		[Title("Settings")] [SerializeField] [Range(1, 100)]
+		int interlacing = 2;
+
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
@@ -57,26 +57,22 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
 #endif
 
-		[Title("World")]
-		[InlineEditor(DrawHeader = false)]
-		[SerializeField] internal SceneData scene = null;
+		[Title("World")] [InlineEditor(DrawHeader = false)] [SerializeField]
+		internal SceneData scene = null;
 
-		[Title("Debug")]
-		[SerializeField] Shader viewRangeShader = null;
+		[Title("Debug")] [SerializeField] Shader viewRangeShader = null;
 		[OdinReadOnly] public float AccumulatedSamples;
 
-		[UsedImplicitly]
-		[OdinReadOnly]
+		[UsedImplicitly] [OdinReadOnly]
 		public float MillionRaysPerSecond, AvgMRaysPerSecond, LastBatchDuration, LastTraceDuration;
 
-		[UsedImplicitly]
-		[OdinReadOnly]
-		public float BufferMinValue, BufferMaxValue;
+		[UsedImplicitly] [OdinReadOnly] public float BufferMinValue, BufferMaxValue;
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
 
-		[OdinReadOnly] public int InterlacingOffset;
+		int interlacingOffsetIndex;
+		int[] interlacingOffsets;
 
 		NativeArray<float4> colorAccumulationBuffer;
 		NativeArray<float3> normalAccumulationBuffer, albedoAccumulationBuffer;
@@ -133,6 +129,7 @@ namespace RaytracerInOneWeekend
 				OnComplete?.Invoke();
 			}
 		}
+
 		struct ActiveJobData
 		{
 			public JobHandle Handle;
@@ -150,12 +147,15 @@ namespace RaytracerInOneWeekend
 			public NativeArray<float4> Color;
 			public NativeArray<float3> Normal, Albedo;
 		}
+
 		struct PassOutputData
 		{
 			public NativeArray<float3> Color, Normal, Albedo;
 		}
 
-		readonly Queue<ActiveJobData<AccumulateOutputData>> activeAccumulateJobs = new Queue<ActiveJobData<AccumulateOutputData>>();
+		readonly Queue<ActiveJobData<AccumulateOutputData>> activeAccumulateJobs =
+			new Queue<ActiveJobData<AccumulateOutputData>>();
+
 		readonly Queue<ActiveJobData<PassOutputData>> activeCombineJobs = new Queue<ActiveJobData<PassOutputData>>();
 		readonly Queue<ActiveJobData<PassOutputData>> activeDenoiseJobs = new Queue<ActiveJobData<PassOutputData>>();
 		ActiveJobData? activeFinalizeJob;
@@ -249,47 +249,47 @@ namespace RaytracerInOneWeekend
 			OidnDevice.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
 			OidnDevice.Commit(oidnDevice);
 
-            oidnFilter = OidnFilter.New(oidnDevice, "RT");
-            OidnFilter.Set(oidnFilter, "hdr", true);
+			oidnFilter = OidnFilter.New(oidnDevice, "RT");
+			OidnFilter.Set(oidnFilter, "hdr", true);
 
-            // OptiX
+			// OptiX
 
-            CudaError cudaError;
-            if ((cudaError = OptixApi.InitializeCuda()) != CudaError.Success)
-            {
-	            Debug.LogError($"CUDA initialization failed : {cudaError}");
-	            return;
-            }
+			CudaError cudaError;
+			if ((cudaError = OptixApi.InitializeCuda()) != CudaError.Success)
+			{
+				Debug.LogError($"CUDA initialization failed : {cudaError}");
+				return;
+			}
 
-            OptixResult result;
-            if ((result = OptixApi.Initialize()) != OptixResult.Success)
-            {
-	            Debug.LogError($"OptiX initialization failed : {result}");
-	            return;
-            }
+			OptixResult result;
+			if ((result = OptixApi.Initialize()) != OptixResult.Success)
+			{
+				Debug.LogError($"OptiX initialization failed : {result}");
+				return;
+			}
 
-            var options = new OptixDeviceContextOptions
-            {
+			var options = new OptixDeviceContextOptions
+			{
 				LogCallbackFunction = OnOptixError,
 				LogCallbackLevel = OptixLogLevel.Warning
-            };
+			};
 
-            if ((result = OptixDeviceContext.Create(options, ref optixDeviceContext)) != OptixResult.Success)
-            {
-	            Debug.LogError($"Optix device creation failed : {result}");
-	            return;
-            }
+			if ((result = OptixDeviceContext.Create(options, ref optixDeviceContext)) != OptixResult.Success)
+			{
+				Debug.LogError($"Optix device creation failed : {result}");
+				return;
+			}
 
-            var denoiseOptions = new OptixDenoiserOptions
-            {
-	            InputKind = OptixDenoiserInputKind.RgbAlbedo,
-	            PixelFormat = OptixPixelFormat.Float3
-            };
+			var denoiseOptions = new OptixDenoiserOptions
+			{
+				InputKind = OptixDenoiserInputKind.RgbAlbedo,
+				PixelFormat = OptixPixelFormat.Float3
+			};
 
-            OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
-            OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Ldr, IntPtr.Zero, 0);
+			OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
+			OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Ldr, IntPtr.Zero, 0);
 
-            if ((cudaError = CudaStream.Create(ref cudaStream)) != CudaError.Success)
+			if ((cudaError = CudaStream.Create(ref cudaStream)) != CudaError.Success)
 				Debug.LogError($"CUDA Stream creation failed : {cudaError}");
 		}
 
@@ -307,10 +307,18 @@ namespace RaytracerInOneWeekend
 		{
 			switch (level)
 			{
-				case OptixLogLevel.Fatal: Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}"); break;
-				case OptixLogLevel.Error: Debug.LogError($"nVidia OptiX Error : {tag} - {message}"); break;
-				case OptixLogLevel.Warning: Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}"); break;
-				case OptixLogLevel.Print: Debug.Log($"nVidia OptiX Trace : {tag} - {message}"); break;
+				case OptixLogLevel.Fatal:
+					Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}");
+					break;
+				case OptixLogLevel.Error:
+					Debug.LogError($"nVidia OptiX Error : {tag} - {message}");
+					break;
+				case OptixLogLevel.Warning:
+					Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}");
+					break;
+				case OptixLogLevel.Print:
+					Debug.Log($"nVidia OptiX Trace : {tag} - {message}");
+					break;
 			}
 		}
 
@@ -383,7 +391,8 @@ namespace RaytracerInOneWeekend
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
-			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
+			bool samplesPerPixelDecreased =
+				lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 			bool denoiseChanged = lastDenoise != denoiseMode;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
@@ -398,8 +407,7 @@ namespace RaytracerInOneWeekend
 				TimeSpan elapsedTime = batchTimer.Elapsed;
 				float totalRayCount = diagnosticsBuffer.Sum(x => x.RayCount);
 
-				// TODO: some kind of binary tree walk that covers the space a bit better
-				InterlacingOffset++;
+				interlacingOffsetIndex++;
 				AccumulatedSamples += (float) samplesPerBatch / interlacing;
 				LastBatchDuration = (float) elapsedTime.TotalMilliseconds;
 				MillionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
@@ -519,7 +527,7 @@ namespace RaytracerInOneWeekend
 				normalAccumulationBuffer.ZeroMemory();
 				albedoAccumulationBuffer.ZeroMemory();
 
-				InterlacingOffset = 0;
+				interlacingOffsetIndex = 0;
 
 #if PATH_DEBUGGING
 				debugPaths.EnsureCapacity((int) traceDepth);
@@ -540,8 +548,11 @@ namespace RaytracerInOneWeekend
 			NativeArray<float3> normalOutputBuffer = float3Buffers.Take();
 			NativeArray<float3> albedoOutputBuffer = float3Buffers.Take();
 
-			if (InterlacingOffset >= interlacing)
-				InterlacingOffset = 0;
+			if (interlacingOffsets == null || interlacing != interlacingOffsets.Length)
+				interlacingOffsets = Util.SpaceFillingSeries(interlacing).ToArray();
+
+			if (interlacingOffsetIndex >= interlacing)
+				interlacingOffsetIndex = 0;
 
 			var accumulateJob = new AccumulateJob
 			{
@@ -553,7 +564,7 @@ namespace RaytracerInOneWeekend
 				OutputNormal = normalOutputBuffer,
 				OutputAlbedo = albedoOutputBuffer,
 
-				SliceOffset = InterlacingOffset,
+				SliceOffset = interlacingOffsets[interlacingOffsetIndex],
 				SliceDivider = interlacing,
 
 				Size = bufferSize,
@@ -594,9 +605,12 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { Input = colorOutputBuffer, Output = copyOutputData.Color }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { Input = normalOutputBuffer, Output = copyOutputData.Normal }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { Input = albedoOutputBuffer, Output = copyOutputData.Albedo }.Schedule(accumulateJobHandle));
+				new CopyFloat4BufferJob { Input = colorOutputBuffer, Output = copyOutputData.Color }.Schedule(
+					accumulateJobHandle),
+				new CopyFloat3BufferJob { Input = normalOutputBuffer, Output = copyOutputData.Normal }.Schedule(
+					accumulateJobHandle),
+				new CopyFloat3BufferJob { Input = albedoOutputBuffer, Output = copyOutputData.Albedo }.Schedule(
+					accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
 			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
@@ -654,9 +668,12 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat3BufferJob { Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob { Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob { Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
+				new CopyFloat3BufferJob { Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(
+					combineJobHandle),
+				new CopyFloat3BufferJob
+					{ Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
+				new CopyFloat3BufferJob
+					{ Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
 
 			activeCombineJobs.Enqueue(new ActiveJobData<PassOutputData>
 			{
@@ -707,7 +724,7 @@ namespace RaytracerInOneWeekend
 					{
 						Denoiser = optixDenoiser,
 						CudaStream = cudaStream,
-						InputColor =  combineOutput.Color,
+						InputColor = combineOutput.Color,
 						InputAlbedo = combineOutput.Albedo,
 						OutputColor = denoiseColorOutputBuffer,
 						BufferSize = (uint2) bufferSize,
@@ -791,6 +808,7 @@ namespace RaytracerInOneWeekend
 						bufferMin = min(bufferMin, value.RayCount);
 						bufferMax = max(bufferMax, value.RayCount);
 					}
+
 					break;
 
 #if FULL_DIAGNOSTICS && BVH_ITERATIVE
@@ -814,9 +832,15 @@ namespace RaytracerInOneWeekend
 
 			switch (bufferView)
 			{
-				case BufferView.Front: frontBufferTexture.Apply(false); break;
-				case BufferView.Normals: normalsTexture.Apply(false); break;
-				case BufferView.Albedo: albedoTexture.Apply(false); break;
+				case BufferView.Front:
+					frontBufferTexture.Apply(false);
+					break;
+				case BufferView.Normals:
+					normalsTexture.Apply(false);
+					break;
+				case BufferView.Albedo:
+					albedoTexture.Apply(false);
+					break;
 				default:
 					BufferMinValue = bufferMin;
 					BufferMaxValue = bufferMax;
@@ -832,9 +856,15 @@ namespace RaytracerInOneWeekend
 
 				switch (bufferView)
 				{
-					case BufferView.Front: commandBuffer.Blit(frontBufferTexture, blitTarget); break;
-					case BufferView.Normals: commandBuffer.Blit(normalsTexture, blitTarget); break;
-					case BufferView.Albedo: commandBuffer.Blit(albedoTexture, blitTarget); break;
+					case BufferView.Front:
+						commandBuffer.Blit(frontBufferTexture, blitTarget);
+						break;
+					case BufferView.Normals:
+						commandBuffer.Blit(normalsTexture, blitTarget);
+						break;
+					case BufferView.Albedo:
+						commandBuffer.Blit(albedoTexture, blitTarget);
+						break;
 
 					default:
 						viewRangeMaterial.SetInt(channelPropertyId, (int) bufferView - 1);
@@ -913,7 +943,8 @@ namespace RaytracerInOneWeekend
 			OptixDenoiserSizes newSizes = default;
 			OptixDenoiser.ComputeMemoryResources(optixDenoiser, newBufferSize.x, newBufferSize.y, &newSizes);
 
-			Check(optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes, newSizes.RecommendedScratchSizeInBytes));
+			Check(optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes,
+				newSizes.RecommendedScratchSizeInBytes));
 			Check(optixDenoiserState.EnsureCapacity(lastSizes.StateSizeInBytes, newSizes.StateSizeInBytes));
 
 			optixDenoiserSizes = newSizes;
@@ -996,7 +1027,8 @@ namespace RaytracerInOneWeekend
 					: default;
 
 				Entity entity = e.Moving
-					? new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material, e.DestinationOffset, e.TimeRange)
+					? new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material, e.DestinationOffset,
+						e.TimeRange)
 					: new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material);
 
 				entityBuffer[entityIndex++] = entity;
