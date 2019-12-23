@@ -42,6 +42,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] UnityEngine.Camera targetCamera = null;
 
 		[Title("Settings")]
+		[SerializeField] [Range(1, 100)] int interlacing = 2;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
@@ -62,7 +63,7 @@ namespace RaytracerInOneWeekend
 
 		[Title("Debug")]
 		[SerializeField] Shader viewRangeShader = null;
-		[OdinReadOnly] public uint AccumulatedSamples;
+		[OdinReadOnly] public float AccumulatedSamples;
 
 		[UsedImplicitly]
 		[OdinReadOnly]
@@ -74,6 +75,8 @@ namespace RaytracerInOneWeekend
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
+
+		[OdinReadOnly] public int InterlacingOffset;
 
 		NativeArray<float4> colorAccumulationBuffer;
 		NativeArray<float3> normalAccumulationBuffer, albedoAccumulationBuffer;
@@ -395,7 +398,9 @@ namespace RaytracerInOneWeekend
 				TimeSpan elapsedTime = batchTimer.Elapsed;
 				float totalRayCount = diagnosticsBuffer.Sum(x => x.RayCount);
 
-				AccumulatedSamples += samplesPerBatch;
+				// TODO: some kind of binary tree walk that covers the space a bit better
+				InterlacingOffset++;
+				AccumulatedSamples += (float) samplesPerBatch / interlacing;
 				LastBatchDuration = (float) elapsedTime.TotalMilliseconds;
 				MillionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
 				if (!ignoreBatchTimings) mraysPerSecResults.Add(MillionRaysPerSecond);
@@ -514,6 +519,8 @@ namespace RaytracerInOneWeekend
 				normalAccumulationBuffer.ZeroMemory();
 				albedoAccumulationBuffer.ZeroMemory();
 
+				InterlacingOffset = 0;
+
 #if PATH_DEBUGGING
 				debugPaths.EnsureCapacity((int) traceDepth);
 #endif
@@ -533,6 +540,9 @@ namespace RaytracerInOneWeekend
 			NativeArray<float3> normalOutputBuffer = float3Buffers.Take();
 			NativeArray<float3> albedoOutputBuffer = float3Buffers.Take();
 
+			if (InterlacingOffset >= interlacing)
+				InterlacingOffset = 0;
+
 			var accumulateJob = new AccumulateJob
 			{
 				InputColor = colorAccumulationBuffer,
@@ -542,6 +552,9 @@ namespace RaytracerInOneWeekend
 				OutputColor = colorOutputBuffer,
 				OutputNormal = normalOutputBuffer,
 				OutputAlbedo = albedoOutputBuffer,
+
+				SliceOffset = InterlacingOffset,
+				SliceDivider = interlacing,
 
 				Size = bufferSize,
 				Camera = raytracingCamera,
@@ -622,6 +635,7 @@ namespace RaytracerInOneWeekend
 				InputColor = accumulateOutput.Color,
 				InputNormal = accumulateOutput.Normal,
 				InputAlbedo = accumulateOutput.Albedo,
+				Size = (int2) bufferSize,
 
 				OutputColor = float3Buffers.Take(),
 				OutputNormal = float3Buffers.Take(),

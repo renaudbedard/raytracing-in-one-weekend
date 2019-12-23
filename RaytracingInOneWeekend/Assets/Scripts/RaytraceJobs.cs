@@ -44,6 +44,8 @@ namespace RaytracerInOneWeekend
 		}
 #endif
 		[ReadOnly] public float2 Size;
+		[ReadOnly] public int SliceOffset;
+		[ReadOnly] public int SliceDivider;
 		[ReadOnly] public uint Seed;
 		[ReadOnly] public Camera Camera;
 		[ReadOnly] public uint SampleCount;
@@ -78,6 +80,9 @@ namespace RaytracerInOneWeekend
 
 		public void Execute(int index)
 		{
+			float3 fallbackAlbedo = default, fallbackNormal = default;
+			Diagnostics diagnostics = default;
+
 			// ReSharper disable once PossibleLossOfFraction
 			float2 coordinates = float2(
 				index % Size.x, // column
@@ -91,9 +96,18 @@ namespace RaytracerInOneWeekend
 
 			int sampleCount = (int) lastColor.w;
 
+			// early out
+			if (((int)coordinates.y % SliceDivider) != SliceOffset)
+			{
+				OutputColor[index] = float4(colorAcc, sampleCount);
+				OutputNormal[index] = sampleCount == 0 ? fallbackNormal : normalAcc;
+				OutputAlbedo[index] = sampleCount == 0 ? fallbackAlbedo : albedoAcc;
+				OutputDiagnostics[index] = diagnostics;
+				return;
+			}
+
 			// big primes stolen from Unity's random class
 			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
-			Diagnostics diagnostics = default;
 
 #if BVH_ITERATIVE
 			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
@@ -115,8 +129,6 @@ namespace RaytracerInOneWeekend
 
 			float3* emissionStack = stackalloc float3[TraceDepth];
 			float3* attenuationStack = stackalloc float3[TraceDepth];
-
-			float3 fallbackAlbedo = default, fallbackNormal = default;
 
 			for (int s = 0; s < SampleCount; s++)
 			{
@@ -236,7 +248,8 @@ namespace RaytracerInOneWeekend
 					else
 					{
 						float3 outgoingLightDirection = -ray.Direction;
-						float scatterPdfValue = material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
+						float scatterPdfValue =
+							material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
 
 						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);
@@ -303,6 +316,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
+		[ReadOnly] public int2 Size;
 
 		[WriteOnly] public NativeArray<float3> OutputColor;
 		[WriteOnly] public NativeArray<float3> OutputNormal;
@@ -311,7 +325,6 @@ namespace RaytracerInOneWeekend
 		public void Execute(int index)
 		{
 			float4 inputColor = InputColor[index];
-
 			var realSampleCount = (int) inputColor.w;
 
 			float3 finalColor;
@@ -323,7 +336,19 @@ namespace RaytracerInOneWeekend
 			}
 			else
 			{
-				if (realSampleCount == 0) finalColor = NoSamplesColor;
+				if (realSampleCount == 0)
+				{
+					int tentativeIndex = index;
+
+					// look-around (for interlaced buffer)
+					while (realSampleCount == 0 && (tentativeIndex -= Size.x) >= 0)
+					{
+						inputColor = InputColor[tentativeIndex];
+						realSampleCount = (int) inputColor.w;
+					}
+				}
+
+				if (realSampleCount == 0)  finalColor = NoSamplesColor;
 				else if (any(isnan(inputColor))) finalColor = NaNColor;
 				else finalColor = inputColor.xyz / realSampleCount;
 			}
