@@ -378,11 +378,31 @@ namespace RaytracerInOneWeekend
 		public void Execute() => NativeArray<float4>.Copy(Input, Output);
 	}
 
+	// because the OIDN API uses strings, we can't use Burst here
 	struct OpenImageDenoiseJob : IJob
 	{
+		[ReadOnly] public NativeArray<float3> InputColor, InputNormal, InputAlbedo;
+		[ReadOnly] public ulong Width, Height;
+
+		public NativeArray<float3> OutputColor;
+
 		public OidnFilter DenoiseFilter;
 
-		public void Execute() => OidnFilter.Execute(DenoiseFilter);
+		public unsafe void Execute()
+		{
+			OidnFilter.SetSharedImage(DenoiseFilter, "color", new IntPtr(InputColor.GetUnsafeReadOnlyPtr()),
+				OidnBuffer.Format.Float3, Width, Height, 0, 0, 0);
+			OidnFilter.SetSharedImage(DenoiseFilter, "normal", new IntPtr(InputNormal.GetUnsafeReadOnlyPtr()),
+				OidnBuffer.Format.Float3, Width, Height, 0, 0, 0);
+			OidnFilter.SetSharedImage(DenoiseFilter, "albedo", new IntPtr(InputAlbedo.GetUnsafeReadOnlyPtr()),
+				OidnBuffer.Format.Float3, Width, Height, 0, 0, 0);
+
+			OidnFilter.SetSharedImage(DenoiseFilter, "output", new IntPtr(OutputColor.GetUnsafePtr()),
+				OidnBuffer.Format.Float3, Width, Height, 0, 0, 0);
+
+			OidnFilter.Commit(DenoiseFilter);
+			OidnFilter.Execute(DenoiseFilter);
+		}
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]

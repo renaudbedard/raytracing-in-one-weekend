@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using System.IO;
+using JetBrains.Annotations;
 using static Unity.Mathematics.math;
 
 #if ODIN_INSPECTOR
@@ -20,6 +21,7 @@ namespace RaytracerInOneWeekend
 	{
 		[ButtonGroup("Save")]
 		[DisableInEditorMode]
+		[UsedImplicitly]
 		void SaveFrontBuffer()
 		{
 			byte[] pngBytes = frontBufferTexture.EncodeToPNG();
@@ -30,6 +32,7 @@ namespace RaytracerInOneWeekend
 
 		[ButtonGroup("Save")]
 		[DisableInEditorMode]
+		[UsedImplicitly]
 		void SaveView()
 		{
 			ScreenCapture.CaptureScreenshot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
@@ -39,11 +42,13 @@ namespace RaytracerInOneWeekend
 		[DisableIf(nameof(TraceActive))]
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
+		[UsedImplicitly]
 		void TriggerTrace() => ScheduleAccumulate(true);
 
 		[EnableIf(nameof(TraceActive))]
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
+		[UsedImplicitly]
 		void AbortTrace() => traceAborted = true;
 
 #if BVH
