@@ -80,14 +80,15 @@ namespace RaytracerInOneWeekend
 
 		public void Execute(int index)
 		{
-			float3 fallbackAlbedo = default, fallbackNormal = default;
-			Diagnostics diagnostics = default;
-
 			// ReSharper disable once PossibleLossOfFraction
 			float2 coordinates = float2(
 				index % Size.x, // column
 				index / Size.x // row
 			);
+
+			// early out
+			if ((int) coordinates.y % SliceDivider != SliceOffset)
+				return;
 
 			float4 lastColor = InputColor[index];
 			float3 colorAcc = lastColor.xyz;
@@ -95,16 +96,6 @@ namespace RaytracerInOneWeekend
 			float3 albedoAcc = InputAlbedo[index];
 
 			int sampleCount = (int) lastColor.w;
-
-			// early out
-			if (((int)coordinates.y % SliceDivider) != SliceOffset)
-			{
-				OutputColor[index] = float4(colorAcc, sampleCount);
-				OutputNormal[index] = sampleCount == 0 ? fallbackNormal : normalAcc;
-				OutputAlbedo[index] = sampleCount == 0 ? fallbackAlbedo : albedoAcc;
-				OutputDiagnostics[index] = diagnostics;
-				return;
-			}
 
 			// big primes stolen from Unity's random class
 			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
@@ -129,6 +120,9 @@ namespace RaytracerInOneWeekend
 
 			float3* emissionStack = stackalloc float3[TraceDepth];
 			float3* attenuationStack = stackalloc float3[TraceDepth];
+
+			float3 fallbackAlbedo = default, fallbackNormal = default;
+			Diagnostics diagnostics = default;
 
 			for (int s = 0; s < SampleCount; s++)
 			{
@@ -248,8 +242,7 @@ namespace RaytracerInOneWeekend
 					else
 					{
 						float3 outgoingLightDirection = -ray.Direction;
-						float scatterPdfValue =
-							material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
+						float scatterPdfValue = material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
 
 						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);

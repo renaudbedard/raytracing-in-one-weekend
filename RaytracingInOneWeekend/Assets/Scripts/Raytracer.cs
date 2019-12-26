@@ -18,6 +18,7 @@ using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 using OptiX;
+
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
@@ -595,7 +596,18 @@ namespace RaytracerInOneWeekend
 #endif
 			};
 
-			JobHandle accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1);
+			JobHandle accumulateJobHandle;
+			if (interlacing > 1)
+			{
+				JobHandle preCopyHandle = JobHandle.CombineDependencies(
+					new CopyFloat4BufferJob { Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(),
+					new CopyFloat3BufferJob { Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(),
+					new CopyFloat3BufferJob { Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule());
+
+				accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1, preCopyHandle);
+			}
+			else
+				accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1);
 
 			var copyOutputData = new AccumulateOutputData
 			{
@@ -605,12 +617,9 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { Input = colorOutputBuffer, Output = copyOutputData.Color }.Schedule(
-					accumulateJobHandle),
-				new CopyFloat3BufferJob { Input = normalOutputBuffer, Output = copyOutputData.Normal }.Schedule(
-					accumulateJobHandle),
-				new CopyFloat3BufferJob { Input = albedoOutputBuffer, Output = copyOutputData.Albedo }.Schedule(
-					accumulateJobHandle));
+				new CopyFloat4BufferJob { Input = colorOutputBuffer, Output = copyOutputData.Color }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { Input = normalOutputBuffer, Output = copyOutputData.Normal }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { Input = albedoOutputBuffer, Output = copyOutputData.Albedo }.Schedule(accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
 			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
@@ -668,12 +677,9 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat3BufferJob { Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(
-					combineJobHandle),
-				new CopyFloat3BufferJob
-					{ Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob
-					{ Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
+				new CopyFloat3BufferJob { Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(combineJobHandle),
+				new CopyFloat3BufferJob { Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
+				new CopyFloat3BufferJob { Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
 
 			activeCombineJobs.Enqueue(new ActiveJobData<PassOutputData>
 			{
@@ -799,12 +805,14 @@ namespace RaytracerInOneWeekend
 		void SwapBuffers()
 		{
 			float bufferMin = float.MaxValue, bufferMax = float.MinValue;
+			Diagnostics* diagnosticsPtr = (Diagnostics*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(diagnosticsBuffer);
 
 			switch (bufferView)
 			{
 				case BufferView.RayCount:
-					foreach (Diagnostics value in diagnosticsBuffer)
+					for (int i=0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
+						Diagnostics value = *diagnosticsPtr;
 						bufferMin = min(bufferMin, value.RayCount);
 						bufferMax = max(bufferMax, value.RayCount);
 					}
@@ -813,16 +821,18 @@ namespace RaytracerInOneWeekend
 
 #if FULL_DIAGNOSTICS && BVH_ITERATIVE
 				case BufferView.BvhHitCount:
-					foreach (Diagnostics value in diagnosticsBuffer)
+					for (int i=0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
+						Diagnostics value = *diagnosticsPtr;
 						bufferMin = min(bufferMin, value.BoundsHitCount);
 						bufferMax = max(bufferMax, value.BoundsHitCount);
 					}
 					break;
 
 				case BufferView.CandidateCount:
-					foreach (Diagnostics value in diagnosticsBuffer)
+					for (int i=0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
+						Diagnostics value = *diagnosticsPtr;
 						bufferMin = min(bufferMin, value.CandidateCount);
 						bufferMax = max(bufferMax, value.CandidateCount);
 					}
@@ -1027,8 +1037,7 @@ namespace RaytracerInOneWeekend
 					: default;
 
 				Entity entity = e.Moving
-					? new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material, e.DestinationOffset,
-						e.TimeRange)
+					? new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material, e.DestinationOffset, e.TimeRange)
 					: new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material);
 
 				entityBuffer[entityIndex++] = entity;
