@@ -514,4 +514,22 @@ namespace RaytracerInOneWeekend
 			};
 		}
 	}
+
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	struct ReduceRayCountJob : IJob
+	{
+		[ReadOnly] public NativeArray<Diagnostics> Diagnostics;
+
+		[WriteOnly] public NativeArray<int> TotalRayCount;
+
+		public void Execute()
+		{
+			float totalRayCount = 0;
+
+			for (int i = 0; i < Diagnostics.Length; i++)
+				totalRayCount += Diagnostics[i].RayCount;
+
+			TotalRayCount[0] = (int) totalRayCount;
+		}
+	}
 }

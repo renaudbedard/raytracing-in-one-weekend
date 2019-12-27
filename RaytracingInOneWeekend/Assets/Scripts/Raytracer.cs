@@ -36,7 +36,7 @@ namespace RaytracerInOneWeekend
 		NvidiaOptix
 	}
 
-	unsafe partial class Raytracer : MonoBehaviour
+	partial class Raytracer : MonoBehaviour
 	{
 		[Title("References")] [SerializeField] UnityEngine.Camera targetCamera = null;
 
@@ -64,7 +64,7 @@ namespace RaytracerInOneWeekend
 		[OdinReadOnly] public float AccumulatedSamples;
 
 		[UsedImplicitly] [OdinReadOnly]
-		public float MillionRaysPerSecond, AvgMRaysPerSecond, LastBatchDuration, LastTraceDuration;
+		public float MillionRaysPerSecond, AvgMRaysPerSecond, LastBatchDuration, LastBatchRayCount, LastTraceDuration;
 
 		[UsedImplicitly] [OdinReadOnly] public float BufferMinValue, BufferMaxValue;
 
@@ -88,6 +88,7 @@ namespace RaytracerInOneWeekend
 		CommandBuffer commandBuffer;
 		UnityEngine.Material viewRangeMaterial;
 		NativeArray<Diagnostics> diagnosticsBuffer;
+		NativeArray<int> reducedRayCountBuffer;
 
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Rect> rectBuffer;
@@ -103,7 +104,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
 		NativeList<BvhNodeMetadata> bvhNodeMetadataBuffer;
-		BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
+		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
 		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
@@ -139,6 +140,7 @@ namespace RaytracerInOneWeekend
 		{
 			public NativeArray<float4> Color;
 			public NativeArray<float3> Normal, Albedo;
+			public JobHandle DiagnosticsJobHandle;
 		}
 
 		struct PassOutputData
@@ -157,7 +159,6 @@ namespace RaytracerInOneWeekend
 		uint lastSamplesPerPixel;
 		bool queuedAccumulate;
 		ImportanceSamplingMode lastSamplingMode;
-		DenoiseMode lastDenoise;
 
 		readonly Stopwatch batchTimer = new Stopwatch(), traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
@@ -214,6 +215,8 @@ namespace RaytracerInOneWeekend
 			float4Buffers = new Pool<NativeArray<float4>>(() =>
 					new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<float4>") { Capacity = 16 };
+
+			reducedRayCountBuffer = new NativeArray<int>(1, Allocator.Persistent);
 
 			ignoreBatchTimings = true;
 		}
@@ -277,7 +280,10 @@ namespace RaytracerInOneWeekend
 				PixelFormat = OptixPixelFormat.Float3
 			};
 
-			OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
+			unsafe
+			{
+				OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
+			}
 			OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Ldr, IntPtr.Zero, 0);
 
 			if ((cudaError = CudaStream.Create(ref cudaStream)) != CudaError.Success)
@@ -317,7 +323,11 @@ namespace RaytracerInOneWeekend
 		{
 			// if there is any running job, wait for completion
 			// TODO: cancellation
-			foreach (var jobData in activeAccumulateJobs) jobData.Complete();
+			foreach (var jobData in activeAccumulateJobs)
+			{
+				jobData.Complete();
+				jobData.OutputData.DiagnosticsJobHandle.Complete();
+			}
 			foreach (var jobData in activeCombineJobs) jobData.Complete();
 			foreach (var jobData in activeDenoiseJobs) jobData.Complete();
 			foreach (var jobData in activeFinalizeJobs) jobData.Complete();
@@ -327,6 +337,7 @@ namespace RaytracerInOneWeekend
 			sphereBuffer.SafeDispose();
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
+			reducedRayCountBuffer.SafeDispose();
 
 			float3Buffers.ReturnAll();
 			float3Buffers.Capacity = 0;
@@ -383,10 +394,9 @@ namespace RaytracerInOneWeekend
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
 			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
-			bool denoiseChanged = lastDenoise != denoiseMode;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
-			                       samplingModeChanged || samplesPerPixelDecreased || denoiseChanged;
+			                       samplingModeChanged || samplesPerPixelDecreased;
 			bool traceNeedsKick = traceNeedsReset || !stopWhenCompleted;
 
 			if (activeAccumulateJobs.Count > 0 && activeAccumulateJobs.Peek().Handle.IsCompleted)
@@ -395,15 +405,21 @@ namespace RaytracerInOneWeekend
 				completedJob.Complete();
 
 				TimeSpan elapsedTime = batchTimer.Elapsed;
-				float totalRayCount = diagnosticsBuffer.Sum(x => x.RayCount) / interlacing;
 
-				interlacingOffsetIndex++;
+				completedJob.OutputData.DiagnosticsJobHandle.Complete();
+				int totalRayCount = reducedRayCountBuffer[0];
+
+				LastBatchRayCount = totalRayCount;
 				AccumulatedSamples += (float) samplesPerBatch / interlacing;
 				LastBatchDuration = (float) elapsedTime.TotalMilliseconds;
 				MillionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
 				if (!ignoreBatchTimings) mraysPerSecResults.Add(MillionRaysPerSecond);
 				AvgMRaysPerSecond = mraysPerSecResults.Count == 0 ? 0 : mraysPerSecResults.Average();
 				ignoreBatchTimings = false;
+
+#if UNITY_EDITOR
+				ForceUpdateInspector();
+#endif
 
 				if (traceAborted)
 				{
@@ -514,7 +530,6 @@ namespace RaytracerInOneWeekend
 				lastTraceDepth = traceDepth;
 				lastSamplingMode = importanceSampling;
 				lastSamplesPerPixel = samplesPerPixel;
-				lastDenoise = denoiseMode;
 				traceAborted = false;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
@@ -531,50 +546,58 @@ namespace RaytracerInOneWeekend
 			if (interlacingOffsetIndex >= interlacing)
 				interlacingOffsetIndex = 0;
 
-			var accumulateJob = new AccumulateJob
+			AccumulateJob accumulateJob;
+
+			unsafe
 			{
-				InputColor = colorAccumulationBuffer,
-				InputNormal = normalAccumulationBuffer,
-				InputAlbedo = albedoAccumulationBuffer,
-
-				OutputColor = colorOutputBuffer,
-				OutputNormal = normalOutputBuffer,
-				OutputAlbedo = albedoOutputBuffer,
-
-				SliceOffset = interlacingOffsets[interlacingOffsetIndex],
-				SliceDivider = interlacing,
-
-				Size = bufferSize,
-				Camera = raytracingCamera,
-				SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
-				SkyTopColor = scene.SkyTopColor.ToFloat3(),
-				Seed = (uint) Time.frameCount + 1,
-				SampleCount = min(samplesPerPixel, samplesPerBatch),
-				TraceDepth = traceDepth,
-				SubPixelJitter = subPixelJitter,
-				Entities = entityBuffer,
-#if BVH
-				BvhRoot = BvhRoot,
-#endif
-				PerlinData = perlinData.GetRuntimeData(),
-				OutputDiagnostics = diagnosticsBuffer,
-				ImportanceSampler = new ImportanceSampler
+				accumulateJob = new AccumulateJob
 				{
-					TargetEntities = importanceSamplingEntityBuffer,
-					Mode = importanceSamplingEntityBuffer.Length == 0 ? ImportanceSamplingMode.None : importanceSampling
-				},
+					InputColor = colorAccumulationBuffer,
+					InputNormal = normalAccumulationBuffer,
+					InputAlbedo = albedoAccumulationBuffer,
+
+					OutputColor = colorOutputBuffer,
+					OutputNormal = normalOutputBuffer,
+					OutputAlbedo = albedoOutputBuffer,
+
+					SliceOffset = interlacingOffsets[interlacingOffsetIndex++],
+					SliceDivider = interlacing,
+
+					Size = bufferSize,
+					Camera = raytracingCamera,
+					SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
+					SkyTopColor = scene.SkyTopColor.ToFloat3(),
+					Seed = (uint) Time.frameCount + 1,
+					SampleCount = min(samplesPerPixel, samplesPerBatch),
+					TraceDepth = traceDepth,
+					SubPixelJitter = subPixelJitter,
+					Entities = entityBuffer,
+#if BVH
+					BvhRoot = BvhRoot,
+#endif
+					PerlinData = perlinData.GetRuntimeData(),
+					OutputDiagnostics = diagnosticsBuffer,
+					ImportanceSampler = new ImportanceSampler
+					{
+						TargetEntities = importanceSamplingEntityBuffer,
+						Mode = importanceSamplingEntityBuffer.Length == 0 ? ImportanceSamplingMode.None : importanceSampling
+					},
 #if BVH_ITERATIVE
-				NodeCount = bvhNodeBuffer.Length,
+					NodeCount = bvhNodeBuffer.Length,
 #endif
 #if PATH_DEBUGGING
 				DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
 				DebugCoordinates = int2 (bufferSize / 2)
 #endif
-			};
+				};
+			}
 
-			JobHandle accumulateJobHandle;
+			JobHandle accumulateJobHandle, diagnosticsJobHandle;
+
 			if (interlacing > 1)
 			{
+				diagnosticsBuffer.ZeroMemory();
+
 				JobHandle preCopyHandle = JobHandle.CombineDependencies(
 					new CopyFloat4BufferJob { Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(),
 					new CopyFloat3BufferJob { Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(),
@@ -589,7 +612,10 @@ namespace RaytracerInOneWeekend
 			{
 				Color = float4Buffers.Take(),
 				Normal = float3Buffers.Take(),
-				Albedo = float3Buffers.Take()
+				Albedo = float3Buffers.Take(),
+				DiagnosticsJobHandle = new ReduceRayCountJob
+						{ Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountBuffer }
+					.Schedule(accumulateJobHandle)
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
@@ -618,8 +644,11 @@ namespace RaytracerInOneWeekend
 			normalAccumulationBuffer = normalOutputBuffer;
 			albedoAccumulationBuffer = albedoOutputBuffer;
 
-			if (AccumulatedSamples + accumulateJob.SampleCount / (float)interlacing >= samplesPerPixel || previewAfterBatch)
+			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel ||
+			    previewAfterBatch)
 				ScheduleCombine(combinedDependency, copyOutputData);
+
+			JobHandle.ScheduleBatchedJobs();
 
 			batchTimer.Restart();
 			if (firstBatch) traceTimer.Restart();
@@ -783,7 +812,7 @@ namespace RaytracerInOneWeekend
 #endif
 		}
 
-		void SwapBuffers()
+		unsafe void SwapBuffers()
 		{
 			float bufferMin = float.MaxValue, bufferMax = float.MinValue;
 			Diagnostics* diagnosticsPtr = (Diagnostics*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(diagnosticsBuffer);
@@ -791,7 +820,7 @@ namespace RaytracerInOneWeekend
 			switch (bufferView)
 			{
 				case BufferView.RayCount:
-					for (int i=0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
+					for (int i = 0; i < diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
 						Diagnostics value = *diagnosticsPtr;
 						bufferMin = min(bufferMin, value.RayCount);
@@ -802,7 +831,7 @@ namespace RaytracerInOneWeekend
 
 #if FULL_DIAGNOSTICS && BVH_ITERATIVE
 				case BufferView.BvhHitCount:
-					for (int i=0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
+					for (int i = 0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
 						Diagnostics value = *diagnosticsPtr;
 						bufferMin = min(bufferMin, value.BoundsHitCount);
@@ -811,7 +840,7 @@ namespace RaytracerInOneWeekend
 					break;
 
 				case BufferView.CandidateCount:
-					for (int i=0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
+					for (int i = 0; i<diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
 						Diagnostics value = *diagnosticsPtr;
 						bufferMin = min(bufferMin, value.CandidateCount);
@@ -913,7 +942,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		void RebuildOptixBuffers(uint2 lastBufferSize)
+		unsafe void RebuildOptixBuffers(uint2 lastBufferSize)
 		{
 			var newBufferSize = (uint2) bufferSize;
 
@@ -966,7 +995,7 @@ namespace RaytracerInOneWeekend
 			worldNeedsRebuild = false;
 		}
 
-		void RebuildEntityBuffers()
+		unsafe void RebuildEntityBuffers()
 		{
 			int entityCount = ActiveEntities.Count;
 
@@ -1029,7 +1058,7 @@ namespace RaytracerInOneWeekend
 		}
 
 #if BVH
-		void RebuildBvh()
+		unsafe void RebuildBvh()
 		{
 			bvhNodeBuffer.EnsureCapacity(entityBuffer.Length * 2);
 			bvhNodeMetadataBuffer.EnsureCapacity(entityBuffer.Length * 2);
@@ -1052,7 +1081,7 @@ namespace RaytracerInOneWeekend
 #endif // BVH
 
 #if BVH_ITERATIVE
-		public bool HitWorld(Ray r, out HitRecord hitRec)
+		unsafe bool HitWorld(Ray r, out HitRecord hitRec)
 		{
 			BvhNode** nodes = stackalloc BvhNode*[bvhNodeBuffer.Length];
 			Entity* entities = stackalloc Entity[entityBuffer.Length];
