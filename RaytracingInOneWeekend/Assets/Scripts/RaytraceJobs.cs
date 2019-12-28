@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using OpenImageDenoise;
 using OptiX;
 using Unity.Burst;
@@ -6,8 +8,8 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
 using static Unity.Mathematics.math;
+using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
@@ -242,7 +244,8 @@ namespace RaytracerInOneWeekend
 					else
 					{
 						float3 outgoingLightDirection = -ray.Direction;
-						float scatterPdfValue = material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
+						float scatterPdfValue =
+							material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
 
 						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);
@@ -341,7 +344,7 @@ namespace RaytracerInOneWeekend
 					}
 				}
 
-				if (realSampleCount == 0)  finalColor = NoSamplesColor;
+				if (realSampleCount == 0) finalColor = NoSamplesColor;
 				else if (any(isnan(inputColor))) finalColor = NaNColor;
 				else finalColor = inputColor.xyz / realSampleCount;
 			}
@@ -357,6 +360,17 @@ namespace RaytracerInOneWeekend
 			OutputColor[index] = finalColor;
 			OutputNormal[index] = normalizesafe(InputNormal[index] / max(realSampleCount, 1));
 			OutputAlbedo[index] = finalAlbedo;
+		}
+	}
+
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	struct ClearBufferJob<T> : IJob where T : unmanaged
+	{
+		[WriteOnly] public NativeArray<T> Buffer;
+
+		public void Execute()
+		{
+			Buffer.ZeroMemory();
 		}
 	}
 
@@ -530,6 +544,22 @@ namespace RaytracerInOneWeekend
 				totalRayCount += Diagnostics[i].RayCount;
 
 			TotalRayCount[0] = (int) totalRayCount;
+		}
+	}
+
+	struct RecordTimeJob : IJob
+	{
+		[DllImport("Kernel32.dll", CallingConvention = CallingConvention.Winapi)]
+		static extern void GetSystemTimePreciseAsFileTime(out long filetime);
+
+		[ReadOnly] public int Index;
+
+		[WriteOnly] public NativeArray<long> Buffer;
+
+		public void Execute()
+		{
+			GetSystemTimePreciseAsFileTime(out long fileTime);
+			Buffer[Index] = fileTime;
 		}
 	}
 }
