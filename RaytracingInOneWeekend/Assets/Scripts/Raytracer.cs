@@ -71,15 +71,16 @@ namespace RaytracerInOneWeekend
 
 		[UsedImplicitly] [OdinReadOnly] public float BufferMinValue, BufferMaxValue;
 
-		[UsedImplicitly] [ShowInInspector] public float AccumulateJobs => activeAccumulateJobs.Count;
-		[UsedImplicitly] [ShowInInspector] public float CombineJobs => activeCombineJobs.Count;
-		[UsedImplicitly] [ShowInInspector] public float DenoiseJobs => activeDenoiseJobs.Count;
-		[UsedImplicitly] [ShowInInspector] public float FinalizeJobs => activeFinalizeJobs.Count;
+		[UsedImplicitly] [ShowInInspector] public float AccumulateJobs => scheduledAccumulateJobs.Count;
+		[UsedImplicitly] [ShowInInspector] public float CombineJobs => scheduledCombineJobs.Count;
+		[UsedImplicitly] [ShowInInspector] public float DenoiseJobs => scheduledDenoiseJobs.Count;
+		[UsedImplicitly] [ShowInInspector] public float FinalizeJobs => scheduledFinalizeJobs.Count;
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
 		Pool<NativeArray<int>> intBuffers;
 		Pool<NativeArray<long>> longBuffers;
+		Pool<NativeArray<bool>> boolBuffers;
 
 		int interlacingOffsetIndex;
 		int[] interlacingOffsets;
@@ -132,6 +133,15 @@ namespace RaytracerInOneWeekend
 			public JobHandle Handle;
 			public Action OnComplete;
 			public T OutputData;
+			public NativeArray<bool> CancellationToken;
+
+			public unsafe void Cancel()
+			{
+				*((bool*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(CancellationToken)) = true;
+				Handle.Complete();
+			}
+
+			public unsafe bool Cancelled => *((bool*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(CancellationToken));
 
 			public void Complete()
 			{
@@ -155,10 +165,10 @@ namespace RaytracerInOneWeekend
 			public NativeArray<float3> Color, Normal, Albedo;
 		}
 
-		readonly Queue<ActiveJobData<AccumulateOutputData>> activeAccumulateJobs = new Queue<ActiveJobData<AccumulateOutputData>>();
-		readonly Queue<ActiveJobData<PassOutputData>> activeCombineJobs = new Queue<ActiveJobData<PassOutputData>>();
-		readonly Queue<ActiveJobData<PassOutputData>> activeDenoiseJobs = new Queue<ActiveJobData<PassOutputData>>();
-		readonly Queue<ActiveJobData<PassOutputData>> activeFinalizeJobs = new Queue<ActiveJobData<PassOutputData>>();
+		readonly Queue<ActiveJobData<AccumulateOutputData>> scheduledAccumulateJobs = new Queue<ActiveJobData<AccumulateOutputData>>();
+		readonly Queue<ActiveJobData<PassOutputData>> scheduledCombineJobs = new Queue<ActiveJobData<PassOutputData>>();
+		readonly Queue<ActiveJobData<PassOutputData>> scheduledDenoiseJobs = new Queue<ActiveJobData<PassOutputData>>();
+		readonly Queue<ActiveJobData<PassOutputData>> scheduledFinalizeJobs = new Queue<ActiveJobData<PassOutputData>>();
 
 		bool commandBufferHooked, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
 		float focusDistance;
@@ -177,8 +187,8 @@ namespace RaytracerInOneWeekend
 
 		int BufferLength => (int) (bufferSize.x * bufferSize.y);
 
-		bool TraceActive => activeAccumulateJobs.Count > 0 || activeCombineJobs.Count > 0 ||
-		                    activeDenoiseJobs.Count > 0 || activeFinalizeJobs.Count > 0;
+		bool TraceActive => scheduledAccumulateJobs.Count > 0 || scheduledCombineJobs.Count > 0 ||
+		                    scheduledDenoiseJobs.Count > 0 || scheduledFinalizeJobs.Count > 0;
 
 		enum BufferView
 		{
@@ -230,6 +240,9 @@ namespace RaytracerInOneWeekend
 			longBuffers = new Pool<NativeArray<long>>(() =>
 					new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<long>") { Capacity = 4 };
+
+			boolBuffers = new Pool<NativeArray<bool>>(() => new NativeArray<bool>(1, Allocator.Persistent),
+				itemNameOverride: "NativeArray<bool>", cleanupMethod: buffer => buffer[0] = false) { Capacity = 64 };
 
 			ignoreBatchTimings = true;
 		}
@@ -336,16 +349,14 @@ namespace RaytracerInOneWeekend
 		void OnDestroy()
 		{
 			// if there is any running job, wait for completion
-			// TODO: cancellation
-			foreach (var jobData in activeAccumulateJobs)
+			foreach (var jobData in scheduledAccumulateJobs)
 			{
-				jobData.Complete();
+				jobData.Cancel();
 				jobData.OutputData.ReduceRayCountJobHandle.Complete();
 			}
-
-			foreach (var jobData in activeCombineJobs) jobData.Complete();
-			foreach (var jobData in activeDenoiseJobs) jobData.Complete();
-			foreach (var jobData in activeFinalizeJobs) jobData.Complete();
+			foreach (var jobData in scheduledCombineJobs) jobData.Cancel();
+			foreach (var jobData in scheduledDenoiseJobs) jobData.Cancel();
+			foreach (var jobData in scheduledFinalizeJobs) jobData.Cancel();
 
 			entityBuffer.SafeDispose();
 			importanceSamplingEntityBuffer.SafeDispose();
@@ -364,6 +375,9 @@ namespace RaytracerInOneWeekend
 
 			longBuffers.ReturnAll();
 			longBuffers.Capacity = 0;
+
+			boolBuffers.ReturnAll();
+			boolBuffers.Capacity = 0;
 
 #if BVH
 			bvhNodeBuffer.SafeDispose();
@@ -413,23 +427,24 @@ namespace RaytracerInOneWeekend
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
-			bool samplesPerPixelDecreased =
-				lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
+			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
 			                       samplingModeChanged || samplesPerPixelDecreased;
 
 			if (traceNeedsReset)
 			{
-				foreach (var jobData in activeAccumulateJobs) jobData.Handle.Complete();
-				foreach (var jobData in activeCombineJobs) jobData.Handle.Complete();
-				foreach (var jobData in activeDenoiseJobs) jobData.Handle.Complete();
-				foreach (var jobData in activeFinalizeJobs) jobData.Handle.Complete();
+				// TODO: this causes streaks and I'm not sure why
+				int i = 0;
+				foreach (var jobData in scheduledAccumulateJobs) { if (i == 0) jobData.Handle.Complete(); else jobData.Cancel(); i++; } i = 0;
+				foreach (var jobData in scheduledCombineJobs) { if (i == 0) jobData.Handle.Complete(); else jobData.Cancel(); i++; } i = 0;
+				foreach (var jobData in scheduledDenoiseJobs) { if (i == 0) jobData.Handle.Complete(); else jobData.Cancel(); i++; } i = 0;
+				foreach (var jobData in scheduledFinalizeJobs) { if (i == 0) jobData.Handle.Complete(); else jobData.Cancel(); i++; } i = 0;
 			}
 
-			while (activeAccumulateJobs.Count > 0 && activeAccumulateJobs.Peek().Handle.IsCompleted)
+			while (scheduledAccumulateJobs.Count > 0 && scheduledAccumulateJobs.Peek().Handle.IsCompleted)
 			{
-				ActiveJobData<AccumulateOutputData> completedJob = activeAccumulateJobs.Dequeue();
+				ActiveJobData<AccumulateOutputData> completedJob = scheduledAccumulateJobs.Dequeue();
 				completedJob.Complete();
 
 				TimeSpan elapsedTime = DateTime.FromFileTimeUtc(completedJob.OutputData.Timing[1]) -
@@ -461,9 +476,9 @@ namespace RaytracerInOneWeekend
 					queuedAccumulate = true;
 			}
 
-			while (activeCombineJobs.Count > 0 && activeCombineJobs.Peek().Handle.IsCompleted)
+			while (scheduledCombineJobs.Count > 0 && scheduledCombineJobs.Peek().Handle.IsCompleted)
 			{
-				ActiveJobData<PassOutputData> completedJob = activeCombineJobs.Dequeue();
+				ActiveJobData<PassOutputData> completedJob = scheduledCombineJobs.Dequeue();
 				completedJob.Complete();
 
 				if (traceAborted)
@@ -474,15 +489,15 @@ namespace RaytracerInOneWeekend
 				}
 			}
 
-			while (activeDenoiseJobs.Count > 0 && activeDenoiseJobs.Peek().Handle.IsCompleted)
+			while (scheduledDenoiseJobs.Count > 0 && scheduledDenoiseJobs.Peek().Handle.IsCompleted)
 			{
-				ActiveJobData<PassOutputData> completedJob = activeDenoiseJobs.Dequeue();
+				ActiveJobData<PassOutputData> completedJob = scheduledDenoiseJobs.Dequeue();
 				completedJob.Complete();
 			}
 
-			while (activeFinalizeJobs.Count > 0 && activeFinalizeJobs.Peek().Handle.IsCompleted)
+			while (scheduledFinalizeJobs.Count > 0 && scheduledFinalizeJobs.Peek().Handle.IsCompleted)
 			{
-				ActiveJobData<PassOutputData> completedJob = activeFinalizeJobs.Dequeue();
+				ActiveJobData<PassOutputData> completedJob = scheduledFinalizeJobs.Dequeue();
 				completedJob.Complete();
 
 				if (AccumulatedSamples >= samplesPerPixel)
@@ -502,15 +517,15 @@ namespace RaytracerInOneWeekend
 			if (cameraDirty) CleanCamera();
 
 			// kick if needed (with double-buffering)
-			if ((queuedAccumulate && activeFinalizeJobs.Count <= 1) ||
+			if ((queuedAccumulate && scheduledFinalizeJobs.Count <= 1) ||
 			    traceNeedsReset ||
 			    (!TraceActive && !stopWhenCompleted))
 			{
 				ScheduleAccumulate(traceNeedsReset || AccumulatedSamples >= samplesPerPixel,
-					activeAccumulateJobs.Count > 0
+					scheduledAccumulateJobs.Count > 0
 						? (JobHandle?) JobHandle.CombineDependencies(
-							activeAccumulateJobs.Peek().Handle,
-							activeAccumulateJobs.Peek().OutputData.ReduceRayCountJobHandle)
+							scheduledAccumulateJobs.Peek().Handle,
+							scheduledAccumulateJobs.Peek().OutputData.ReduceRayCountJobHandle)
 						: null);
 
 				queuedAccumulate = false;
@@ -562,6 +577,7 @@ namespace RaytracerInOneWeekend
 			NativeArray<float4> colorOutputBuffer = float4Buffers.Take();
 			NativeArray<float3> normalOutputBuffer = float3Buffers.Take();
 			NativeArray<float3> albedoOutputBuffer = float3Buffers.Take();
+			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
 
 			if (interlacingOffsets == null || interlacing != interlacingOffsets.Length)
 				interlacingOffsets = Util.SpaceFillingSeries(interlacing).ToArray();
@@ -574,6 +590,8 @@ namespace RaytracerInOneWeekend
 			{
 				accumulateJob = new AccumulateJob
 				{
+					CancellationToken = cancellationBuffer,
+
 					InputColor = colorAccumulationBuffer,
 					InputNormal = normalAccumulationBuffer,
 					InputAlbedo = albedoAccumulationBuffer,
@@ -623,10 +641,10 @@ namespace RaytracerInOneWeekend
 			{
 				using (var handles = new NativeArray<JobHandle>(4, Allocator.Temp)
 				{
-					[0] = new CopyFloat4BufferJob { Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
-					[1] = new CopyFloat3BufferJob { Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
-					[2] = new CopyFloat3BufferJob { Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
-					[3] = new ClearBufferJob<Diagnostics> { Buffer = diagnosticsBuffer }.Schedule(dependency ?? default)
+					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
+					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
+					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
+					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }.Schedule(dependency ?? default)
 				})
 				{
 					JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
@@ -656,16 +674,17 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
+				new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
 			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
 				albedoInputBuffer = albedoAccumulationBuffer;
 
-			activeAccumulateJobs.Enqueue(new ActiveJobData<AccumulateOutputData>
+			scheduledAccumulateJobs.Enqueue(new ActiveJobData<AccumulateOutputData>
 			{
+				CancellationToken = cancellationBuffer,
 				Handle = combinedDependency,
 				OutputData = outputData,
 				OnComplete = () =>
@@ -673,6 +692,7 @@ namespace RaytracerInOneWeekend
 					float4Buffers.Return(colorInputBuffer);
 					float3Buffers.Return(normalInputBuffer);
 					float3Buffers.Return(albedoInputBuffer);
+					boolBuffers.Return(cancellationBuffer);
 				}
 			});
 
@@ -695,8 +715,12 @@ namespace RaytracerInOneWeekend
 
 		void ScheduleCombine(JobHandle dependency, AccumulateOutputData accumulateOutput)
 		{
+			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+
 			var combineJob = new CombineJob
 			{
+				CancellationToken = cancellationBuffer,
+
 				DebugMode = denoiseMode == DenoiseMode.None,
 				LdrMode = denoiseMode == DenoiseMode.NvidiaOptix,
 
@@ -722,12 +746,13 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat3BufferJob { Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob { Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob { Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(combineJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
 
-			activeCombineJobs.Enqueue(new ActiveJobData<PassOutputData>
+			scheduledCombineJobs.Enqueue(new ActiveJobData<PassOutputData>
 			{
+				CancellationToken = cancellationBuffer,
 				Handle = combinedDependency,
 				OutputData = copyOutputData,
 				OnComplete = () =>
@@ -736,6 +761,7 @@ namespace RaytracerInOneWeekend
 					float3Buffers.Return(combineJob.OutputColor);
 					float3Buffers.Return(combineJob.OutputNormal);
 					float3Buffers.Return(combineJob.OutputAlbedo);
+					boolBuffers.Return(cancellationBuffer);
 				}
 			});
 
@@ -748,6 +774,8 @@ namespace RaytracerInOneWeekend
 		void ScheduleDenoise(JobHandle dependency, PassOutputData combineOutput)
 		{
 			NativeArray<float3> denoiseColorOutputBuffer = float3Buffers.Take();
+			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+
 			JobHandle denoiseJobHandle = default;
 
 			switch (denoiseMode)
@@ -756,6 +784,7 @@ namespace RaytracerInOneWeekend
 				{
 					var denoiseJob = new OpenImageDenoiseJob
 					{
+						CancellationToken = cancellationBuffer,
 						Width = (ulong) bufferSize.x,
 						Height = (ulong) bufferSize.y,
 						InputColor = combineOutput.Color,
@@ -772,6 +801,7 @@ namespace RaytracerInOneWeekend
 				{
 					var denoiseJob = new OptixDenoiseJob
 					{
+						CancellationToken = cancellationBuffer,
 						Denoiser = optixDenoiser,
 						CudaStream = cudaStream,
 						InputColor = combineOutput.Color,
@@ -798,13 +828,18 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle copyJobHandle = new CopyFloat3BufferJob
-				{ Input = denoiseColorOutputBuffer, Output = copyOutputData.Color }.Schedule(denoiseJobHandle);
+				{ CancellationToken = cancellationBuffer, Input = denoiseColorOutputBuffer, Output = copyOutputData.Color }.Schedule(denoiseJobHandle);
 
-			activeDenoiseJobs.Enqueue(new ActiveJobData<PassOutputData>
+			scheduledDenoiseJobs.Enqueue(new ActiveJobData<PassOutputData>
 			{
+				CancellationToken = cancellationBuffer,
 				Handle = copyJobHandle,
 				OutputData = copyOutputData,
-				OnComplete = () => float3Buffers.Return(denoiseColorOutputBuffer)
+				OnComplete = () =>
+				{
+					float3Buffers.Return(denoiseColorOutputBuffer);
+					boolBuffers.Return(cancellationBuffer);
+				}
 			});
 
 			ScheduleFinalize(copyJobHandle, copyOutputData);
@@ -812,8 +847,12 @@ namespace RaytracerInOneWeekend
 
 		void ScheduleFinalize(JobHandle dependency, PassOutputData lastPassOutput)
 		{
+			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+
 			var finalizeJob = new FinalizeTexturesJob
 			{
+				CancellationToken = cancellationBuffer,
+
 				InputColor = lastPassOutput.Color,
 				InputNormal = lastPassOutput.Normal,
 				InputAlbedo = lastPassOutput.Albedo,
@@ -826,19 +865,21 @@ namespace RaytracerInOneWeekend
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
 			JobHandle combinedDependency = dependency;
-			foreach (ActiveJobData<PassOutputData> priorFinalizeJob in activeFinalizeJobs)
+			foreach (ActiveJobData<PassOutputData> priorFinalizeJob in scheduledFinalizeJobs)
 				combinedDependency = JobHandle.CombineDependencies(combinedDependency, priorFinalizeJob.Handle);
 
 			JobHandle finalizeJobHandle = finalizeJob.Schedule(totalBufferSize, 128, combinedDependency);
 
-			activeFinalizeJobs.Enqueue(new ActiveJobData<PassOutputData>
+			scheduledFinalizeJobs.Enqueue(new ActiveJobData<PassOutputData>
 			{
+				CancellationToken = cancellationBuffer,
 				Handle = finalizeJobHandle,
 				OnComplete = () =>
 				{
 					float3Buffers.Return(lastPassOutput.Color);
 					float3Buffers.Return(lastPassOutput.Normal);
 					float3Buffers.Return(lastPassOutput.Albedo);
+					boolBuffers.Return(cancellationBuffer);
 				}
 			});
 		}

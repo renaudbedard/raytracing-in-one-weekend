@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using OpenImageDenoise;
 using OptiX;
@@ -38,6 +37,8 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 #if BVH_ITERATIVE
 		public struct WorkingArea
 		{
@@ -82,6 +83,9 @@ namespace RaytracerInOneWeekend
 
 		public void Execute(int index)
 		{
+			if (CancellationToken[0])
+				return;
+
 			// ReSharper disable once PossibleLossOfFraction
 			float2 coordinates = float2(
 				index % Size.x, // column
@@ -309,6 +313,8 @@ namespace RaytracerInOneWeekend
 		public bool DebugMode;
 		public bool LdrMode;
 
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
@@ -320,6 +326,9 @@ namespace RaytracerInOneWeekend
 
 		public void Execute(int index)
 		{
+			if (CancellationToken[0])
+				return;
+
 			float4 inputColor = InputColor[index];
 			var realSampleCount = (int) inputColor.w;
 
@@ -366,10 +375,15 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct ClearBufferJob<T> : IJob where T : unmanaged
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[WriteOnly] public NativeArray<T> Buffer;
 
 		public void Execute()
 		{
+			if (CancellationToken[0])
+				return;
+
 			Buffer.ZeroMemory();
 		}
 	}
@@ -377,24 +391,42 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct CopyFloat3BufferJob : IJob
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[ReadOnly] public NativeArray<float3> Input;
 		[WriteOnly] public NativeArray<float3> Output;
 
-		public void Execute() => NativeArray<float3>.Copy(Input, Output);
+		public void Execute()
+		{
+			if (CancellationToken[0])
+				return;
+
+			NativeArray<float3>.Copy(Input, Output);
+		}
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct CopyFloat4BufferJob : IJob
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[ReadOnly] public NativeArray<float4> Input;
 		[WriteOnly] public NativeArray<float4> Output;
 
-		public void Execute() => NativeArray<float4>.Copy(Input, Output);
+		public void Execute()
+		{
+			if (CancellationToken[0])
+				return;
+
+			NativeArray<float4>.Copy(Input, Output);
+		}
 	}
 
 	// because the OIDN API uses strings, we can't use Burst here
 	struct OpenImageDenoiseJob : IJob
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[ReadOnly] public NativeArray<float3> InputColor, InputNormal, InputAlbedo;
 		[ReadOnly] public ulong Width, Height;
 
@@ -404,6 +436,9 @@ namespace RaytracerInOneWeekend
 
 		public unsafe void Execute()
 		{
+			if (CancellationToken[0])
+				return;
+
 			OidnFilter.SetSharedImage(DenoiseFilter, "color", new IntPtr(InputColor.GetUnsafeReadOnlyPtr()),
 				OidnBuffer.Format.Float3, Width, Height, 0, 0, 0);
 			OidnFilter.SetSharedImage(DenoiseFilter, "normal", new IntPtr(InputNormal.GetUnsafeReadOnlyPtr()),
@@ -422,6 +457,8 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct OptixDenoiseJob : IJob
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[ReadOnly] public NativeArray<float3> InputColor, InputAlbedo;
 		[ReadOnly] public uint2 BufferSize;
 		[ReadOnly] public OptixDenoiserSizes DenoiserSizes;
@@ -446,6 +483,9 @@ namespace RaytracerInOneWeekend
 
 		public unsafe void Execute()
 		{
+			if (CancellationToken[0])
+				return;
+
 			Check(CudaBuffer.Copy(new IntPtr(InputColor.GetUnsafeReadOnlyPtr()), InputColorBuffer.Handle,
 				InputColor.Length * sizeof(float3), CudaMemcpyKind.HostToDevice));
 			Check(CudaBuffer.Copy(new IntPtr(InputAlbedo.GetUnsafeReadOnlyPtr()), InputAlbedoBuffer.Handle,
@@ -489,6 +529,8 @@ namespace RaytracerInOneWeekend
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct FinalizeTexturesJob : IJobParallelFor
 	{
+		[ReadOnly] public NativeArray<bool> CancellationToken;
+
 		[ReadOnly] public NativeArray<float3> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
@@ -499,6 +541,9 @@ namespace RaytracerInOneWeekend
 
 		public void Execute(int index)
 		{
+			if (CancellationToken[0])
+				return;
+
 			// TODO: tone-mapping
 			float3 outputColor = saturate(InputColor[index].LinearToGamma()) * 255;
 			OutputColor[index] = new RGBA32
@@ -533,7 +578,6 @@ namespace RaytracerInOneWeekend
 	struct ReduceRayCountJob : IJob
 	{
 		[ReadOnly] public NativeArray<Diagnostics> Diagnostics;
-
 		[WriteOnly] public NativeArray<int> TotalRayCount;
 
 		public void Execute()
