@@ -768,6 +768,10 @@ namespace RaytracerInOneWeekend
 
 			JobHandle denoiseJobHandle = default;
 
+			JobHandle combinedDependency = dependency;
+			foreach (ScheduledJobData<PassOutputData> priorFinalizeJob in scheduledDenoiseJobs)
+				combinedDependency = JobHandle.CombineDependencies(combinedDependency, priorFinalizeJob.Handle);
+
 			switch (denoiseMode)
 			{
 				case DenoiseMode.OpenImageDenoise:
@@ -783,7 +787,7 @@ namespace RaytracerInOneWeekend
 						OutputColor = denoiseColorOutputBuffer,
 						DenoiseFilter = oidnFilter
 					};
-					denoiseJobHandle = denoiseJob.Schedule(dependency);
+					denoiseJobHandle = denoiseJob.Schedule(combinedDependency);
 					break;
 				}
 
@@ -805,7 +809,7 @@ namespace RaytracerInOneWeekend
 						InputColorBuffer = optixColorBuffer,
 						OutputColorBuffer = optixOutputBuffer
 					};
-					denoiseJobHandle = denoiseJob.Schedule(dependency);
+					denoiseJobHandle = denoiseJob.Schedule(combinedDependency);
 					break;
 				}
 			}
