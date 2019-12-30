@@ -496,12 +496,16 @@ namespace RaytracerInOneWeekend
 				Data = InputColorBuffer,
 				Format = OptixPixelFormat.Float3,
 				Width = BufferSize.x, Height = BufferSize.y,
+				RowStrideInBytes = (uint) (sizeof(float3) * BufferSize.x),
+				PixelStrideInBytes = (uint) sizeof(float3)
 			};
 			var albedoImage = new OptixImage2D
 			{
 				Data = InputAlbedoBuffer,
 				Format = OptixPixelFormat.Float3,
 				Width = BufferSize.x, Height = BufferSize.y,
+				RowStrideInBytes = (uint) (sizeof(float3) * BufferSize.x),
+				PixelStrideInBytes = (uint) sizeof(float3)
 			};
 
 			OptixImage2D* optixImages = stackalloc OptixImage2D[2];
@@ -515,6 +519,8 @@ namespace RaytracerInOneWeekend
 				Data = OutputColorBuffer,
 				Format = OptixPixelFormat.Float3,
 				Width = BufferSize.x, Height = BufferSize.y,
+				RowStrideInBytes = (uint) (sizeof(float3) * BufferSize.x),
+				PixelStrideInBytes = (uint) sizeof(float3)
 			};
 
 			OptixDenoiser.Invoke(Denoiser, CudaStream, &denoiserParams, DenoiserState, DenoiserSizes.StateSizeInBytes,

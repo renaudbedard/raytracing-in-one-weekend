@@ -469,7 +469,7 @@ namespace RaytracerInOneWeekend
 				ForceUpdateInspector();
 #endif
 
-				queuedAccumulate = !traceAborted;
+				queuedAccumulate = !traceAborted && AccumulatedSamples < samplesPerPixel;
 			}
 
 			while (scheduledCombineJobs.Count > 0 && scheduledCombineJobs.Peek().Handle.IsCompleted)
