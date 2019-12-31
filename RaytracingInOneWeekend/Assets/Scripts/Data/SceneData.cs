@@ -200,6 +200,7 @@ namespace RaytracerInOneWeekend
 		[Range(0, 2000)]
 		public float SpreadX = default, SpreadY = default, SpreadZ = default;
 		public Vector3 Offset = default;
+		public bool OffsetByRadius = default;
 		public Vector3 Rotation = default;
 
 		[Range(0, 1)] public float MovementChance = 0;
@@ -216,6 +217,7 @@ namespace RaytracerInOneWeekend
 		[Range(0, 1)] public float LambertChance = 1;
 		[Range(0, 1)] public float MetalChance = default;
 		[Range(0, 1)] public float DieletricChance = default;
+		[Range(0, 1)] public float LightChance = default;
 
 		[HideIf(nameof(LambertChance), 0.0f)]
 		public Gradient DiffuseAlbedo = default;
@@ -234,5 +236,9 @@ namespace RaytracerInOneWeekend
 		[HideIf(nameof(DieletricChance), 0.0f)]
 		[MinMaxSlider(0, 2.65f, true)]
 		public Vector2 RefractiveIndex = default;
+
+		[HideIf(nameof(LightChance), 0.0f)]
+		[GradientUsage(true)]
+		public Gradient Emissive = default;
 	}
 }

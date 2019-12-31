@@ -431,7 +431,6 @@ namespace RaytracerInOneWeekend
 
 			if (traceNeedsReset || traceAborted)
 			{
-				// TODO: this causes streaks and I'm not sure why
 				int i = 0;
 				bool ShouldCancel() => i++ > 0 || traceAborted;
 				foreach (var jobData in scheduledAccumulateJobs) { if (ShouldCancel()) jobData.Cancel(); } i = 0;
@@ -1196,17 +1195,20 @@ namespace RaytracerInOneWeekend
 				{
 					MaterialData GetMaterial()
 					{
-						(float lambertian, float metal, float dielectric) probabilities = (
+						(float lambertian, float metal, float dielectric, float light) probabilities = (
 							group.LambertChance,
 							group.MetalChance,
-							group.DieletricChance);
+							group.DieletricChance,
+							group.LightChance);
 
-						float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric;
+						float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric + probabilities.light;
 						probabilities.metal += probabilities.lambertian;
 						probabilities.dielectric += probabilities.metal;
+						probabilities.light += probabilities.dielectric;
 						probabilities.lambertian /= sum;
 						probabilities.metal /= sum;
 						probabilities.dielectric /= sum;
+						probabilities.light /= sum;
 
 						MaterialData material = null;
 						float randomValue = rng.NextFloat();
@@ -1232,6 +1234,13 @@ namespace RaytracerInOneWeekend
 							material = MaterialData.Dielectric(rng.NextFloat(
 								group.RefractiveIndex.x,
 								group.RefractiveIndex.y));
+						}
+						else if (randomValue < probabilities.light)
+						{
+							Color from = group.Emissive.colorKeys[0].color;
+							Color to = group.Emissive.colorKeys[1].color;
+							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+							material = MaterialData.DiffuseLight(TextureData.Constant(color));
 						}
 
 						return material;
@@ -1293,6 +1302,9 @@ namespace RaytracerInOneWeekend
 								center += (float3) group.Offset;
 
 								float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+
+								if (group.OffsetByRadius)
+									center += radius;
 
 								if (!group.SkipOverlapTest && AnyOverlap(center, radius))
 									continue;

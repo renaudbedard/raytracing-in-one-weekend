@@ -111,6 +111,15 @@ namespace RaytracerInOneWeekend
 			return data;
 		}
 
+		public static MaterialData DiffuseLight(TextureData emissionTexture)
+		{
+			var data = CreateInstance<MaterialData>();
+			data.hideFlags = HideFlags.HideAndDontSave;
+			data.type = MaterialType.DiffuseLight;
+			data.emission = emissionTexture;
+			return data;
+		}
+
 		bool TextureCanScale => (albedo && albedo.Type == TextureType.CheckerPattern) ||
 		                        (emission && emission.Type == TextureType.CheckerPattern);
 
