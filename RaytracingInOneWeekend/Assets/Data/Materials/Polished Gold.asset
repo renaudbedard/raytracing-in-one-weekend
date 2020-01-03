@@ -13,6 +13,19 @@ MonoBehaviour:
   m_Name: Polished Gold
   m_EditorClassIdentifier: 
   type: 2
-  albedo: {fileID: 11400000, guid: 404694a9233084f2ca692673a9c1f0c2, type: 2}
-  fuzz: 0.3
+  textureScale: {x: 1, y: 1}
+  roughness: 0.3
   refractiveIndex: 1
+  density: 1
+  albedo:
+    type: 1
+    mainColor: {r: 0.8, g: 0.6, b: 0.2, a: 0}
+    secondaryColor: {r: 0, g: 0, b: 0, a: 0}
+    noiseFrequency: 0
+    image: {fileID: 0}
+  emission:
+    type: 0
+    mainColor: {r: 0, g: 0, b: 0, a: 0}
+    secondaryColor: {r: 0, g: 0, b: 0, a: 0}
+    noiseFrequency: 0
+    image: {fileID: 0}

@@ -1099,8 +1099,8 @@ namespace RaytracerInOneWeekend
 				}
 
 				MaterialData materialData = e.Material;
-				TextureData albedo = materialData ? materialData.Albedo : null;
-				TextureData emission = materialData ? materialData.Emission : null;
+				TextureData albedo = materialData.Albedo;
+				TextureData emission = materialData.Emission;
 
 				Material material = materialData
 					? new Material(materialData.Type, materialData.TextureScale * sizeFactor,

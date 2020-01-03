@@ -19,7 +19,7 @@ namespace RaytracerInOneWeekend
 
 		[FormerlySerializedAs("fuzz")]
 		[ShowIf(nameof(Type), MaterialType.Metal)]
-		[Range(0, 1)] [SerializeField] float roughness = 0;
+		[Range(0, 1)] [SerializeField] float roughness;
 
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
@@ -28,40 +28,19 @@ namespace RaytracerInOneWeekend
 		[Range(0, 1)] [SerializeField] float density = 1;
 
 #if UNITY_EDITOR
-		[AssetList]
 		[ShowIf(nameof(AlbedoSupported))]
 #endif
-		[SerializeField] TextureData albedo = null;
+		[SerializeField] TextureData albedo;
 #if UNITY_EDITOR
-		[ShowInInspector]
-		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
-		[ShowIf(nameof(albedo))]
-		[BoxGroup]
-		TextureData AlbedoTexture
-		{
-			get => albedo;
-			set => albedo = value;
-		}
-		bool AlbedoSupported => type == MaterialType.Lambertian || type == MaterialType.Metal ||
+		bool AlbedoSupported => type == MaterialType.Lambertian ||
+		                        type == MaterialType.Metal ||
 		                        type == MaterialType.ProbabilisticVolume;
 #endif
 
 #if UNITY_EDITOR
-		[AssetList]
 		[ShowIf(nameof(type), MaterialType.DiffuseLight)]
 #endif
-		[SerializeField] TextureData emission = null;
-#if UNITY_EDITOR
-		[ShowInInspector]
-		[InlineEditor(DrawHeader = false, ObjectFieldMode = InlineEditorObjectFieldModes.Hidden)]
-		[ShowIf(nameof(emission))]
-		[BoxGroup]
-		TextureData EmissiveTexture
-		{
-			get => emission;
-			set => emission = value;
-		}
-#endif
+		[SerializeField] TextureData emission;
 
 		public MaterialType Type => type;
 		public float Roughness => roughness;
@@ -120,18 +99,17 @@ namespace RaytracerInOneWeekend
 			return data;
 		}
 
-		bool TextureCanScale => (albedo && albedo.Type == TextureType.CheckerPattern) ||
-		                        (emission && emission.Type == TextureType.CheckerPattern);
+		bool TextureCanScale => albedo.Type == TextureType.CheckerPattern || emission.Type == TextureType.CheckerPattern;
 
 #if UNITY_EDITOR
 		bool dirty;
-		public bool Dirty => dirty || (albedo && albedo.Dirty) || (emission && emission.Dirty);
+		public bool Dirty => dirty || albedo.Dirty || emission.Dirty;
 
 		public void ClearDirty()
 		{
 			dirty = false;
-			if (albedo) albedo.ClearDirty();
-			if (emission) emission.ClearDirty();
+			albedo.ClearDirty();
+			emission.ClearDirty();
 		}
 
 		void OnValidate()

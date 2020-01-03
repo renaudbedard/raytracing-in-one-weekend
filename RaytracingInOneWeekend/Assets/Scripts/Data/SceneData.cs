@@ -123,13 +123,8 @@ namespace RaytracerInOneWeekend
 					clonedMaterial = Instantiate(sourceEntity.Material);
 					clonedMaterial.name = $"{sourceEntity.Material.name} [COPY]";
 					clonedMaterial.hideFlags = HideFlags.HideAndDontSave;
-
-					if (sourceEntity.Material.Albedo)
-					{
-						clonedMaterial.Albedo = Instantiate(sourceEntity.Material.Albedo);
-						clonedMaterial.Albedo.name = $"{sourceEntity.Material.Albedo.name} [COPY]";
-						clonedMaterial.Albedo.hideFlags = HideFlags.HideAndDontSave;
-					}
+					clonedMaterial.Albedo = sourceEntity.Material.Albedo;
+					clonedMaterial.Emission = sourceEntity.Material.Emission;
 				}
 
 				var clonedEntity = (EntityData) Activator.CreateInstance(sourceEntity.GetType());

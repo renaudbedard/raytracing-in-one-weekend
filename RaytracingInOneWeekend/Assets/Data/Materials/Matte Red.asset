@@ -14,7 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   type: 1
   textureScale: {x: 1, y: 1}
-  fuzz: 0
+  roughness: 0
   refractiveIndex: 1
-  albedo: {fileID: 11400000, guid: d0b15b51a46cb4a5d93b11a0858626cf, type: 2}
-  emission: {fileID: 0}
+  density: 1
+  albedo:
+    type: 1
+    mainColor: {r: 0.65, g: 0.05, b: 0.05, a: 0}
+    secondaryColor: {r: 0, g: 0, b: 0, a: 0}
+    noiseFrequency: 0
+    image: {fileID: 0}
+  emission:
+    type: 0
+    mainColor: {r: 0, g: 0, b: 0, a: 0}
+    secondaryColor: {r: 0, g: 0, b: 0, a: 0}
+    noiseFrequency: 0
+    image: {fileID: 0}

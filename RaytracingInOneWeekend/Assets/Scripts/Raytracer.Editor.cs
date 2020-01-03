@@ -219,7 +219,7 @@ namespace RaytracerInOneWeekend
 				bool transparent = entity.Material.Type == MaterialType.Dielectric;
 				bool emissive = entity.Material.Type == MaterialType.DiffuseLight;
 
-				Color albedoMainColor = entity.Material.Albedo ? entity.Material.Albedo.MainColor : Color.white;
+				Color albedoMainColor = entity.Material.Albedo.MainColor;
 				Color color = transparent ? albedoMainColor.GetAlphaReplaced(0.5f) : albedoMainColor;
 				var material = new UnityEngine.Material(previewMeshRenderer.sharedMaterial) { color = color };
 				previewMaterials.Add(material);
@@ -227,7 +227,7 @@ namespace RaytracerInOneWeekend
 				material.SetFloat("_Metallic", entity.Material.Type == MaterialType.Metal ? 1 : 0);
 				material.SetFloat("_Glossiness",
 					entity.Material.Type == MaterialType.Metal ? 1 - entity.Material.Roughness : transparent ? 1 : 0);
-				material.SetTexture("_MainTex", entity.Material.Albedo ? entity.Material.Albedo.Image : null);
+				material.SetTexture("_MainTex", entity.Material.Albedo.Image);
 
 				if (transparent)
 				{
@@ -241,8 +241,7 @@ namespace RaytracerInOneWeekend
 				if (emissive)
 				{
 					material.EnableKeyword("_EMISSION");
-					material.SetColor("_EmissionColor",
-						entity.Material.Emission ? entity.Material.Emission.MainColor : Color.black);
+					material.SetColor("_EmissionColor", entity.Material.Emission.MainColor);
 				}
 
 				CommandBuffer previewCommandBuffer =
@@ -294,9 +293,7 @@ namespace RaytracerInOneWeekend
 				.Where(x => x.Material)
 				.OrderBy(x => Vector3.Dot(sceneCameraTransform.position - x.Position, sceneCameraTransform.forward)))
 			{
-				Color color = e.Material.Albedo ? e.Material.Albedo.MainColor : Color.white;
-				if (e.Material.Emission)
-					color += e.Material.Emission.MainColor;
+				Color color = e.Material.Albedo.MainColor + e.Material.Emission.MainColor;
 
 				switch (e.Material.Type)
 				{

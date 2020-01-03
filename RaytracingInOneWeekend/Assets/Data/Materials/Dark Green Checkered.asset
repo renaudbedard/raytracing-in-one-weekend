@@ -13,7 +13,19 @@ MonoBehaviour:
   m_Name: Dark Green Checkered
   m_EditorClassIdentifier: 
   type: 1
-  albedo: {fileID: 11400000, guid: 80ab2fc9f45654b8a9d5d53bb31def9e, type: 2}
   textureScale: {x: 5, y: 5}
-  fuzz: 0.3
+  roughness: 0.3
   refractiveIndex: 1
+  density: 1
+  albedo:
+    type: 2
+    mainColor: {r: 0.2, g: 0.3, b: 0.1, a: 0}
+    secondaryColor: {r: 0.9, g: 0.9, b: 0.9, a: 0}
+    noiseFrequency: 0
+    image: {fileID: 0}
+  emission:
+    type: 0
+    mainColor: {r: 0, g: 0, b: 0, a: 0}
+    secondaryColor: {r: 0, g: 0, b: 0, a: 0}
+    noiseFrequency: 0
+    image: {fileID: 0}

@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
@@ -10,8 +11,8 @@ using OdinMock;
 
 namespace RaytracerInOneWeekend
 {
-	[CreateAssetMenu]
-	class TextureData : ScriptableObject
+	[Serializable]
+	struct TextureData
 	{
 		[SerializeField] TextureType type;
 
@@ -23,10 +24,10 @@ namespace RaytracerInOneWeekend
 		[SerializeField] Color secondaryColor;
 
 		[ShowIf(nameof(Type), TextureType.PerlinNoise)]
-		[SerializeField] float noiseFrequency = 1;
+		[SerializeField] float noiseFrequency;
 
 		[ShowIf(nameof(Type), TextureType.Image)]
-		[SerializeField] Texture2D image = null;
+		[SerializeField] Texture2D image;
 
 		public TextureType Type => type;
 		public Color MainColor => mainColor;
@@ -36,20 +37,18 @@ namespace RaytracerInOneWeekend
 
 		public static TextureData Constant(float3 color)
 		{
-			var data = CreateInstance<TextureData>();
-			data.hideFlags = HideFlags.HideAndDontSave;
-			data.type = TextureType.Constant;
-			data.mainColor = color.ToColor();
+			var data = new TextureData { type = TextureType.Constant, mainColor = color.ToColor() };
 			return data;
 		}
 
 		public static TextureData CheckerPattern(float3 oddColor, float3 evenColor)
 		{
-			var data = CreateInstance<TextureData>();
-			data.hideFlags = HideFlags.HideAndDontSave;
-			data.type = TextureType.CheckerPattern;
-			data.mainColor = oddColor.ToColor();
-			data.secondaryColor = evenColor.ToColor();
+			var data = new TextureData
+			{
+				type = TextureType.CheckerPattern,
+				mainColor = oddColor.ToColor(),
+				secondaryColor = evenColor.ToColor()
+			};
 			return data;
 		}
 
@@ -75,12 +74,10 @@ namespace RaytracerInOneWeekend
 		// this could be an instance method but it's kinda nice to be able to null-check
 		public static unsafe Texture GetRuntimeData(this TextureData t)
 		{
-			bool hasImage = t != null && t.Image;
-			return t
-				? new Texture(t.Type, t.MainColor.ToFloat3(), t.SecondaryColor.ToFloat3(), t.NoiseFrequency,
-					hasImage ? (byte*) t.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
-					hasImage ? t.Image.width : -1, hasImage ? t.Image.height : -1)
-				: default;
+			bool hasImage = t.Image;
+			return new Texture(t.Type, t.MainColor.ToFloat3(), t.SecondaryColor.ToFloat3(), t.NoiseFrequency,
+				hasImage ? (byte*) t.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
+				hasImage ? t.Image.width : -1, hasImage ? t.Image.height : -1);
 		}
 	}
 }
