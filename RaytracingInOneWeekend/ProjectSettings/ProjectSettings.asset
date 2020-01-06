@@ -527,7 +527,7 @@ PlayerSettings:
   webGLThreadsSupport: 0
   webGLWasmStreaming: 0
   scriptingDefineSymbols:
-    1: ODIN_INSPECTOR;BVH_ITERATIVE;BVH
+    1: ODIN_INSPECTOR;BVH;BVH_ITERATIVE
   platformArchitecture: {}
   scriptingBackend:
     Standalone: 1

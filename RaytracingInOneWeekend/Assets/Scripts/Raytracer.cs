@@ -594,8 +594,13 @@ namespace RaytracerInOneWeekend
 
 					Size = bufferSize,
 					Camera = raytracingCamera,
-					SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
-					SkyTopColor = scene.SkyTopColor.ToFloat3(),
+					Environment = new Environment
+					{
+						SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
+						SkyTopColor = scene.SkyTopColor.ToFloat3(),
+						SkyCubemap = scene.SkyCubemap ? new Cubemap(scene.SkyCubemap) : default,
+						SkyType = scene.SkyType,
+					},
 					Seed = (uint) Time.frameCount + 1,
 					SampleCount = min(samplesPerPixel, samplesPerBatch),
 					TraceDepth = traceDepth,

@@ -1,6 +1,7 @@
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Serialization;
+
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #else

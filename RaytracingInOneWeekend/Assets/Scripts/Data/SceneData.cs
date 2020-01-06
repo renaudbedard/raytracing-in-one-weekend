@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.UIElements;
+
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #else
@@ -68,14 +68,24 @@ namespace RaytracerInOneWeekend
 
 		[Title("Sky")]
 		[SerializeField]
+		SkyType skyType = SkyType.GradientSky;
+
+		[SerializeField]
 		[ColorUsage(false, true)]
 		[LabelText("Bottom Color")]
+		[ShowIf(nameof(skyType), SkyType.GradientSky)]
 		Color skyBottomColor = Color.white;
 
 		[SerializeField]
 		[ColorUsage(false, true)]
 		[LabelText("Top Color")]
+		[ShowIf(nameof(skyType), SkyType.GradientSky)]
 		Color skyTopColor = new Color(0.5f, 0.7f, 1);
+
+		[SerializeField]
+		[LabelText("Cubemap")]
+		[ShowIf(nameof(skyType), SkyType.CubeMap)]
+		UnityEngine.Cubemap skyCubemap = default;
 
 		public Vector3 CameraPosition => cameraPosition;
 		public Vector3 CameraTarget => cameraTarget;
@@ -84,8 +94,11 @@ namespace RaytracerInOneWeekend
 		public uint RandomSeed => randomSeed;
 		public IReadOnlyList<EntityData> Entities => entities;
 		public IReadOnlyList<RandomEntityGroup> RandomEntityGroups => randomEntityGroups;
+
+		public SkyType SkyType => skyType;
 		public Color SkyBottomColor => skyBottomColor;
 		public Color SkyTopColor => skyTopColor;
+		public UnityEngine.Cubemap SkyCubemap => skyCubemap;
 
 #if UNITY_EDITOR
 		bool dirty;

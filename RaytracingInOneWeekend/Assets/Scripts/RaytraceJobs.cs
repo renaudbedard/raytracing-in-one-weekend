@@ -51,10 +51,9 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public int SliceDivider;
 		[ReadOnly] public uint Seed;
 		[ReadOnly] public Camera Camera;
+		[ReadOnly] public Environment Environment;
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public int TraceDepth;
-		[ReadOnly] public float3 SkyBottomColor;
-		[ReadOnly] public float3 SkyTopColor;
 		[ReadOnly] public bool SubPixelJitter;
 		[ReadOnly] public ImportanceSampler ImportanceSampler;
 		[ReadOnly] public NativeArray<Entity> Entities;
@@ -273,7 +272,18 @@ namespace RaytracerInOneWeekend
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
 #endif
 					// sample the sky color
-					float3 hitSkyColor = lerp(SkyBottomColor, SkyTopColor, 0.5f * (ray.Direction.y + 1));
+					float3 hitSkyColor = default;
+					switch (Environment.SkyType)
+					{
+						case SkyType.GradientSky:
+							hitSkyColor = lerp(Environment.SkyBottomColor, Environment.SkyTopColor, 0.5f * (ray.Direction.y + 1));
+							break;
+
+						case SkyType.CubeMap:
+							hitSkyColor = Environment.SkyCubemap.Sample(ray.Direction);
+							break;
+					}
+
 					*emissionCursor++ = hitSkyColor;
 					attenuationCursor++;
 

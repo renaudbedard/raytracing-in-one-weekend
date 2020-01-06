@@ -2,6 +2,7 @@ using System;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -37,22 +38,33 @@ namespace RaytracerInOneWeekend
 
 		public static TextureData Constant(float3 color)
 		{
-			var data = new TextureData { type = TextureType.Constant, mainColor = color.ToColor() };
-			return data;
+			return new TextureData { type = TextureType.Constant, mainColor = color.ToColor() };
 		}
 
 		public static TextureData CheckerPattern(float3 oddColor, float3 evenColor)
 		{
-			var data = new TextureData
+			return new TextureData
 			{
 				type = TextureType.CheckerPattern,
 				mainColor = oddColor.ToColor(),
 				secondaryColor = evenColor.ToColor()
 			};
-			return data;
 		}
 
-		// TODO: other factory methods as needed
+		public unsafe Texture GetRuntimeData()
+		{
+			switch (Type)
+			{
+				case TextureType.Image:
+					// TODO: adapt to texture format
+					return new Texture(Type, MainColor.ToFloat3(), SecondaryColor.ToFloat3(), NoiseFrequency,
+						Image ? (byte*) Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
+						Image ? Image.width : -1, Image ? Image.height : -1);
+
+				default:
+					return new Texture(Type, MainColor.ToFloat3(), SecondaryColor.ToFloat3(), NoiseFrequency, null, -1, -1);
+			}
+		}
 
 #if UNITY_EDITOR
 		public bool Dirty { get; private set; }
@@ -67,17 +79,5 @@ namespace RaytracerInOneWeekend
 			Dirty = true;
 		}
 #endif
-	}
-
-	static class TextureDataExtensions
-	{
-		// this could be an instance method but it's kinda nice to be able to null-check
-		public static unsafe Texture GetRuntimeData(this TextureData t)
-		{
-			bool hasImage = t.Image;
-			return new Texture(t.Type, t.MainColor.ToFloat3(), t.SecondaryColor.ToFloat3(), t.NoiseFrequency,
-				hasImage ? (byte*) t.Image.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr() : null,
-				hasImage ? t.Image.width : -1, hasImage ? t.Image.height : -1);
-		}
 	}
 }

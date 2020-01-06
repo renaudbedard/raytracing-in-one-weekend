@@ -4,7 +4,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.Experimental.Rendering;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 
@@ -16,7 +16,7 @@ namespace RaytracerInOneWeekend
 		Constant,
 		CheckerPattern,
 		PerlinNoise,
-		Image,
+		Image
 	}
 
 	unsafe struct Texture
@@ -81,6 +81,102 @@ namespace RaytracerInOneWeekend
 			}
 
 			return default;
+		}
+	}
+
+	unsafe struct Cubemap
+	{
+		public readonly int2 FaceSize;
+		public readonly ChannelType ChannelType;
+		public readonly int PixelStride;
+
+		[NativeDisableUnsafePtrRestriction]
+		public readonly byte* NegativeX, PositiveX, NegativeY, PositiveY, NegativeZ, PositiveZ;
+
+		public Cubemap(UnityEngine.Cubemap cubemap)
+		{
+			FaceSize = int2(cubemap.width, cubemap.height);
+
+			switch (cubemap.graphicsFormat)
+			{
+				case GraphicsFormat.R16G16B16A16_SFloat:
+					ChannelType = ChannelType.SignedHalf;
+					PixelStride = (4 * 16) / 8;
+					break;
+
+				default:
+					throw new NotSupportedException();
+			}
+
+			NegativeX = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.NegativeX).GetUnsafeReadOnlyPtr();
+			PositiveX = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveX).GetUnsafeReadOnlyPtr();
+			NegativeY = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.NegativeY).GetUnsafeReadOnlyPtr();
+			PositiveY = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveY).GetUnsafeReadOnlyPtr();
+			NegativeZ = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.NegativeZ).GetUnsafeReadOnlyPtr();
+			PositiveZ = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveZ).GetUnsafeReadOnlyPtr();
+		}
+
+		[Pure]
+		public float3 Sample(float3 vector)
+		{
+			if (NegativeX == (byte*) 0)
+				return default;
+
+			// indexing math adapted from : https://scalibq.wordpress.com/2013/06/23/cubemaps/
+			float4 absVector = float4(abs(vector), 0);
+			float maxDistance = cmax(absVector);
+			int laneMask = bitmask(maxDistance == absVector);
+			int firstLane = tzcnt(laneMask);
+			bool positive = vector[firstLane] >= 0;
+
+			float u, v;
+			int2 coords;
+			byte* pFaceData;
+
+			switch (firstLane)
+			{
+				case 0: // x
+					u = (((positive ? -vector.z : vector.z) / absVector.x) + 1) / 2;
+					v = ((-vector.y / absVector.x) + 1) / 2;
+
+					coords = (int2) (float2(u, v) * FaceSize);
+					pFaceData = positive ? PositiveX : NegativeX;
+					break;
+
+				case 1: // y
+					u = ((vector.x / absVector.y) + 1) / 2;
+					v = (((positive ? vector.z : -vector.z) / absVector.y) + 1) / 2;
+
+					coords = (int2) (float2(u, v) * FaceSize);
+					pFaceData = positive ? PositiveY : NegativeY;
+					break;
+
+				case 2: // z
+					u = (((positive ? vector.x : -vector.x) / absVector.z) + 1) / 2;
+					v = ((-vector.y / absVector.z) + 1) / 2;
+
+					coords = (int2) (float2(u, v) * FaceSize);
+					pFaceData = positive ? PositiveZ : NegativeZ;
+					break;
+
+				default:
+					throw new InvalidOperationException();
+			}
+
+			pFaceData += coords.y * FaceSize.x * PixelStride + coords.x * PixelStride;
+
+			switch (ChannelType)
+			{
+				case ChannelType.UnsignedByte:
+					return float3(pFaceData[0], pFaceData[1], pFaceData[2]) / 255;
+
+				case ChannelType.SignedHalf:
+					var pTypedData = (half*) pFaceData;
+					return float3(pTypedData[0], pTypedData[1], pTypedData[2]);
+
+				default:
+					throw new InvalidOperationException();
+			}
 		}
 	}
 

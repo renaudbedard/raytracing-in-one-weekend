@@ -26,7 +26,7 @@ namespace RaytracerInOneWeekend
 		{
 			byte[] pngBytes = frontBufferTexture.EncodeToPNG();
 			File.WriteAllBytes(
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+				Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
 					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
 		}
 
@@ -35,7 +35,7 @@ namespace RaytracerInOneWeekend
 		[UsedImplicitly]
 		void SaveView()
 		{
-			ScreenCapture.CaptureScreenshot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+			ScreenCapture.CaptureScreenshot(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
 				$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"));
 		}
 
@@ -200,6 +200,8 @@ namespace RaytracerInOneWeekend
 
 			skybox.material.SetColor("_Color1", scene.SkyBottomColor);
 			skybox.material.SetColor("_Color2", scene.SkyTopColor);
+
+			// TODO: skybox preview for cubemap
 
 			EnsurePreviewObjectExists(PrimitiveType.Sphere, ref previewSphere);
 			EnsurePreviewObjectExists(PrimitiveType.Quad, ref previewRect);
