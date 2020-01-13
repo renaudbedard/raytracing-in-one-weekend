@@ -61,18 +61,23 @@ namespace RaytracerInOneWeekend
 
 				case MaterialType.Metal:
 				{
-					float3 outgoingDirection = WorldToTangentSpace(-ray.Direction, rec.Normal);
+					// GGX (probably wrong though)
+					// float3 outgoingDirection = WorldToTangentSpace(-ray.Direction, rec.Normal);
+					// if (GgxMicrofacet.ImportanceSample(Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData),
+					// 	Roughness, ref rng, outgoingDirection, out float3 toLight, out reflectance))
+					// {
+					// 	float3 scatterDirection = TangentToWorldSpace(toLight, rec.Normal);
+					// 	scattered = new Ray(rec.Point, scatterDirection, ray.Time);
+					// 	return true;
+					// }
+					// scattered = default;
+					// return false;
 
-					if (GgxMicrofacet.ImportanceSample(Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData),
-						Roughness, ref rng, outgoingDirection, out float3 toLight, out reflectance))
-					{
-						float3 scatterDirection = TangentToWorldSpace(toLight, rec.Normal);
-						scattered = new Ray(rec.Point, scatterDirection, ray.Time);
-						return true;
-					}
-
-					scattered = default;
-					return false;
+					// Peter Shirley's fuzzy metal
+					float3 reflected = reflect(ray.Direction, rec.Normal);
+					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					scattered = new Ray(rec.Point, normalize(reflected + Roughness * rng.NextFloat3Direction()), ray.Time);
+					return true;
 				}
 
 				case MaterialType.Dielectric:
