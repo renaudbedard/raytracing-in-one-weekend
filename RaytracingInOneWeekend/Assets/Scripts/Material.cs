@@ -2,7 +2,6 @@ using System;
 using JetBrains.Annotations;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using static RaytracerInOneWeekend.MathExtensions;
 using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
@@ -137,7 +136,7 @@ namespace RaytracerInOneWeekend
 
 				case MaterialType.Metal:
 					throw new NotImplementedException();
-					// Disabled because it current does not work right
+					// Disabled because it currently does not work right
 					//return GgxMicrofacet.Pdf(incomingLightDirection, outgoingLightDirection, geometricNormal, Roughness);
 
 				default: throw new NotImplementedException();
