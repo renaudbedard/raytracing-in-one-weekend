@@ -44,14 +44,14 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Scatter(Ray ray, HitRecord rec, ref Random rng, PerlinData perlinData,
+		public bool Scatter(Ray ray, HitRecord rec, ref Random rng, PerlinNoise perlinNoise,
 			out float3 reflectance, out Ray scattered)
 		{
 			switch (Type)
 			{
 				case MaterialType.Lambertian:
 				{
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
 					float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
 					//float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, ray.Time);
@@ -74,7 +74,7 @@ namespace RaytracerInOneWeekend
 
 					// Peter Shirley's fuzzy metal
 					float3 reflected = reflect(ray.Direction, rec.Normal);
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
 					scattered = new Ray(rec.Point, normalize(reflected + Roughness * rng.NextFloat3Direction()), ray.Time);
 					return true;
 				}
@@ -113,7 +113,7 @@ namespace RaytracerInOneWeekend
 
 				case MaterialType.ProbabilisticVolume:
 					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData);
+					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
 					return true;
 
 				default:
@@ -144,11 +144,11 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public float3 Emit(float3 position, float3 normal, PerlinData perlinData)
+		public float3 Emit(float3 position, float3 normal, PerlinNoise perlinNoise)
 		{
 			switch (Type)
 			{
-				case MaterialType.DiffuseLight: return Texture.Value(position, normal, TextureScale, perlinData);
+				case MaterialType.DiffuseLight: return Texture.Value(position, normal, TextureScale, perlinNoise);
 				default: return 0;
 			}
 		}

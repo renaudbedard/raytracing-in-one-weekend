@@ -112,7 +112,7 @@ namespace RaytracerInOneWeekend
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
-		readonly PerlinDataGenerator perlinData = new PerlinDataGenerator();
+		readonly PerlinNoiseGenerator perlinNoise = new PerlinNoiseGenerator();
 
 		OidnDevice oidnDevice;
 		OidnFilter oidnFilter;
@@ -380,7 +380,7 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.SafeDispose();
 			bvhNodeMetadataBuffer.SafeDispose();
 #endif
-			perlinData.Dispose();
+			perlinNoise.Dispose();
 #if PATH_DEBUGGING
 			debugPaths.SafeDispose();
 #endif
@@ -609,7 +609,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 					BvhRoot = BvhRoot,
 #endif
-					PerlinData = perlinData.GetRuntimeData(),
+					PerlinNoise = perlinNoise.GetRuntimeData(),
 					OutputDiagnostics = diagnosticsBuffer,
 					ImportanceSampler = new ImportanceSampler
 					{
@@ -1057,7 +1057,7 @@ namespace RaytracerInOneWeekend
 			RebuildBvh();
 #endif
 
-			perlinData.Generate(scene.RandomSeed);
+			perlinNoise.Generate(scene.RandomSeed);
 
 			worldNeedsRebuild = false;
 		}

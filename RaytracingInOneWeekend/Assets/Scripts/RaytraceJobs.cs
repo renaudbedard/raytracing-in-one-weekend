@@ -61,7 +61,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] [NativeDisableUnsafePtrRestriction]
 		public BvhNode* BvhRoot;
 #endif
-		[ReadOnly] public PerlinData PerlinData;
+		[ReadOnly] public PerlinNoise PerlinNoise;
 #if BVH_ITERATIVE
 		[ReadOnly] public int NodeCount;
 #endif
@@ -213,10 +213,10 @@ namespace RaytracerInOneWeekend
 						break;
 
 					Material material = Entities[rec.EntityId].Material;
-					float3 emission = material.Emit(rec.Point, rec.Normal, PerlinData);
+					float3 emission = material.Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
 
-					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinData,
+					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinNoise,
 						out float3 albedo, out Ray scatteredRay);
 
 					if (!firstNonSpecularHit)
