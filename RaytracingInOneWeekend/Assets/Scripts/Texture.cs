@@ -38,7 +38,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public float3 Value(float3 position, float3 normal, float2 scale, PerlinNoise perlinNoise)
+		public float3 Value(float3 position, float3 normal, float2 scale, PerlinNoiseRuntimeData perlinNoise)
 		{
 			// TODO: make this use UVW coordinates instead
 

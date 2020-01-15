@@ -38,7 +38,9 @@ namespace RaytracerInOneWeekend
 
 	partial class Raytracer : MonoBehaviour
 	{
-		[Title("References")] [SerializeField] UnityEngine.Camera targetCamera = null;
+		[Title("References")]
+		[SerializeField] UnityEngine.Camera targetCamera = null;
+		[SerializeField] BlueNoise blueNoise;
 
 		[Title("Settings")] [SerializeField] [Range(1, 100)]
 		int interlacing = 2;
@@ -112,7 +114,7 @@ namespace RaytracerInOneWeekend
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
-		readonly PerlinNoiseGenerator perlinNoise = new PerlinNoiseGenerator();
+		readonly PerlinNoise perlinNoise = new PerlinNoise();
 
 		OidnDevice oidnDevice;
 		OidnFilter oidnFilter;
@@ -575,6 +577,8 @@ namespace RaytracerInOneWeekend
 				interlacingOffsetIndex = 0;
 
 			AccumulateJob accumulateJob;
+			uint frameSeed = (uint) Time.frameCount + 1;
+
 			unsafe
 			{
 				accumulateJob = new AccumulateJob
@@ -601,7 +605,7 @@ namespace RaytracerInOneWeekend
 						SkyCubemap = scene.SkyCubemap ? new Cubemap(scene.SkyCubemap) : default,
 						SkyType = scene.SkyType,
 					},
-					Seed = (uint) Time.frameCount + 1,
+					Seed = frameSeed,
 					SampleCount = min(samplesPerPixel, samplesPerBatch),
 					TraceDepth = traceDepth,
 					SubPixelJitter = subPixelJitter,
@@ -610,6 +614,7 @@ namespace RaytracerInOneWeekend
 					BvhRoot = BvhRoot,
 #endif
 					PerlinNoise = perlinNoise.GetRuntimeData(),
+					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
 					OutputDiagnostics = diagnosticsBuffer,
 					ImportanceSampler = new ImportanceSampler
 					{
@@ -694,6 +699,8 @@ namespace RaytracerInOneWeekend
 			colorAccumulationBuffer = colorOutputBuffer;
 			normalAccumulationBuffer = normalOutputBuffer;
 			albedoAccumulationBuffer = albedoOutputBuffer;
+
+			blueNoise.CycleTexture();
 
 			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel || previewAfterBatch)
 				ScheduleCombine(combinedDependency, outputData);

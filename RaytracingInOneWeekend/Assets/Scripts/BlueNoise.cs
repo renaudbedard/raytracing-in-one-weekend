@@ -1,64 +1,109 @@
+using System;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
 
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#else
+using OdinMock;
+#endif
+
+
 namespace RaytracerInOneWeekend
 {
-	class BlueNoiseData
+	[Serializable]
+	class BlueNoise
 	{
-		readonly Texture2D[] noiseTextures;
+		[LabelText("Textures")] [AssetsOnly]
+		public Texture2D[] NoiseTextures;
+
 		int textureIndex;
 
-		public BlueNoiseData(Texture2D[] noiseTextures)
+		public unsafe BlueNoiseRuntimeData GetRuntimeData(uint seed)
 		{
-			this.noiseTextures = noiseTextures;
+			if (NoiseTextures.Length == 0)
+				throw new InvalidOperationException();
+
+			textureIndex %= NoiseTextures.Length;
+
+			Texture2D currentTexture = NoiseTextures[textureIndex];
+
+			return new BlueNoiseRuntimeData(seed,
+				(half*) currentTexture.GetPixelData<half>(0).GetUnsafeReadOnlyPtr(),
+				(uint) currentTexture.width);
 		}
 
-		public unsafe BlueNoise GetNoiseData(uint seed)
+		public void CycleTexture()
 		{
-			return new BlueNoise(seed,
-				(half4*) noiseTextures[textureIndex].GetRawTextureData<RGBX64>().GetUnsafeReadOnlyPtr());
-		}
-
-		public void IncrementIndex()
-		{
-			textureIndex = (textureIndex + 1) % noiseTextures.Length;
+			textureIndex = (textureIndex + 1) % NoiseTextures.Length;
 		}
 	}
 
-	unsafe struct BlueNoise
+	unsafe struct BlueNoiseRuntimeData
 	{
-		[NativeDisableUnsafePtrRestriction] readonly half4* noiseData;
+		[NativeDisableUnsafePtrRestriction] readonly half* noiseData;
+		readonly uint rowStride;
+		readonly uint seed;
+
+		public BlueNoiseRuntimeData(uint seed, half* noiseData, uint rowStride) : this()
+		{
+			this.noiseData = noiseData;
+			this.rowStride = rowStride;
+			this.seed = seed;
+		}
+
+		public PerPixelBlueNoise GetPerPixelData(uint2 coordinates) =>
+			new PerPixelBlueNoise(seed, coordinates, noiseData, rowStride);
+	}
+
+	unsafe struct PerPixelBlueNoise
+	{
+		[NativeDisableUnsafePtrRestriction] readonly half* noiseData;
+		readonly uint rowStride;
+		readonly uint2 coordinates;
+
 		uint2 offset;
 		uint n;
 
-		public BlueNoise(uint seed, half4* noiseData) : this()
+		public PerPixelBlueNoise(uint seed, uint2 coordinates, half* noiseData, uint rowStride) : this()
 		{
+			this.coordinates = coordinates;
 			this.noiseData = noiseData;
+			this.rowStride = rowStride;
+
 			n = seed;
 			Advance();
 		}
 
-		public half3 NextHalf3(uint2 coordinates)
+		public float NextFloat()
 		{
-			coordinates = (coordinates + offset) % 256;
-			half3 value = noiseData[coordinates.y * 256 + coordinates.x].xyz;
+			uint2 wrappedCoords = (coordinates + offset) % rowStride;
+			half* pPixel = noiseData + wrappedCoords.y * rowStride * 4 + wrappedCoords.x * 4;
 			Advance();
-			return value;
+			return pPixel[0];
 		}
 
-		public half NextHalf(uint2 coordinates)
+		public float2 NextFloat2()
 		{
-			coordinates = (coordinates + offset) % 256;
-			half value = noiseData[coordinates.y * 256 + coordinates.x].x;
+			uint2 wrappedCoords = (coordinates + offset) % rowStride;
+			half* pPixel = noiseData + wrappedCoords.y * rowStride * 4 + wrappedCoords.x * 4;
 			Advance();
-			return value;
+			return float2(pPixel[0], pPixel[1]);
+		}
+
+		public float3 NextFloat3()
+		{
+			uint2 wrappedCoords = (coordinates + offset) % rowStride;
+			half* pPixel = noiseData + wrappedCoords.y * rowStride * 4 + wrappedCoords.x * 4;
+			Advance();
+			return float3(pPixel[0], pPixel[1], pPixel[2]);
 		}
 
 		void Advance()
 		{
-			offset += (uint2) floor(R2(n++) * 256);
+			offset += (uint2) floor(R2(n++) * rowStride);
 		}
 
 		static float2 R2(uint n)

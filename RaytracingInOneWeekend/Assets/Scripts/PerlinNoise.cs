@@ -8,7 +8,7 @@ using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-	class PerlinNoiseGenerator : IDisposable
+	class PerlinNoise : IDisposable
 	{
 		const int BufferSize = 256;
 
@@ -52,9 +52,9 @@ namespace RaytracerInOneWeekend
 			randomVectorBuffer.SafeDispose();
 		}
 
-		public unsafe PerlinNoise GetRuntimeData()
+		public unsafe PerlinNoiseRuntimeData GetRuntimeData()
 		{
-			return new PerlinNoise(
+			return new PerlinNoiseRuntimeData(
 				(int*) xPermBuffer.GetUnsafeReadOnlyPtr(),
 				(int*) yPermBuffer.GetUnsafeReadOnlyPtr(),
 				(int*) zPermBuffer.GetUnsafeReadOnlyPtr(),
@@ -62,14 +62,14 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	unsafe struct PerlinNoise
+	unsafe struct PerlinNoiseRuntimeData
 	{
 		// based on : http://www.eastfarthing.com/blog/2015-04-21-noise/
 
 		[NativeDisableUnsafePtrRestriction] readonly int* permX, permY, permZ;
 		[NativeDisableUnsafePtrRestriction] readonly float3* randomVectors;
 
-		public PerlinNoise(int* permX, int* permY, int* permZ, float3* randomVectors)
+		public PerlinNoiseRuntimeData(int* permX, int* permY, int* permZ, float3* randomVectors)
 		{
 			this.permX = permX;
 			this.permY = permY;

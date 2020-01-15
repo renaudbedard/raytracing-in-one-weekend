@@ -17,6 +17,20 @@ namespace RaytracerInOneWeekend
             return radius * float2(cosTheta, sinTheta);
         }
 
+        public static float NextFloat(this ref PerPixelBlueNoise rng, float min, float max)
+        {
+            return rng.NextFloat() * (max - min) + min;
+        }
+
+        public static float2 InUnitDisk(this ref PerPixelBlueNoise rng)
+        {
+            // from : https://programming.guide/random-point-within-circle.html
+            float theta = rng.NextFloat(0, 2 * PI);
+            float radius = sqrt(rng.NextFloat());
+            sincos(theta, out float sinTheta, out float cosTheta);
+            return radius * float2(cosTheta, sinTheta);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GetOrthonormalBasis(float3 normal, out float3 tangent, out float3 bitangent)
         {
@@ -43,6 +57,32 @@ namespace RaytracerInOneWeekend
             float3 tangentSpaceDirection = float3(xz.x, 1 - u, xz.y);
 
             return TangentToWorldSpace(tangentSpaceDirection, normal);
+        }
+
+        public static float3 OnUniformHemisphere(this ref PerPixelBlueNoise rng, float3 normal)
+        {
+            float2 uv = rng.NextFloat2();
+
+            // uniform sampling of a hemisphere
+            // from : https://cg.informatik.uni-freiburg.de/course_notes/graphics2_08_renderingEquation.pdf (inversion method, page 42)
+            float u = uv.x;
+            float radius = sqrt(2 * u - u * u);
+            float theta = uv.y * 2 * PI;
+            sincos(theta, out float sinTheta, out float cosTheta);
+            float2 xz = radius * float2(cosTheta, sinTheta);
+            float3 tangentSpaceDirection = float3(xz.x, 1 - u, xz.y);
+
+            return TangentToWorldSpace(tangentSpaceDirection, normal);
+        }
+
+        public static float3 NextFloat3Direction(this ref PerPixelBlueNoise rng)
+        {
+            float2 rnd = rng.NextFloat2();
+            float z = rnd.x * 2.0f - 1.0f;
+            float r = sqrt(max(1.0f - z * z, 0.0f));
+            float angle = rnd.y * PI * 2.0f;
+            sincos(angle, out float s, out float c);
+            return float3(c*r, s*r, z);
         }
 
         public static float3 OnCosineWeightedHemisphere(this ref Random rng, float3 normal)
