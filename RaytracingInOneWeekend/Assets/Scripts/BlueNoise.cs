@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
@@ -32,7 +33,7 @@ namespace RaytracerInOneWeekend
 
 			return new BlueNoiseRuntimeData(seed,
 				(half*) currentTexture.GetPixelData<half>(0).GetUnsafeReadOnlyPtr(),
-				(uint) currentTexture.width);
+				(ushort) currentTexture.width);
 		}
 
 		public void CycleTexture()
@@ -44,10 +45,10 @@ namespace RaytracerInOneWeekend
 	unsafe struct BlueNoiseRuntimeData
 	{
 		[NativeDisableUnsafePtrRestriction] readonly half* noiseData;
-		readonly uint rowStride;
+		readonly ushort rowStride;
 		readonly uint seed;
 
-		public BlueNoiseRuntimeData(uint seed, half* noiseData, uint rowStride) : this()
+		public BlueNoiseRuntimeData(uint seed, half* noiseData, ushort rowStride) : this()
 		{
 			this.noiseData = noiseData;
 			this.rowStride = rowStride;
@@ -61,19 +62,18 @@ namespace RaytracerInOneWeekend
 	unsafe struct PerPixelBlueNoise
 	{
 		[NativeDisableUnsafePtrRestriction] readonly half* noiseData;
-		readonly uint rowStride;
 		readonly uint2 coordinates;
-
 		uint2 offset;
+		readonly uint rowStride;
 		uint n;
 
-		public PerPixelBlueNoise(uint seed, uint2 coordinates, half* noiseData, uint rowStride) : this()
+		public PerPixelBlueNoise(uint seed, uint2 coordinates, half* noiseData, ushort rowStride) : this()
 		{
 			this.coordinates = coordinates;
 			this.noiseData = noiseData;
 			this.rowStride = rowStride;
 
-			n = seed;
+			n = (byte) (seed % 255);
 			Advance();
 		}
 
@@ -85,6 +85,8 @@ namespace RaytracerInOneWeekend
 			return pPixel[0];
 		}
 
+		public float NextFloat(float min, float max) => NextFloat() * (max - min) + min;
+
 		public float2 NextFloat2()
 		{
 			uint2 wrappedCoords = (coordinates + offset) % rowStride;
@@ -93,6 +95,8 @@ namespace RaytracerInOneWeekend
 			return float2(pPixel[0], pPixel[1]);
 		}
 
+		public float2 NextFloat2(float2 min, float2 max) => NextFloat2() * (max - min) + min;
+
 		public float3 NextFloat3()
 		{
 			uint2 wrappedCoords = (coordinates + offset) % rowStride;
@@ -100,6 +104,8 @@ namespace RaytracerInOneWeekend
 			Advance();
 			return float3(pPixel[0], pPixel[1], pPixel[2]);
 		}
+
+		public int NextInt(int min, int max) => (int) floor(NextFloat() * (max - min) + min);
 
 		void Advance()
 		{

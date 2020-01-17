@@ -51,6 +51,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
 		[SerializeField] ImportanceSamplingMode importanceSampling = ImportanceSamplingMode.None;
 		[SerializeField] DenoiseMode denoiseMode = DenoiseMode.None;
+		[SerializeField] NoiseColor noiseColor = NoiseColor.White;
 		[SerializeField] bool subPixelJitter = true;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
@@ -615,6 +616,7 @@ namespace RaytracerInOneWeekend
 #endif
 					PerlinNoise = perlinNoise.GetRuntimeData(),
 					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
+					NoiseColor = noiseColor,
 					OutputDiagnostics = diagnosticsBuffer,
 					ImportanceSampler = new ImportanceSampler
 					{
@@ -1166,7 +1168,11 @@ namespace RaytracerInOneWeekend
 				Entities = entities,
 			};
 
-			var rng = new Random(scene.RandomSeed);
+			var rng = new RandomSource(
+				noiseColor,
+				new Random(scene.RandomSeed),
+				blueNoise.GetRuntimeData(scene.RandomSeed).GetPerPixelData((uint2)(bufferSize / 2)));
+
 #if FULL_DIAGNOSTICS
 			Diagnostics _ = default;
 			return BvhRoot->Hit(entityBuffer, r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);

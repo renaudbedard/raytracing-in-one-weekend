@@ -21,7 +21,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		// TODO: this could (should?) be view-dependent
-		public float3 RandomPoint(ref Random rng) => rng.NextFloat3Direction() * Radius;
+		public float3 RandomPoint(ref RandomSource rng) => rng.NextFloat3Direction() * Radius;
 
 		public AxisAlignedBoundingBox Bounds
 		{

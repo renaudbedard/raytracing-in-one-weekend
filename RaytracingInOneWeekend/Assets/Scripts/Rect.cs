@@ -30,7 +30,7 @@ namespace RaytracerInOneWeekend
 			return distanceSquared / (cosine * Area);
 		}
 
-		public float3 RandomPoint(ref Random rng) => float3(rng.NextFloat2(From, To), 0);
+		public float3 RandomPoint(ref RandomSource rng) => float3(rng.NextFloat2(From, To), 0);
 
 		public AxisAlignedBoundingBox Bounds => new AxisAlignedBoundingBox(
 			float3(From, -0.001f),

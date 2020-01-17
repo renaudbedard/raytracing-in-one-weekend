@@ -164,7 +164,7 @@ namespace RaytracerInOneWeekend
 
 #elif BVH_ITERATIVE
 		public static unsafe bool Hit(this BvhNode n, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
-			ref Random rng, AccumulateJob.WorkingArea wa,
+			ref RandomSource rng, AccumulateJob.WorkingArea wa,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif

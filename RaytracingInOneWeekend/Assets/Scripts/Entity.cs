@@ -65,7 +65,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Hit(Ray ray, float tMin, float tMax, ref Random rng, out HitRecord rec)
+		public bool Hit(Ray ray, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)
 		{
 			if (HitInternal(ray, tMin, tMax, ref rng, out float distance, out float3 entityLocalNormal,
 				out RigidTransform transformAtTime, out _))
@@ -79,7 +79,7 @@ namespace RaytracerInOneWeekend
 			return false;
 		}
 
-		bool HitInternal(Ray ray, float tMin, float tMax, ref Random rng,
+		bool HitInternal(Ray ray, float tMin, float tMax, ref RandomSource rng,
 			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay)
 		{
 			transformAtTime = TransformAtTime(ray.Time);
@@ -132,7 +132,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		public float Pdf(Ray r, ref Random rng)
+		public float Pdf(Ray r, ref RandomSource rng)
 		{
 			if (HitInternal(r, 0.001f, float.PositiveInfinity, ref rng, out float distance,
 				out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
@@ -152,7 +152,7 @@ namespace RaytracerInOneWeekend
 			return 0;
 		}
 
-		public float3 RandomPoint(float time, ref Random rng)
+		public float3 RandomPoint(float time, ref RandomSource rng)
 		{
 			float3 localPoint;
 			switch (Type)

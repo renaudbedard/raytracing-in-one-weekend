@@ -17,7 +17,7 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public NativeArray<Entity> TargetEntities;
 		public ImportanceSamplingMode Mode;
 
-		public unsafe void Sample(Ray materialScatterRay, float3 outgoingLightDirection, HitRecord rec, Material material, ref Random rng,
+		public unsafe void Sample(Ray materialScatterRay, float3 outgoingLightDirection, HitRecord rec, Material material, ref RandomSource rng,
 			out Ray scatterRay, out float pdfValue, out int? targetEntityId)
 		{
 			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);

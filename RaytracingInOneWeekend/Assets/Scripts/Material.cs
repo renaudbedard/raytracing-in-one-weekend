@@ -44,7 +44,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		[Pure]
-		public bool Scatter(Ray ray, HitRecord rec, ref Random rng, ref PerPixelBlueNoise blueNoise, PerlinNoiseRuntimeData perlinNoise,
+		public bool Scatter(Ray ray, HitRecord rec, ref RandomSource rng, PerlinNoiseRuntimeData perlinNoise,
 			out float3 reflectance, out Ray scattered)
 		{
 			switch (Type)
@@ -53,8 +53,7 @@ namespace RaytracerInOneWeekend
 				{
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
 					//float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
-					//float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
-					float3 randomDirection = blueNoise.OnUniformHemisphere(rec.Normal);
+					float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, ray.Time);
 					return true;
 				}
@@ -76,7 +75,7 @@ namespace RaytracerInOneWeekend
 					// Peter Shirley's fuzzy metal
 					float3 reflected = reflect(ray.Direction, rec.Normal);
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
-					scattered = new Ray(rec.Point, normalize(reflected + Roughness * blueNoise.NextFloat3Direction()), ray.Time);
+					scattered = new Ray(rec.Point, normalize(reflected + Roughness * rng.NextFloat3Direction()), ray.Time);
 					return true;
 				}
 
@@ -104,7 +103,7 @@ namespace RaytracerInOneWeekend
 					if (Refract(ray.Direction, outwardNormal, niOverNt, out float3 refracted))
 					{
 						float reflectProb = Schlick(cosine, RefractiveIndex);
-						scattered = new Ray(rec.Point, blueNoise.NextFloat() < reflectProb ? reflected : refracted, ray.Time);
+						scattered = new Ray(rec.Point, rng.NextFloat() < reflectProb ? reflected : refracted, ray.Time);
 					}
 					else
 						scattered = new Ray(rec.Point, reflected, ray.Time);
@@ -113,7 +112,7 @@ namespace RaytracerInOneWeekend
 				}
 
 				case MaterialType.ProbabilisticVolume:
-					scattered = new Ray(rec.Point, blueNoise.NextFloat3Direction());
+					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
 					return true;
 

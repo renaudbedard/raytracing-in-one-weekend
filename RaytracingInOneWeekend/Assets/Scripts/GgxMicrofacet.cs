@@ -1,10 +1,9 @@
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using static RaytracerInOneWeekend.MathExtensions;
 
 namespace RaytracerInOneWeekend
 {
-	public static class GgxMicrofacet
+	static class GgxMicrofacet
 	{
 		// from https://schuttejoe.github.io/post/ggximportancesamplingpart1/
 		public static float3 Schlick(float radians, float3 r0)
@@ -36,7 +35,7 @@ namespace RaytracerInOneWeekend
 		}
 
 		// from https://schuttejoe.github.io/post/ggximportancesamplingpart1/
-		public static bool ImportanceSample(float3 specularColor, float roughness, ref Random rng, float3 wo,
+		public static bool ImportanceSample(float3 specularColor, float roughness, ref RandomSource rng, float3 wo,
 			out float3 wi, out float3 reflectance)
 		{
 			float a = roughness;
@@ -53,7 +52,7 @@ namespace RaytracerInOneWeekend
 			// theta = atan( alphaU * sqrt( bs.v / ( 1.0f - bs.v )) );
 
 			// convert from spherical to Cartesian coordinates
-			float3 wm = SphericalToCartesian(theta, phi);
+			float3 wm = Util.SphericalToCartesian(theta, phi);
 
 			// calculate wi by reflecting wo about wm
 			wi = 2 * dot(wo, wm) * wm - wo;
@@ -83,8 +82,8 @@ namespace RaytracerInOneWeekend
 			float3 wi = incomingLightDirection;
 			float3 wo = outgoingLightDirection;
 
-			wi = WorldToTangentSpace(wi, geometricNormal);
-			wo = WorldToTangentSpace(wo, geometricNormal);
+			wi = Util.WorldToTangentSpace(wi, geometricNormal);
+			wo = Util.WorldToTangentSpace(wo, geometricNormal);
 
 			float3 halfVector = normalize(wo + wi);
 			float EoH = abs(dot(wo, halfVector)); // TODO: no idea what EoH stands for

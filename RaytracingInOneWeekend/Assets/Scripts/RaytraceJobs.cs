@@ -63,6 +63,7 @@ namespace RaytracerInOneWeekend
 #endif
 		[ReadOnly] public PerlinNoiseRuntimeData PerlinNoise;
 		[ReadOnly] public BlueNoiseRuntimeData BlueNoise;
+		[ReadOnly] public NoiseColor NoiseColor;
 #if BVH_ITERATIVE
 		[ReadOnly] public int NodeCount;
 #endif
@@ -92,8 +93,6 @@ namespace RaytracerInOneWeekend
 				index / (int) Size.x // row
 			);
 
-			PerPixelBlueNoise blueNoise = BlueNoise.GetPerPixelData((uint2) coordinates);
-
 			// early out
 			if (coordinates.y % SliceDivider != SliceOffset)
 				return;
@@ -105,8 +104,11 @@ namespace RaytracerInOneWeekend
 
 			int sampleCount = (int) lastColor.w;
 
+			PerPixelBlueNoise blueNoise = BlueNoise.GetPerPixelData((uint2) coordinates);
 			// big primes stolen from Unity's random class
-			var rng = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
+			Random whiteNoise = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
+
+			var rng = new RandomSource(NoiseColor, whiteNoise, blueNoise);
 
 #if BVH_ITERATIVE
 			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
@@ -135,9 +137,9 @@ namespace RaytracerInOneWeekend
 			for (int s = 0; s < SampleCount; s++)
 			{
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? blueNoise.NextFloat2() : 0.5f)) / Size;
-				Ray eyeRay = Camera.GetRay(normalizedCoordinates, ref rng, ref blueNoise);
+				Ray eyeRay = Camera.GetRay(normalizedCoordinates, ref rng);
 
-				if (Sample(eyeRay, ref rng, ref blueNoise, emissionStack, attenuationStack,
+				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack,
 #if BVH_ITERATIVE
 					workingArea,
 #endif
@@ -167,7 +169,7 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
-		bool Sample(Ray eyeRay, ref Random rng, ref PerPixelBlueNoise blueNoise, float3* emissionStack, float3* attenuationStack,
+		bool Sample(Ray eyeRay, ref RandomSource rng, float3* emissionStack, float3* attenuationStack,
 #if BVH_ITERATIVE
 			WorkingArea workingArea,
 #endif
@@ -219,8 +221,7 @@ namespace RaytracerInOneWeekend
 					float3 emission = material.Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
 
-					bool didScatter = material.Scatter(ray, rec, ref rng, ref blueNoise, PerlinNoise,
-						out float3 albedo, out Ray scatteredRay);
+					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
 					if (!firstNonSpecularHit)
 					{

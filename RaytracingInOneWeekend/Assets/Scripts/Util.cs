@@ -1,12 +1,48 @@
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
 	static class Util
 	{
+		public static float3 SphericalToCartesian(float theta, float phi)
+		{
+			sincos(float2(theta, phi), out float2 sinThetaPhi, out float2 cosThetaPhi);
+			return float3(sinThetaPhi.x * cosThetaPhi.y, cosThetaPhi.x, sinThetaPhi.x * sinThetaPhi.y);
+		}
+
+		public static void GetOrthonormalBasis(float3 normal, out float3 tangent, out float3 bitangent)
+		{
+			// Corrected Frisvad method
+			// from listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+			float s = normal.z >= 0 ? 1.0f : -1.0f;
+			float a = -1 / (s + normal.z);
+			float b = normal.x * normal.y * a;
+			tangent = float3(1 + s * normal.x * normal.x * a, s * b, -s * normal.x);
+			bitangent = float3(b, s + normal.y * normal.y * a, -normal.y);
+		}
+
+		public static float3 TangentToWorldSpace(float3 tangentSpaceVector, float3 normal)
+		{
+			GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
+
+			float3x3 orthogonalMatrix = float3x3(tangent, normal, bitangent);
+			float3 result = mul(orthogonalMatrix, tangentSpaceVector);
+			return normalize(result);
+		}
+
+		public static float3 WorldToTangentSpace(float3 worldSpaceVector, float3 normal)
+		{
+			GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
+
+			float3x3 orthogonalMatrix = float3x3(tangent, normal, bitangent);
+			float3 result = mul(transpose(orthogonalMatrix), worldSpaceVector);
+			return normalize(result);
+		}
+
 		public static void Swap<T>(ref T lhs, ref T rhs) where T : struct
 		{
 			T temp = lhs;
