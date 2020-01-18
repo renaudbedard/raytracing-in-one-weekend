@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
@@ -11,7 +10,6 @@ using Sirenix.OdinInspector;
 using OdinMock;
 #endif
 
-
 namespace RaytracerInOneWeekend
 {
 	[Serializable]
@@ -21,6 +19,25 @@ namespace RaytracerInOneWeekend
 		public Texture2D[] NoiseTextures;
 
 		int textureIndex;
+
+		public unsafe void Linearize()
+		{
+			foreach (var texture in NoiseTextures)
+			{
+				var pixelData = (half4*) texture.GetPixelData<half4>(0).GetUnsafePtr();
+
+				// test for linearization marker
+				if (pixelData[0].w < 0.5f)
+					continue;
+
+				// set the marker
+				pixelData[0].w = half(0);
+
+				for (int i = 0; i < texture.height; i++)
+				for (int j = 0; j < texture.width; j++)
+					pixelData[i * texture.width + j] = (half4) pow(pixelData[i * texture.width + j], 1 / 2.2f);
+			}
+		}
 
 		public unsafe BlueNoiseRuntimeData GetRuntimeData(uint seed)
 		{
@@ -32,8 +49,8 @@ namespace RaytracerInOneWeekend
 			Texture2D currentTexture = NoiseTextures[textureIndex];
 
 			return new BlueNoiseRuntimeData(seed,
-				(half*) currentTexture.GetPixelData<half>(0).GetUnsafeReadOnlyPtr(),
-				(ushort) currentTexture.width);
+				(half4*) currentTexture.GetPixelData<half4>(0).GetUnsafeReadOnlyPtr(),
+				(uint) currentTexture.width);
 		}
 
 		public void CycleTexture()
@@ -44,30 +61,32 @@ namespace RaytracerInOneWeekend
 
 	unsafe struct BlueNoiseRuntimeData
 	{
-		[NativeDisableUnsafePtrRestriction] readonly half* noiseData;
-		readonly ushort rowStride;
+		[field: NativeDisableUnsafePtrRestriction]
+		public half4* NoiseData { get; }
+		public uint RowStride { get; }
+
 		readonly uint seed;
 
-		public BlueNoiseRuntimeData(uint seed, half* noiseData, ushort rowStride) : this()
+		public BlueNoiseRuntimeData(uint seed, half4* noiseData, uint rowStride) : this()
 		{
-			this.noiseData = noiseData;
-			this.rowStride = rowStride;
+			RowStride = rowStride;
+			NoiseData = noiseData;
 			this.seed = seed;
 		}
 
 		public PerPixelBlueNoise GetPerPixelData(uint2 coordinates) =>
-			new PerPixelBlueNoise(seed, coordinates, noiseData, rowStride);
+			new PerPixelBlueNoise(seed, coordinates, NoiseData, RowStride);
 	}
 
 	unsafe struct PerPixelBlueNoise
 	{
-		[NativeDisableUnsafePtrRestriction] readonly half* noiseData;
+		[NativeDisableUnsafePtrRestriction] readonly half4* noiseData;
 		readonly uint2 coordinates;
 		uint2 offset;
 		readonly uint rowStride;
 		uint n;
 
-		public PerPixelBlueNoise(uint seed, uint2 coordinates, half* noiseData, ushort rowStride) : this()
+		public PerPixelBlueNoise(uint seed, uint2 coordinates, half4* noiseData, uint rowStride) : this()
 		{
 			this.coordinates = coordinates;
 			this.noiseData = noiseData;
@@ -80,9 +99,9 @@ namespace RaytracerInOneWeekend
 		public float NextFloat()
 		{
 			uint2 wrappedCoords = (coordinates + offset) % rowStride;
-			half* pPixel = noiseData + wrappedCoords.y * rowStride * 4 + wrappedCoords.x * 4;
+			half4* pPixel = noiseData + wrappedCoords.y * rowStride + wrappedCoords.x;
 			Advance();
-			return pPixel[0];
+			return pPixel->x;
 		}
 
 		public float NextFloat(float min, float max) => NextFloat() * (max - min) + min;
@@ -90,20 +109,12 @@ namespace RaytracerInOneWeekend
 		public float2 NextFloat2()
 		{
 			uint2 wrappedCoords = (coordinates + offset) % rowStride;
-			half* pPixel = noiseData + wrappedCoords.y * rowStride * 4 + wrappedCoords.x * 4;
+			half4* pPixel = noiseData + wrappedCoords.y * rowStride + wrappedCoords.x;
 			Advance();
-			return float2(pPixel[0], pPixel[1]);
+			return float2(pPixel->xy);
 		}
 
 		public float2 NextFloat2(float2 min, float2 max) => NextFloat2() * (max - min) + min;
-
-		public float3 NextFloat3()
-		{
-			uint2 wrappedCoords = (coordinates + offset) % rowStride;
-			half* pPixel = noiseData + wrappedCoords.y * rowStride * 4 + wrappedCoords.x * 4;
-			Advance();
-			return float3(pPixel[0], pPixel[1], pPixel[2]);
-		}
 
 		public int NextInt(int min, int max) => (int) floor(NextFloat() * (max - min) + min);
 

@@ -87,6 +87,7 @@ namespace RaytracerInOneWeekend
 
 		int interlacingOffsetIndex;
 		int[] interlacingOffsets;
+		uint frameSeed = 1;
 
 		NativeArray<float4> colorAccumulationBuffer;
 		NativeArray<float3> normalAccumulationBuffer, albedoAccumulationBuffer;
@@ -245,6 +246,8 @@ namespace RaytracerInOneWeekend
 				itemNameOverride: "NativeArray<bool>", cleanupMethod: buffer => buffer[0] = false) { Capacity = 64 };
 
 			ignoreBatchTimings = true;
+
+			blueNoise.Linearize();
 		}
 
 		void Start()
@@ -506,6 +509,7 @@ namespace RaytracerInOneWeekend
 				if (buffersNeedRebuild) EnsureBuffersBuilt();
 				if (worldNeedsRebuild) RebuildWorld();
 			}
+
 			if (cameraDirty) CleanCamera();
 
 			// kick if needed (with double-buffering)
@@ -552,6 +556,9 @@ namespace RaytracerInOneWeekend
 
 				interlacingOffsetIndex = 0;
 
+				blueNoise.CycleTexture();
+				frameSeed = (uint) Time.frameCount + 1;
+
 #if PATH_DEBUGGING
 				debugPaths.EnsureCapacity((int) traceDepth);
 #endif
@@ -578,7 +585,6 @@ namespace RaytracerInOneWeekend
 				interlacingOffsetIndex = 0;
 
 			AccumulateJob accumulateJob;
-			uint frameSeed = (uint) Time.frameCount + 1;
 
 			unsafe
 			{
@@ -658,6 +664,7 @@ namespace RaytracerInOneWeekend
 				JobHandle startTimerJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 0 }.Schedule(dependency ?? default);
 				accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
 			}
+
 			accumulateJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 1 }.Schedule(accumulateJobHandle);
 
 			NativeArray<int> reducedRayCountBuffer = intBuffers.Take();
@@ -701,8 +708,6 @@ namespace RaytracerInOneWeekend
 			colorAccumulationBuffer = colorOutputBuffer;
 			normalAccumulationBuffer = normalOutputBuffer;
 			albedoAccumulationBuffer = albedoOutputBuffer;
-
-			blueNoise.CycleTexture();
 
 			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel || previewAfterBatch)
 				ScheduleCombine(combinedDependency, outputData);
