@@ -538,6 +538,8 @@ namespace RaytracerInOneWeekend
 
 			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
+			else
+				focusDistance = 1;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
 				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
@@ -555,9 +557,6 @@ namespace RaytracerInOneWeekend
 				albedoAccumulationBuffer.ZeroMemory();
 
 				interlacingOffsetIndex = 0;
-
-				blueNoise.CycleTexture();
-				frameSeed = (uint) Time.frameCount + 1;
 
 #if PATH_DEBUGGING
 				debugPaths.EnsureCapacity((int) traceDepth);
@@ -583,6 +582,12 @@ namespace RaytracerInOneWeekend
 
 			if (interlacingOffsetIndex >= interlacing)
 				interlacingOffsetIndex = 0;
+
+			if (interlacingOffsetIndex == 0)
+			{
+				blueNoise.CycleTexture();
+				frameSeed = (uint) Time.frameCount + 1;
+			}
 
 			AccumulateJob accumulateJob;
 
@@ -1118,13 +1123,11 @@ namespace RaytracerInOneWeekend
 				}
 
 				MaterialData materialData = e.Material;
-				TextureData albedo = materialData.Albedo;
-				TextureData emission = materialData.Emission;
 
 				Material material = materialData
 					? new Material(materialData.Type, materialData.TextureScale * sizeFactor,
-						albedo.GetRuntimeData(), emission.GetRuntimeData(),
-						materialData.Roughness, materialData.RefractiveIndex, materialData.Density)
+						materialData.Albedo.GetRuntimeData(), materialData.Emission.GetRuntimeData(),
+						materialData.Roughness.GetRuntimeData(), materialData.RefractiveIndex, materialData.Density)
 					: default;
 
 				Entity entity = e.Moving
@@ -1189,7 +1192,9 @@ namespace RaytracerInOneWeekend
 #else // !BVH_ITERATIVE
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			var rng = new Random(scene.RandomSeed);
+			var rng = new RandomSource(noiseColor, new Random(frameSeed),
+				blueNoise.GetRuntimeData(frameSeed).GetPerPixelData((uint2) bufferSize / 2));
+
 #if BVH_RECURSIVE
 			return World->Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
 #else
@@ -1250,7 +1255,7 @@ namespace RaytracerInOneWeekend
 							Color to = group.MetalAlbedo.colorKeys[1].color;
 							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
 							float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
-							material = MaterialData.Metal(TextureData.Constant(color), 1, fuzz);
+							material = MaterialData.Metal(TextureData.Constant(color), 1, TextureData.Constant(fuzz));
 						}
 						else if (randomValue < probabilities.dielectric)
 						{

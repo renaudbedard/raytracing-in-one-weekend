@@ -228,7 +228,7 @@ namespace RaytracerInOneWeekend
 
 				material.SetFloat("_Metallic", entity.Material.Type == MaterialType.Metal ? 1 : 0);
 				material.SetFloat("_Glossiness",
-					entity.Material.Type == MaterialType.Metal ? 1 - entity.Material.Roughness : transparent ? 1 : 0);
+					entity.Material.Type == MaterialType.Metal ? 1 - entity.Material.Roughness.MainColor.r : transparent ? 1 : 0);
 				material.SetTexture("_MainTex", entity.Material.Albedo.Image);
 
 				if (transparent)

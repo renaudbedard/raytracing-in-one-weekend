@@ -1,1 +1,0 @@
-HDR Cubemaps are sourced from : http://gl.ict.usc.edu/Data/HighResProbes/

@@ -19,16 +19,15 @@ namespace RaytracerInOneWeekend
 	struct Material
 	{
 		public readonly MaterialType Type;
-		public readonly Texture Texture;
+		public readonly Texture Texture, Roughness;
 		public readonly float2 TextureScale;
 		public readonly float Parameter;
 
-		float Roughness => Parameter; // for Metal
 		float RefractiveIndex => Parameter; // for Dielectric
 		public float Density => Parameter; // for ProbabilisticVolume
 
 		public Material(MaterialType type, float2 textureScale, Texture albedo = default,
-			Texture emission = default, float roughness = 0, float refractiveIndex = 1, float density = 1) : this()
+			Texture emission = default, Texture roughness = default, float refractiveIndex = 1, float density = 1) : this()
 		{
 			Type = type;
 			TextureScale = textureScale;
@@ -36,7 +35,7 @@ namespace RaytracerInOneWeekend
 			switch (type)
 			{
 				case MaterialType.Lambertian: Texture = albedo; break;
-				case MaterialType.Metal: Parameter = saturate(roughness); Texture = albedo; break;
+				case MaterialType.Metal: Roughness = roughness; Texture = albedo; break;
 				case MaterialType.Dielectric: Parameter = refractiveIndex; break;
 				case MaterialType.DiffuseLight: Texture = emission; break;
 				case MaterialType.ProbabilisticVolume: Parameter = density; Texture = albedo; break;
@@ -75,7 +74,8 @@ namespace RaytracerInOneWeekend
 					// Peter Shirley's fuzzy metal
 					float3 reflected = reflect(ray.Direction, rec.Normal);
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
-					scattered = new Ray(rec.Point, normalize(reflected + Roughness * rng.NextFloat3Direction()), ray.Time);
+					float3 roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
+					scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
 					return true;
 				}
 
@@ -160,7 +160,7 @@ namespace RaytracerInOneWeekend
 				switch (Type)
 				{
 					case MaterialType.Dielectric: return true;
-					case MaterialType.Metal: return Roughness.AlmostEquals(0);
+					case MaterialType.Metal: return Roughness.Type == TextureType.Constant && all(Roughness.MainColor.AlmostEquals(0));
 				}
 				return false;
 			}

@@ -1,6 +1,5 @@
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -18,9 +17,8 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(TextureCanScale))]
 		[SerializeField] Vector2 textureScale = Vector2.one;
 
-		[FormerlySerializedAs("fuzz")]
 		[ShowIf(nameof(Type), MaterialType.Metal)]
-		[Range(0, 1)] [SerializeField] float roughness;
+		[SerializeField] TextureData roughness;
 
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
@@ -44,7 +42,7 @@ namespace RaytracerInOneWeekend
 		[SerializeField] TextureData emission;
 
 		public MaterialType Type => type;
-		public float Roughness => roughness;
+		public TextureData Roughness => roughness;
 		public float RefractiveIndex => refractiveIndex;
 		public Vector2 TextureScale => textureScale;
 		public float Density => density;
@@ -71,7 +69,7 @@ namespace RaytracerInOneWeekend
 			return data;
 		}
 
-		public static MaterialData Metal(TextureData albedoTexture, float2 textureScale, float fuzz = 0)
+		public static MaterialData Metal(TextureData albedoTexture, float2 textureScale, TextureData fuzz)
 		{
 			var data = CreateInstance<MaterialData>();
 			data.hideFlags = HideFlags.HideAndDontSave;
@@ -100,7 +98,9 @@ namespace RaytracerInOneWeekend
 			return data;
 		}
 
-		bool TextureCanScale => albedo.Type == TextureType.CheckerPattern || emission.Type == TextureType.CheckerPattern;
+		bool TextureCanScale => albedo.Type == TextureType.CheckerPattern ||
+		                        emission.Type == TextureType.CheckerPattern ||
+		                        roughness.Type == TextureType.CheckerPattern;
 
 #if UNITY_EDITOR
 		bool dirty;

@@ -68,6 +68,9 @@ namespace RaytracerInOneWeekend
 
 				case TextureType.Image:
 				{
+					if (ImagePointer == null)
+						return 0;
+
 					float phi = atan2(normal.z, normal.x);
 					float theta = asin(normal.y);
 					float2 uv = float2((phi + PI) / (2 * PI), (theta + PI / 2) / PI);
