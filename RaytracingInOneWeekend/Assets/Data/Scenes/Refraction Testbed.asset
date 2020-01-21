@@ -14,13 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cameraPosition: {x: 0, y: -0.25, z: -3}
   cameraTarget: {x: 0, y: -0.25, z: 0}
-  cameraAperture: 0.05
+  cameraAperture: 0.0125
   cameraFieldOfView: 55
   entities:
-  - type: 1
+  - name: 
+    type: 1
     enabled: 1
     position: {x: 0, y: 0, z: 0}
     rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 1
       excludeFromOverlapTest: 0
@@ -28,11 +32,15 @@ MonoBehaviour:
       size: {x: 0, y: 0}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 708a8b9c4d228461ab8d935dc07149cd, type: 2}
-  - type: 1
+    material: {fileID: 11400000, guid: 5f02d2091b9782b40be9ed1605926ae7, type: 2}
+  - name: 
+    type: 1
     enabled: 1
     position: {x: 0, y: -101, z: 0}
     rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 100
       excludeFromOverlapTest: 0
@@ -42,6 +50,8 @@ MonoBehaviour:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: e2b440160971b4fecbbfadbe5fcdab3a, type: 2}
   randomSeed: 1
-  randomSphereGroups: []
+  randomEntityGroups: []
+  skyType: 0
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
+  skyCubemap: {fileID: 0}

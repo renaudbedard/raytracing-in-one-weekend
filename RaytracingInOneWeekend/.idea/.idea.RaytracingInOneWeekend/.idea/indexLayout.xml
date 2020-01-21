@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ContentModelUserStore">
-    <attachedFolders>
-      <Path>../../../../AppData/Local/Unity/cache/packages/packages.unity.com/com.unity.test-framework@1.1.1</Path>
-    </attachedFolders>
+    <attachedFolders />
     <explicitIncludes>
       <Path>../../../../AppData/Local/Unity/cache/packages/packages.unity.com/com.unity.test-framework@1.1.1</Path>
       <Path>Library/PackageCache/com.unity.burst@1.1.1</Path>
@@ -28,7 +26,6 @@
       <Path>Logs</Path>
       <Path>Media</Path>
       <Path>MemoryCaptures</Path>
-      <Path>Temp</Path>
       <Path>UserSettings</Path>
       <Path>obj</Path>
     </explicitExcludes>

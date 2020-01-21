@@ -36,7 +36,7 @@ namespace RaytracerInOneWeekend
 			{
 				case MaterialType.Lambertian: Texture = albedo; break;
 				case MaterialType.Metal: Roughness = roughness; Texture = albedo; break;
-				case MaterialType.Dielectric: Parameter = refractiveIndex; break;
+				case MaterialType.Dielectric: Roughness = roughness; Parameter = refractiveIndex; break;
 				case MaterialType.DiffuseLight: Texture = emission; break;
 				case MaterialType.ProbabilisticVolume: Parameter = density; Texture = albedo; break;
 			}
@@ -74,13 +74,15 @@ namespace RaytracerInOneWeekend
 					// Peter Shirley's fuzzy metal
 					float3 reflected = reflect(ray.Direction, rec.Normal);
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
-					float3 roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
+					float roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise).x;
 					scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
 					return true;
 				}
 
 				case MaterialType.Dielectric:
 				{
+					float roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise).x;
+
 					float3 reflected = reflect(ray.Direction, rec.Normal);
 					reflectance = 1;
 					float niOverNt;
@@ -100,14 +102,15 @@ namespace RaytracerInOneWeekend
 						cosine = -dot(ray.Direction, rec.Normal);
 					}
 
-					if (Refract(ray.Direction, outwardNormal, niOverNt, out float3 refracted))
+					float3 scatterDirection = reflected;
+					if (Refract(ray.Direction, outwardNormal, niOverNt, out float3 refracted) &&
+					    rng.NextFloat() > Schlick(cosine, RefractiveIndex))
 					{
-						float reflectProb = Schlick(cosine, RefractiveIndex);
-						scattered = new Ray(rec.Point, rng.NextFloat() < reflectProb ? reflected : refracted, ray.Time);
+						scatterDirection = refracted;
 					}
-					else
-						scattered = new Ray(rec.Point, reflected, ray.Time);
+					scatterDirection = normalize(scatterDirection + roughness * rng.NextFloat3Direction());
 
+					scattered = new Ray(rec.Point, scatterDirection, ray.Time);
 					return true;
 				}
 

@@ -17,7 +17,7 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(TextureCanScale))]
 		[SerializeField] Vector2 textureScale = Vector2.one;
 
-		[ShowIf(nameof(Type), MaterialType.Metal)]
+		[ShowIf(nameof(RoughnessSupported))]
 		[SerializeField] TextureData roughness;
 
 		[ShowIf(nameof(Type), MaterialType.Dielectric)]
@@ -30,16 +30,20 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(AlbedoSupported))]
 #endif
 		[SerializeField] TextureData albedo;
-#if UNITY_EDITOR
-		bool AlbedoSupported => type == MaterialType.Lambertian ||
-		                        type == MaterialType.Metal ||
-		                        type == MaterialType.ProbabilisticVolume;
-#endif
-
+		
 #if UNITY_EDITOR
 		[ShowIf(nameof(type), MaterialType.DiffuseLight)]
 #endif
 		[SerializeField] TextureData emission;
+		
+#if UNITY_EDITOR
+		bool AlbedoSupported => type == MaterialType.Lambertian ||
+		                        type == MaterialType.Metal ||
+		                        type == MaterialType.ProbabilisticVolume;
+
+		bool RoughnessSupported => type == MaterialType.Dielectric ||
+		                           type == MaterialType.Metal;
+#endif
 
 		public MaterialType Type => type;
 		public TextureData Roughness => roughness;
