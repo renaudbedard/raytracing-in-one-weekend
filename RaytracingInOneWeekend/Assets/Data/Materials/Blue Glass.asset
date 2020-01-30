@@ -10,27 +10,30 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 605b1e03a25b42cd8e794e33ec9899e1, type: 3}
-  m_Name: Glass
+  m_Name: Blue Glass
   m_EditorClassIdentifier: 
   type: 3
   textureScale: {x: 1, y: 1}
   roughness:
-    type: 0
-    mainColor: {r: 0, g: 0, b: 0, a: 0}
+    type: 5
+    mainColor: {r: 0.05, g: 0.05, b: 0.05, a: 0}
     secondaryColor: {r: 0, g: 0, b: 0, a: 0}
     noiseFrequency: 0
     image: {fileID: 0}
+    value: 0
   refractiveIndex: 1.5
   density: 1
   albedo:
     type: 1
-    mainColor: {r: 1, g: 1, b: 1, a: 0}
+    mainColor: {r: 0, g: 0.14292936, b: 0.8301887, a: 0}
     secondaryColor: {r: 0, g: 0, b: 0, a: 0}
     noiseFrequency: 0
     image: {fileID: 0}
+    value: 0
   emission:
     type: 0
     mainColor: {r: 0, g: 0, b: 0, a: 0}
     secondaryColor: {r: 0, g: 0, b: 0, a: 0}
     noiseFrequency: 0
     image: {fileID: 0}
+    value: 0

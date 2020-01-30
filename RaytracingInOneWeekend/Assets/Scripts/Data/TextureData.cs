@@ -18,6 +18,9 @@ namespace RaytracerInOneWeekend
 		[SerializeField] TextureType type;
 
 		[ColorUsage(false, true)]
+#if UNITY_EDITOR
+		[ShowIf(nameof(SupportsColor))]
+#endif
 		[SerializeField] Color mainColor;
 
 		[ColorUsage(false, true)]
@@ -30,11 +33,21 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(Type), TextureType.Image)]
 		[SerializeField] Texture2D image;
 
+		[ShowIf(nameof(Type), TextureType.ConstantScalar)]
+		[Range(0, 1)] [SerializeField] float value;
+
 		public TextureType Type => type;
+
 		public Color MainColor => mainColor;
 		public Color SecondaryColor => secondaryColor;
 		public float NoiseFrequency => noiseFrequency;
 		public Texture2D Image => image;
+		public float Value => value;
+
+		public static TextureData Constant(float value)
+		{
+			return new TextureData { type = TextureType.ConstantScalar, value = value };
+		}
 
 		public static TextureData Constant(float3 color)
 		{
@@ -62,11 +75,15 @@ namespace RaytracerInOneWeekend
 						Image ? Image.width : -1, Image ? Image.height : -1);
 
 				default:
-					return new Texture(Type, MainColor.ToFloat3(), SecondaryColor.ToFloat3(), NoiseFrequency, null, -1, -1);
+					return new Texture(Type, MainColor.ToFloat3(), SecondaryColor.ToFloat3(),
+						Type == TextureType.PerlinNoise ? noiseFrequency :
+						Type == TextureType.ConstantScalar ? value : 0, null, -1, -1);
 			}
 		}
 
 #if UNITY_EDITOR
+		public bool SupportsColor => type != TextureType.ConstantScalar && type != TextureType.None;
+
 		public bool Dirty { get; private set; }
 
 		public void ClearDirty()

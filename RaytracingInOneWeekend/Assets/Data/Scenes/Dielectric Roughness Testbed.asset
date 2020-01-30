@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
-  m_Name: Roughness Testbed
+  m_Name: Dielectric Roughness Testbed
   m_EditorClassIdentifier: 
   cameraPosition: {x: 1.125, y: -0.25, z: -3.55}
   cameraTarget: {x: 1.125, y: -0.25, z: 0}
@@ -32,7 +32,7 @@ MonoBehaviour:
       size: {x: 0, y: 0}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 683e9b58c1510474597994c888fc985a, type: 2}
+    material: {fileID: 11400000, guid: 975ed98ff303c6b48abff63fedefe510, type: 2}
   - name: 
     type: 1
     enabled: 1
@@ -64,10 +64,10 @@ MonoBehaviour:
       size: {x: 0, y: 0}
     boxData:
       size: {x: 0, y: 0, z: 0}
-    material: {fileID: 11400000, guid: 9001dff502d09e34b90e4091747e171e, type: 2}
+    material: {fileID: 11400000, guid: 5f02d2091b9782b40be9ed1605926ae7, type: 2}
   randomSeed: 1
   randomEntityGroups: []
   skyType: 1
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
-  skyCubemap: {fileID: 8900000, guid: d9239b033be4d114dabe766f6896f132, type: 3}
+  skyCubemap: {fileID: 8900000, guid: 58504c8e226a95944ad302949069e850, type: 3}

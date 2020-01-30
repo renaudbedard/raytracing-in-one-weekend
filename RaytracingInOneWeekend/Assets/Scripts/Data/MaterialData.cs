@@ -30,16 +30,17 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(AlbedoSupported))]
 #endif
 		[SerializeField] TextureData albedo;
-		
+
 #if UNITY_EDITOR
 		[ShowIf(nameof(type), MaterialType.DiffuseLight)]
 #endif
 		[SerializeField] TextureData emission;
-		
+
 #if UNITY_EDITOR
 		bool AlbedoSupported => type == MaterialType.Lambertian ||
 		                        type == MaterialType.Metal ||
-		                        type == MaterialType.ProbabilisticVolume;
+		                        type == MaterialType.ProbabilisticVolume ||
+		                        type == MaterialType.Dielectric;
 
 		bool RoughnessSupported => type == MaterialType.Dielectric ||
 		                           type == MaterialType.Metal;
@@ -84,12 +85,14 @@ namespace RaytracerInOneWeekend
 			return data;
 		}
 
-		public static MaterialData Dielectric(float refractiveIndex)
+		public static MaterialData Dielectric(float refractiveIndex, TextureData albedoTexture, TextureData roughnessTexture)
 		{
 			var data = CreateInstance<MaterialData>();
 			data.hideFlags = HideFlags.HideAndDontSave;
 			data.type = MaterialType.Dielectric;
 			data.refractiveIndex = refractiveIndex;
+			data.albedo = albedoTexture;
+			data.roughness = roughnessTexture;
 			return data;
 		}
 

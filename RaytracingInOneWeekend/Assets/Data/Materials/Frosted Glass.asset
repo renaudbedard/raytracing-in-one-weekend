@@ -15,22 +15,25 @@ MonoBehaviour:
   type: 3
   textureScale: {x: 1, y: 1}
   roughness:
-    type: 1
-    mainColor: {r: 0, g: 0, b: 0, a: 0}
+    type: 5
+    mainColor: {r: 0.05, g: 0.05, b: 0.05, a: 0}
     secondaryColor: {r: 0, g: 0, b: 0, a: 0}
     noiseFrequency: 0
     image: {fileID: 0}
+    value: 0.664
   refractiveIndex: 1.5
   density: 1
   albedo:
-    type: 0
-    mainColor: {r: 0, g: 0, b: 0, a: 0}
+    type: 1
+    mainColor: {r: 1, g: 1, b: 1, a: 0}
     secondaryColor: {r: 0, g: 0, b: 0, a: 0}
     noiseFrequency: 0
     image: {fileID: 0}
+    value: 0
   emission:
     type: 0
     mainColor: {r: 0, g: 0, b: 0, a: 0}
     secondaryColor: {r: 0, g: 0, b: 0, a: 0}
     noiseFrequency: 0
     image: {fileID: 0}
+    value: 0

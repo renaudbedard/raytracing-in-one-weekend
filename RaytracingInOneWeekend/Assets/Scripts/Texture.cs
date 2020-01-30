@@ -14,7 +14,8 @@ namespace RaytracerInOneWeekend
 		Constant,
 		CheckerPattern,
 		PerlinNoise,
-		Image
+		Image,
+		ConstantScalar
 	}
 
 	unsafe struct Texture
@@ -22,17 +23,20 @@ namespace RaytracerInOneWeekend
 		public readonly TextureType Type;
 		public readonly float3 MainColor;
 		public readonly float3 SecondaryColor;
-		public readonly float NoiseFrequency;
+		public readonly float Parameter;
 		public readonly int2 ImageSize;
 		public readonly byte* ImagePointer;
 
-		public Texture(TextureType type, float3 mainColor, float3 secondaryColor, float noiseFrequency, byte* pImage,
+		float NoiseFrequency => Parameter;
+		float ScalarValue => Parameter;
+
+		public Texture(TextureType type, float3 mainColor, float3 secondaryColor, float parameter, byte* pImage,
 			int imageWidth, int imageHeight)
 		{
 			Type = type;
 			MainColor = mainColor;
 			SecondaryColor = secondaryColor;
-			NoiseFrequency = noiseFrequency;
+			Parameter = parameter;
 			ImagePointer = pImage;
 			ImageSize = int2(imageWidth, imageHeight);
 		}
@@ -46,6 +50,9 @@ namespace RaytracerInOneWeekend
 			{
 				case TextureType.Constant:
 					return MainColor;
+
+				case TextureType.ConstantScalar:
+					return ScalarValue;
 
 				case TextureType.CheckerPattern:
 				{

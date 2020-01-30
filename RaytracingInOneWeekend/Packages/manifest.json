@@ -1,9 +1,9 @@
 {
   "dependencies": {
-    "com.unity.burst": "1.2.0",
+    "com.unity.burst": "1.2.1",
     "com.unity.collections": "0.5.0-preview.9",
     "com.unity.ide.rider": "2.0.0-preview",
-    "com.unity.inputsystem": "1.0.0-preview.3",
+    "com.unity.inputsystem": "1.0.0-preview.4",
     "com.unity.mathematics": "1.1.0",
     "com.unity.ugui": "1.0.0",
     "com.unity.modules.ai": "1.0.0",

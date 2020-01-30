@@ -36,7 +36,7 @@ namespace RaytracerInOneWeekend
 			{
 				case MaterialType.Lambertian: Texture = albedo; break;
 				case MaterialType.Metal: Roughness = roughness; Texture = albedo; break;
-				case MaterialType.Dielectric: Roughness = roughness; Parameter = refractiveIndex; break;
+				case MaterialType.Dielectric: Roughness = roughness; Parameter = refractiveIndex; Texture = albedo; break;
 				case MaterialType.DiffuseLight: Texture = emission; break;
 				case MaterialType.ProbabilisticVolume: Parameter = density; Texture = albedo; break;
 			}
@@ -81,34 +81,34 @@ namespace RaytracerInOneWeekend
 
 				case MaterialType.Dielectric:
 				{
+					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
+
 					float roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise).x;
+					float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction());
 
-					float3 reflected = reflect(ray.Direction, rec.Normal);
-					reflectance = 1;
-					float niOverNt;
-					float3 outwardNormal;
-					float cosine;
-
-					if (dot(ray.Direction, rec.Normal) > 0)
+					float niOverNt, cosine;
+					float3 outwardRoughNormal;
+					if (dot(ray.Direction, roughNormal) > 0)
 					{
-						outwardNormal = -rec.Normal;
+						outwardRoughNormal = -roughNormal;
 						niOverNt = RefractiveIndex;
-						cosine = RefractiveIndex * dot(ray.Direction, rec.Normal);
+						cosine = RefractiveIndex * dot(ray.Direction, roughNormal);
 					}
 					else
 					{
-						outwardNormal = rec.Normal;
+						outwardRoughNormal = roughNormal;
 						niOverNt = 1 / RefractiveIndex;
-						cosine = -dot(ray.Direction, rec.Normal);
+						cosine = -dot(ray.Direction, roughNormal);
 					}
 
-					float3 scatterDirection = reflected;
-					if (Refract(ray.Direction, outwardNormal, niOverNt, out float3 refracted) &&
+					float3 scatterDirection;
+					if (Refract(ray.Direction, outwardRoughNormal, niOverNt, out float3 refracted) &&
 					    rng.NextFloat() > Schlick(cosine, RefractiveIndex))
 					{
 						scatterDirection = refracted;
 					}
-					scatterDirection = normalize(scatterDirection + roughness * rng.NextFloat3Direction());
+					else
+						scatterDirection = reflect(ray.Direction, roughNormal);
 
 					scattered = new Ray(rec.Point, scatterDirection, ray.Time);
 					return true;

@@ -1259,9 +1259,9 @@ namespace RaytracerInOneWeekend
 						}
 						else if (randomValue < probabilities.dielectric)
 						{
-							material = MaterialData.Dielectric(rng.NextFloat(
-								group.RefractiveIndex.x,
-								group.RefractiveIndex.y));
+							material = MaterialData.Dielectric(
+								rng.NextFloat(group.RefractiveIndex.x, group.RefractiveIndex.y),
+								TextureData.Constant(1), TextureData.Constant(0));
 						}
 						else if (randomValue < probabilities.light)
 						{
