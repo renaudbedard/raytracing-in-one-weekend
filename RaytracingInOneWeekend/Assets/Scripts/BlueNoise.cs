@@ -16,7 +16,7 @@ namespace RaytracerInOneWeekend
 	class BlueNoise
 	{
 		[LabelText("Textures")] [AssetsOnly]
-		public Texture2D[] NoiseTextures;
+		public Texture2D[] NoiseTextures = null;
 
 		int textureIndex;
 

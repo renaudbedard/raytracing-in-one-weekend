@@ -117,15 +117,17 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_RECURSIVE
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
+		public static unsafe bool Hit(this BvhNode n, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
+			ref RandomSource rng,
 #if FULL_DIAGNOSTICS
-			ref AccumulateJob.Diagnostics diagnostics,
+			ref Diagnostics diagnostics,
 #endif
 			out HitRecord rec)
 		{
 			rec = default;
+			float3 rayInvDirection = rcp(r.Direction);
 
-			if (!n.Bounds.Hit(r, tMin, tMax))
+			if (!n.Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 				return false;
 
 #if FULL_DIAGNOSTICS
@@ -137,11 +139,16 @@ namespace RaytracerInOneWeekend
 #if FULL_DIAGNOSTICS
 				diagnostics.CandidateCount++;
 #endif
-				return n.Content.Hit(r, tMin, tMax, out rec);
+				return entities[n.EntityId].Hit(r, tMin, tMax, ref rng, out rec);
 			}
 
-			bool hitLeft = n.Left->Hit(r, tMin, tMax, out HitRecord leftRecord);
-			bool hitRight = n.Right->Hit(r, tMin, tMax, out HitRecord rightRecord);
+#if FULL_DIAGNOSTICS
+			bool hitLeft = n.Left->Hit(entities, r, tMin, tMax, ref rng, ref diagnostics, out HitRecord leftRecord);
+			bool hitRight = n.Right->Hit(entities, r, tMin, tMax, ref rng, ref diagnostics, out HitRecord rightRecord);
+#else
+			bool hitLeft = n.Left->Hit(entities, r, tMin, tMax, ref rng, out HitRecord leftRecord);
+			bool hitRight = n.Right->Hit(entities, r, tMin, tMax, ref rng, out HitRecord rightRecord);
+#endif
 
 			if (!hitLeft && !hitRight)
 				return false;
@@ -163,19 +170,19 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
-		public static unsafe bool Hit(this BvhNode n, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
-			ref RandomSource rng, AccumulateJob.WorkingArea wa,
+		public static unsafe bool Hit(this BvhNode node, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
+			ref RandomSource rng, AccumulateJob.WorkingArea workingArea,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
 			out HitRecord rec)
 		{
 			int candidateCount = 0, nodeStackHeight = 1;
-			BvhNode** nodeStackTail = wa.Nodes;
-			Entity* candidateListTail = wa.Entities - 1, candidateListHead = wa.Entities;
+			BvhNode** nodeStackTail = workingArea.Nodes;
+			Entity* candidateListTail = workingArea.Entities - 1, candidateListHead = workingArea.Entities;
 			float3 rayInvDirection = rcp(r.Direction);
 
-			*nodeStackTail = &n;
+			*nodeStackTail = &node;
 
 			while (nodeStackHeight > 0)
 			{
@@ -184,9 +191,7 @@ namespace RaytracerInOneWeekend
 
 				if (!nodePtr->Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 					continue;
-#if FULL_DIAGNOSTICS
-				diagnostics.BoundsHitCount++;
-#endif
+
 				if (nodePtr->IsLeaf)
 				{
 					*++candidateListTail = entities[nodePtr->EntityId];
@@ -199,9 +204,7 @@ namespace RaytracerInOneWeekend
 					nodeStackHeight += 2;
 				}
 			}
-#if FULL_DIAGNOSTICS
-			diagnostics.CandidateCount = candidateCount;
-#endif
+
 			if (candidateCount == 0)
 			{
 				rec = default;

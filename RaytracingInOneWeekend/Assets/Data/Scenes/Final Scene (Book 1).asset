@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cameraPosition: {x: 12.3, y: 1.98, z: -2.99}
   cameraTarget: {x: 11.342338, y: 1.8494737, z: -2.7333953}
-  cameraAperture: 0.05
+  cameraAperture: 0
   cameraFieldOfView: 20
   entities:
   - name: 

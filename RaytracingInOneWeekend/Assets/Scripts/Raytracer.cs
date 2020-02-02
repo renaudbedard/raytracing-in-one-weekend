@@ -40,9 +40,10 @@ namespace RaytracerInOneWeekend
 	{
 		[Title("References")]
 		[SerializeField] UnityEngine.Camera targetCamera = null;
-		[SerializeField] BlueNoise blueNoise;
+		[SerializeField] BlueNoise blueNoise = null;
 
-		[Title("Settings")] [SerializeField] [Range(1, 100)]
+		[Title("Settings")]
+		[SerializeField] [Range(1, 100)]
 		int interlacing = 2;
 
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
@@ -60,10 +61,12 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
 #endif
 
-		[Title("World")] [InlineEditor(DrawHeader = false)] [SerializeField]
+		[Title("World")]
+		[InlineEditor(DrawHeader = false)] [SerializeField]
 		internal SceneData scene = null;
 
-		[Title("Debug")] [SerializeField] Shader viewRangeShader = null;
+		[Title("Debug")]
+		[SerializeField] [DisableInPlayMode] Shader viewRangeShader = null;
 		[OdinReadOnly] public float AccumulatedSamples;
 
 		[UsedImplicitly] [OdinReadOnly] public float MillionRaysPerSecond,
@@ -195,12 +198,12 @@ namespace RaytracerInOneWeekend
 		{
 			Front,
 			RayCount,
-			Normals,
-			Albedo,
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS && BVH
 			BvhHitCount,
-			CandidateCount
+			CandidateCount,
 #endif
+			Normals,
+			Albedo
 		}
 
 #if !UNITY_EDITOR
@@ -216,7 +219,7 @@ namespace RaytracerInOneWeekend
 			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
 			normalsTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
 			albedoTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS && BVH
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RGBAFloat, false) { hideFlags = flags };
 #else
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
@@ -926,7 +929,7 @@ namespace RaytracerInOneWeekend
 
 					break;
 
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS && BVH
 				case BufferView.BvhHitCount:
 					for (int i = 0; i < diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
 					{
@@ -1196,12 +1199,20 @@ namespace RaytracerInOneWeekend
 				blueNoise.GetRuntimeData(frameSeed).GetPerPixelData((uint2) bufferSize / 2));
 
 #if BVH_RECURSIVE
-			return World->Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
+			unsafe
+			{
+#if FULL_DIAGNOSTICS
+				Diagnostics _ = default;
+				return BvhRoot->Hit(entityBuffer, r, 0, float.PositiveInfinity, ref rng, ref _, out hitRec);
+#else
+				return BvhRoot->Hit(entityBuffer, r, 0, float.PositiveInfinity, ref rng, out hitRec);
+#endif // FULL_DIAGNOSTICS
+			}
 #else
 			return World.Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
-#endif
+#endif // BVH_RECURSIVE
 		}
-#endif
+#endif // BVH_ITERATIVE
 
 		void CollectActiveEntities()
 		{

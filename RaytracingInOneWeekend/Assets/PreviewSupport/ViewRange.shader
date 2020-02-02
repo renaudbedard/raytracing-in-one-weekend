@@ -19,7 +19,7 @@ Shader "Hidden/ViewRange"
             #include "UnityCG.cginc"
 
             uniform int _Channel;
-            uniform float2 _Minimum_Range;
+            uniform float4 _Minimum_Range;
             uniform int _NormalDisplay;
 
             struct appdata

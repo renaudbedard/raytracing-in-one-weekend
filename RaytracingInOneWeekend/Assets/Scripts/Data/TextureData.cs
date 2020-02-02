@@ -54,6 +54,16 @@ namespace RaytracerInOneWeekend
 			return new TextureData { type = TextureType.Constant, mainColor = color.ToColor() };
 		}
 
+		public static TextureData Texture(Texture2D image, float3 tint)
+		{
+			return new TextureData { type = TextureType.Image, image = image, mainColor = tint.ToColor() };
+		}
+
+		public static TextureData Perlin(float noiseFrequency, float3 tint)
+		{
+			return new TextureData { type = TextureType.PerlinNoise, noiseFrequency = noiseFrequency, mainColor = tint.ToColor() };
+		}
+
 		public static TextureData CheckerPattern(float3 oddColor, float3 evenColor)
 		{
 			return new TextureData

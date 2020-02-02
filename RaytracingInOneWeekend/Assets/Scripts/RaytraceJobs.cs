@@ -15,7 +15,7 @@ namespace RaytracerInOneWeekend
 {
 	struct Diagnostics
 	{
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS && BVH
 		public float RayCount;
 		public float BoundsHitCount;
 		public float CandidateCount;
@@ -200,7 +200,7 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 					workingArea,
 #endif
-#if FULL_DIAGNOSTICS && BVH_ITERATIVE
+#if FULL_DIAGNOSTICS && BVH
 					ref diagnostics,
 #endif
 					out HitRecord rec);
