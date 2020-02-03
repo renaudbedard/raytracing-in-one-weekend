@@ -695,8 +695,7 @@ namespace RaytracerInOneWeekend
 				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
-			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
-				albedoInputBuffer = albedoAccumulationBuffer;
+			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer, albedoInputBuffer = albedoAccumulationBuffer;
 
 			scheduledAccumulateJobs.Enqueue(new ScheduledJobData<AccumulateOutputData>
 			{
@@ -755,36 +754,29 @@ namespace RaytracerInOneWeekend
 
 			var copyOutputData = new PassOutputData
 			{
-				Color = float3Buffers.Take(),
-				// reuse what we can!
-				Normal = accumulateOutput.Normal,
-				Albedo = accumulateOutput.Albedo
+				Color = combineJob.OutputColor,
+				Normal = combineJob.OutputNormal,
+				Albedo = combineJob.OutputAlbedo
 			};
-
-			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = combineJob.OutputColor, Output = copyOutputData.Color }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = combineJob.OutputNormal, Output = copyOutputData.Normal }.Schedule(combineJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = combineJob.OutputAlbedo, Output = copyOutputData.Albedo }.Schedule(combineJobHandle));
 
 			scheduledCombineJobs.Enqueue(new ScheduledJobData<PassOutputData>
 			{
 				CancellationToken = cancellationBuffer,
-				Handle = combinedDependency,
+				Handle = combineJobHandle,
 				OutputData = copyOutputData,
 				OnComplete = () =>
 				{
 					float4Buffers.Return(accumulateOutput.Color);
-					float3Buffers.Return(combineJob.OutputColor);
-					float3Buffers.Return(combineJob.OutputNormal);
-					float3Buffers.Return(combineJob.OutputAlbedo);
+					float3Buffers.Return(accumulateOutput.Normal);
+					float3Buffers.Return(accumulateOutput.Albedo);
 					boolBuffers.Return(cancellationBuffer);
 				}
 			});
 
 			if (denoiseMode != DenoiseMode.None)
-				ScheduleDenoise(combinedDependency, copyOutputData);
+				ScheduleDenoise(combineJobHandle, copyOutputData);
 			else
-				ScheduleFinalize(combinedDependency, copyOutputData);
+				ScheduleFinalize(combineJobHandle, copyOutputData);
 		}
 
 		void ScheduleDenoise(JobHandle dependency, PassOutputData combineOutput)
@@ -842,27 +834,20 @@ namespace RaytracerInOneWeekend
 
 			var copyOutputData = new PassOutputData
 			{
-				Color = combineOutput.Color,
+				Color = denoiseColorOutputBuffer,
 				Normal = combineOutput.Normal,
 				Albedo = combineOutput.Albedo
 			};
 
-			JobHandle copyJobHandle = new CopyFloat3BufferJob
-				{ CancellationToken = cancellationBuffer, Input = denoiseColorOutputBuffer, Output = copyOutputData.Color }.Schedule(denoiseJobHandle);
-
 			scheduledDenoiseJobs.Enqueue(new ScheduledJobData<PassOutputData>
 			{
 				CancellationToken = cancellationBuffer,
-				Handle = copyJobHandle,
+				Handle = denoiseJobHandle,
 				OutputData = copyOutputData,
-				OnComplete = () =>
-				{
-					float3Buffers.Return(denoiseColorOutputBuffer);
-					boolBuffers.Return(cancellationBuffer);
-				}
+				OnComplete = () => boolBuffers.Return(cancellationBuffer)
 			});
 
-			ScheduleFinalize(copyJobHandle, copyOutputData);
+			ScheduleFinalize(denoiseJobHandle, copyOutputData);
 		}
 
 		void ScheduleFinalize(JobHandle dependency, PassOutputData lastPassOutput)
