@@ -69,8 +69,8 @@ namespace RaytracerInOneWeekend
 				}
 
 				case TextureType.PerlinNoise:
-					return 0.5f * (1 + sin(NoiseFrequency * position.x +
-					                       5 * perlinNoise.Turbulence(NoiseFrequency * position))) *
+					return 0.5f * (1 + sin(NoiseFrequency * position.z +
+					                       10 * perlinNoise.Turbulence(position))) *
 					       MainColor;
 
 				case TextureType.Image:

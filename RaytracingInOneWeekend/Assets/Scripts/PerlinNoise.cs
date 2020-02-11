@@ -3,6 +3,8 @@ using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.Assertions;
 using Random = Unity.Mathematics.Random;
 using static Unity.Mathematics.math;
 
@@ -10,7 +12,7 @@ namespace RaytracerInOneWeekend
 {
 	class PerlinNoise : IDisposable
 	{
-		const int BufferSize = 256;
+		const int BufferSize = 256; // must be a square
 
 		NativeArray<int> xPermBuffer, yPermBuffer, zPermBuffer;
 		NativeArray<float3> randomVectorBuffer;
@@ -40,8 +42,25 @@ namespace RaytracerInOneWeekend
 			GeneratePermutationBuffer(ref zPermBuffer);
 
 			randomVectorBuffer.EnsureCapacity(BufferSize);
-			for (int i = 0; i < BufferSize; i++)
-				randomVectorBuffer[i] = rng.NextFloat3Direction();
+
+			int sqrtBufferSize = (int) sqrt(BufferSize);
+
+			// uniform normalized vectors on a sphere
+			// adapted from https://medium.com/@all2one/generating-uniformly-distributed-points-on-sphere-1f7125978c4c#db7c
+			int index = 0;
+			for (int i = 0; i < sqrtBufferSize; i++)
+			{
+				float z = (i + 0.5f) / sqrtBufferSize * 2 - 1;
+
+				for (int j = 0; j < sqrtBufferSize; j++)
+				{
+					float t = (float) j / sqrtBufferSize * 2 * PI;
+					float r = sqrt(1 - z * z);
+					sincos(t, out float sinT, out float cosT);
+
+					randomVectorBuffer[index++] = float3(r * cosT, r * sinT, z);
+				}
+			}
 		}
 
 		public void Dispose()

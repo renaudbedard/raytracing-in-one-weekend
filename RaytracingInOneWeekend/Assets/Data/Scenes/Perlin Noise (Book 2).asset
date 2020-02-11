@@ -17,10 +17,14 @@ MonoBehaviour:
   cameraAperture: 0
   cameraFieldOfView: 20
   entities:
-  - type: 1
+  - name: 
+    type: 1
     enabled: 1
     position: {x: 0, y: -1000, z: 0}
     rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 1000
       excludeFromOverlapTest: 0
@@ -29,10 +33,14 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
-  - type: 1
+  - name: 
+    type: 1
     enabled: 1
     position: {x: 0, y: 2, z: 0}
     rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
     sphereData:
       radius: 2
       excludeFromOverlapTest: 0
@@ -41,7 +49,9 @@ MonoBehaviour:
     boxData:
       size: {x: 0, y: 0, z: 0}
     material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
-  randomSeed: 10000
-  randomSphereGroups: []
+  randomSeed: 5710
+  randomEntityGroups: []
+  skyType: 0
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
+  skyCubemap: {fileID: 0}
