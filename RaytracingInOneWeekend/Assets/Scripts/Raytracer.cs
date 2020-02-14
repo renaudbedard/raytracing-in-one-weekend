@@ -844,7 +844,11 @@ namespace RaytracerInOneWeekend
 				CancellationToken = cancellationBuffer,
 				Handle = denoiseJobHandle,
 				OutputData = copyOutputData,
-				OnComplete = () => boolBuffers.Return(cancellationBuffer)
+				OnComplete = () =>
+				{
+					float3Buffers.Return(combineOutput.Color);
+					boolBuffers.Return(cancellationBuffer);
+				}
 			});
 
 			ScheduleFinalize(denoiseJobHandle, copyOutputData);
