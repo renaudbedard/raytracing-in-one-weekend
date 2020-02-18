@@ -227,7 +227,7 @@ namespace RaytracerInOneWeekend
 					{
 						if (material.IsPerfectSpecular)
 						{
-							// TODO: fresnel for dielectric, first diffuse bounce for metallic
+							// TODO: fresnel mix for dielectric, first diffuse bounce for metallic
 						}
 						else
 						{
@@ -325,7 +325,7 @@ namespace RaytracerInOneWeekend
 		static readonly float3 NaNColor = new float3(0, 1, 1);
 
 		public bool DebugMode;
-		public bool LdrMode;
+		public bool LdrAlbedo;
 
 		[ReadOnly] public NativeArray<bool> CancellationToken;
 
@@ -374,11 +374,8 @@ namespace RaytracerInOneWeekend
 
 			float3 finalAlbedo = InputAlbedo[index] / max(realSampleCount, 1);
 
-			if (LdrMode)
-			{
-				finalColor = min(finalColor, 1);
+			if (LdrAlbedo)
 				finalAlbedo = min(finalAlbedo, 1);
-			}
 
 			OutputColor[index] = finalColor;
 			OutputNormal[index] = normalizesafe(InputNormal[index] / max(realSampleCount, 1));
@@ -468,7 +465,8 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	// Disabled because it current won't compile using Burst (I swear it used to work)
+	// [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct OptixDenoiseJob : IJob
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;

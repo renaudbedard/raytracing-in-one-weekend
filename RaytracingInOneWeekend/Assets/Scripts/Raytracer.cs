@@ -317,7 +317,7 @@ namespace RaytracerInOneWeekend
 				OptixDenoiser.Create(optixDeviceContext, &denoiseOptions, ref optixDenoiser);
 			}
 
-			OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Ldr, IntPtr.Zero, 0);
+			OptixDenoiser.SetModel(optixDenoiser, OptixModelKind.Hdr, IntPtr.Zero, 0);
 
 			if ((cudaError = CudaStream.Create(ref cudaStream)) != CudaError.Success)
 				Debug.LogError($"CUDA Stream creation failed : {cudaError}");
@@ -737,7 +737,7 @@ namespace RaytracerInOneWeekend
 				CancellationToken = cancellationBuffer,
 
 				DebugMode = denoiseMode == DenoiseMode.None,
-				LdrMode = denoiseMode == DenoiseMode.NvidiaOptix,
+				LdrAlbedo = denoiseMode == DenoiseMode.NvidiaOptix,
 
 				InputColor = accumulateOutput.Color,
 				InputNormal = accumulateOutput.Normal,
