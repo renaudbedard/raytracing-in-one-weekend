@@ -63,6 +63,14 @@ namespace RaytracerInOneWeekend
 
 		MeshFilter previewSphere, previewRect, previewBox;
 
+		private readonly Pool<Mesh> triangleMeshes = new Pool<Mesh>(() =>
+		{
+			var m = new Mesh { subMeshCount = 1 };
+			m.SetVertices(new Vector3[3]);
+			m.SetIndices(new [] { 0, 1, 2 }, MeshTopology.Triangles, 0);
+			return m;
+		});
+
 		[SerializeField] [HideInInspector]
 		List<UnityEngine.Material> previewMaterials = new List<UnityEngine.Material>();
 
@@ -214,6 +222,8 @@ namespace RaytracerInOneWeekend
 			opaquePreviewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 			transparentPreviewCommandBuffer.EnableShaderKeyword("LIGHTPROBE_SH");
 
+			triangleMeshes.ReturnAll();
+
 			foreach (EntityData entity in ActiveEntities)
 			{
 				if (!entity.Material) continue;
@@ -271,6 +281,16 @@ namespace RaytracerInOneWeekend
 						BoxData b = entity.BoxData;
 						previewCommandBuffer.DrawMesh(previewBox.sharedMesh,
 							Matrix4x4.TRS(entity.Position, entity.Rotation, b.Size), material, 0,
+							material.FindPass("FORWARD"));
+						break;
+
+					case EntityType.Triangle:
+						TriangleData t = entity.TriangleData;
+						var triMesh = triangleMeshes.Take();
+						triMesh.SetVertices(new [] { t.A, t.B, t.C });
+						triMesh.UploadMeshData(true);
+						previewCommandBuffer.DrawMesh(triMesh,
+							Matrix4x4.TRS(entity.Position, entity.Rotation, Vector3.one), material, 0,
 							material.FindPass("FORWARD"));
 						break;
 				}

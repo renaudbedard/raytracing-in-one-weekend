@@ -9,7 +9,7 @@ using OdinMock;
 
 namespace RaytracerInOneWeekend
 {
-	[RequireComponent(typeof(Camera))]
+	[RequireComponent(typeof(UnityEngine.Camera))]
 	class CameraControl : MonoBehaviour
 	{
 		[ReadOnly] [SerializeField] new UnityEngine.Camera camera = null;

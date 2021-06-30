@@ -1235,6 +1235,8 @@ namespace RaytracerInOneWeekend
 
 		void CollectActiveEntities()
 		{
+			int lastEntityCount = ActiveEntities.Count;
+
 			ActiveEntities.Clear();
 
 			if (!scene) return;
@@ -1405,7 +1407,8 @@ namespace RaytracerInOneWeekend
 				}
 			}
 
-			Debug.Log($"Collected {ActiveEntities.Count} active entities");
+			if (lastEntityCount != ActiveEntities.Count)
+				Debug.Log($"Collected {ActiveEntities.Count} active entities");
 		}
 	}
 }

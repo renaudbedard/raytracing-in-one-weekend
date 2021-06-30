@@ -4,11 +4,10 @@ using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using Random = Unity.Mathematics.Random;
 
 namespace RaytracerInOneWeekend
 {
-	unsafe struct Entity
+	readonly unsafe struct Entity
 	{
 		public readonly int Id;
 		public readonly EntityType Type;
@@ -171,7 +170,7 @@ namespace RaytracerInOneWeekend
 				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, t), 0.0f, 1.0f));
 	}
 
-	struct EntityIdComparer : IComparer<Entity>
+	readonly struct EntityIdComparer : IComparer<Entity>
 	{
 		public int Compare(Entity x, Entity y) => x.Id.CompareTo(y.Id);
 	}
