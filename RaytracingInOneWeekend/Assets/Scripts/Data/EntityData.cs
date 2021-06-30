@@ -44,6 +44,9 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(type), EntityType.Box)]
 		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] BoxData boxData;
 
+		[ShowIf(nameof(type), EntityType.Triangle)]
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] TriangleData triangleData;
+
 		[SerializeField]
 #if UNITY_EDITOR
 		[AssetList] [FoldoutGroup("$MaterialTitle")]
@@ -106,6 +109,7 @@ namespace RaytracerInOneWeekend
 					case EntityType.Sphere: return sphereData.Radius * 2 * Vector3.one;
 					case EntityType.Rect: return rectData.Size;
 					case EntityType.Box: return boxData.Size;
+					case EntityType.Triangle: throw new NotSupportedException();
 				}
 				return default;
 			}
@@ -145,6 +149,12 @@ namespace RaytracerInOneWeekend
 		{
 			get => boxData;
 			set => boxData = value;
+		}
+
+		public TriangleData TriangleData
+		{
+			get => triangleData;
+			set => triangleData = value;
 		}
 
 #if UNITY_EDITOR

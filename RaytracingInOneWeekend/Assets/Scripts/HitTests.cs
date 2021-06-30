@@ -97,6 +97,39 @@ namespace RaytracerInOneWeekend
 			return true;
 		}
 
+		public static bool Hit(this Triangle tri, Ray r, float tMin, float tMax, out float distance, out float3 normal)
+		{
+			// from "Fast, Minimum Storage Ray/Triangle Intersection" (Möller & Trumbore)
+			// https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
+			distance = 0;
+			normal = 0;
+
+			float3 ab = tri.B - tri.A;
+			float3 ac = tri.C - tri.A;
+			float3 pvec = cross(r.Direction, ac);
+			float det = dot(ab, pvec);
+
+			// if the determinant is negative the triangle is backfacing
+			// if the determinant is close to 0, the ray misses the triangle
+			if (det < 0) return false;
+
+			float invDet = 1 / det;
+
+			float3 tvec = r.Origin - tri.A;
+			float u = dot(tvec, pvec) * invDet;
+			if (u < 0 || u > 1) return false;
+
+			float3 qvec = cross(tvec, ab);
+			float v = dot(r.Direction, qvec) * invDet;
+			if (v < 0 || u + v > 1) return false;
+
+			distance = dot(ac, qvec) * invDet;
+			if (distance < tMin || distance > tMax) return false;
+
+			normal = cross(ab, ac); // TODO: order?
+			return true;
+		}
+
 #if BASIC
 		// iterative entity array hit test
 		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)

@@ -1,3 +1,4 @@
+#if ENABLE_OPTIX
 using System;
 using System.Runtime.InteropServices;
 using Unity.Collections.LowLevel.Unsafe;
@@ -249,3 +250,4 @@ namespace OptiX
 		}
 	}
 }
+#endif

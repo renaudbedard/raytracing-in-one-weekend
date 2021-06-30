@@ -4,7 +4,7 @@ using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-	struct AxisAlignedBoundingBox
+	readonly struct AxisAlignedBoundingBox
 	{
 		public readonly float3 Min, Max;
 

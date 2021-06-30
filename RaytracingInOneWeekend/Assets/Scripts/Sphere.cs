@@ -3,7 +3,7 @@ using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
 {
-	struct Sphere
+	readonly struct Sphere
 	{
 		public readonly float SquaredRadius, Radius;
 

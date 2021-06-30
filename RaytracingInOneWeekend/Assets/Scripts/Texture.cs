@@ -18,7 +18,7 @@ namespace RaytracerInOneWeekend
 		ConstantScalar
 	}
 
-	unsafe struct Texture
+	readonly unsafe struct Texture
 	{
 		public readonly TextureType Type;
 		public readonly float3 MainColor;
@@ -92,7 +92,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	unsafe struct Cubemap
+	readonly unsafe struct Cubemap
 	{
 		public readonly int2 FaceSize;
 		public readonly ChannelType ChannelType;

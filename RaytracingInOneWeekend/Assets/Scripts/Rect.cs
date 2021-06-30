@@ -4,7 +4,7 @@ using static Unity.Mathematics.math;
 namespace RaytracerInOneWeekend
 {
 	// An axis-aligned rectangle in the XY plane
-	struct Rect
+	readonly struct Rect
 	{
 		public readonly float2 From, To;
 
@@ -14,7 +14,7 @@ namespace RaytracerInOneWeekend
 			To = size / 2;
 		}
 
-		public float Area
+		float Area
 		{
 			get
 			{

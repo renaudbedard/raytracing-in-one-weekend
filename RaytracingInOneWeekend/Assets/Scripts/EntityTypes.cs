@@ -5,6 +5,7 @@ namespace RaytracerInOneWeekend
 		None,
 		Sphere,
 		Rect,
-		Box
+		Box,
+		Triangle
 	}
 }

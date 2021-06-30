@@ -179,7 +179,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	struct EntityBoundsComparer : IComparer<Entity>
+	readonly struct EntityBoundsComparer : IComparer<Entity>
 	{
 		readonly PartitionAxis axis;
 

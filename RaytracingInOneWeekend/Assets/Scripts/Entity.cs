@@ -41,16 +41,15 @@ namespace RaytracerInOneWeekend
 				case EntityType.Sphere: Bounds = ((Sphere*) content)->Bounds; break;
 				case EntityType.Rect: Bounds = ((Rect*) content)->Bounds; break;
 				case EntityType.Box: Bounds = ((Box*) content)->Bounds; break;
+				case EntityType.Triangle: Bounds = ((Triangle*) content)->Bounds; break;
 				default: throw new InvalidOperationException($"Unknown entity type : {Type}");
 			}
 
 			float3[] corners = Bounds.Corners;
 
 			float3 destinationPosition = OriginTransform.pos + DestinationOffset;
-			var minTransform =
-				new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
-			var maxTransform =
-				new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
+			var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
+			var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
 
 			var minimum = new float3(float.PositiveInfinity);
 			var maximum = new float3(float.NegativeInfinity);
@@ -124,6 +123,7 @@ namespace RaytracerInOneWeekend
 				case EntityType.Sphere: return ((Sphere*) content)->Hit(r, tMin, tMax, out distance, out normal);
 				case EntityType.Rect: return ((Rect*) content)->Hit(r, tMin, tMax, out distance, out normal);
 				case EntityType.Box: return ((Box*) content)->Hit(r, tMin, tMax, out distance, out normal);
+				case EntityType.Triangle: return ((Triangle*) content)->Hit(r, tMin, tMax, out distance, out normal);
 
 				default:
 					distance = 0;

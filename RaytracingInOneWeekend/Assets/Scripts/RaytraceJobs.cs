@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using OpenImageDenoise;
-using OptiX;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -11,6 +10,10 @@ using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
+
+#if ENABLE_OPTIX
+using OptiX;
+#endif
 
 namespace RaytracerInOneWeekend
 {
@@ -466,6 +469,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
+#if ENABLE_OPTIX
 	// Disabled because it current won't compile using Burst (I swear it used to work)
 	// [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct OptixDenoiseJob : IJob
@@ -544,6 +548,7 @@ namespace RaytracerInOneWeekend
 				OutputColor.Length * sizeof(float3), CudaMemcpyKind.DeviceToHost));
 		}
 	}
+#endif
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct FinalizeTexturesJob : IJobParallelFor

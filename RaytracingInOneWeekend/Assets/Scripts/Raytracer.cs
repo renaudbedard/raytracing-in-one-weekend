@@ -17,7 +17,10 @@ using float3 = Unity.Mathematics.float3;
 using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
+
+#if ENABLE_OPTIX
 using OptiX;
+#endif
 
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
@@ -107,6 +110,7 @@ namespace RaytracerInOneWeekend
 		NativeArray<Sphere> sphereBuffer;
 		NativeArray<Rect> rectBuffer;
 		NativeArray<Box> boxBuffer;
+		NativeArray<Triangle> triangleBuffer;
 		NativeArray<Entity> entityBuffer, importanceSamplingEntityBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
@@ -327,15 +331,7 @@ namespace RaytracerInOneWeekend
 #endif
 		}
 
-		[MonoPInvokeCallback(typeof(OidnErrorFunction))]
-		static void OnOidnError(IntPtr userPtr, OidnError code, string message)
-		{
-			if (string.IsNullOrWhiteSpace(message))
-				Debug.LogError(code);
-			else
-				Debug.LogError($"{code} : {message}");
-		}
-
+#if ENABLE_OPTIX
 		[MonoPInvokeCallback(typeof(OptixLogCallback))]
 		static void OnOptixError(OptixLogLevel level, string tag, string message, IntPtr cbdata)
 		{
@@ -355,6 +351,16 @@ namespace RaytracerInOneWeekend
 					break;
 			}
 		}
+#endif
+
+		[MonoPInvokeCallback(typeof(OidnErrorFunction))]
+		static void OnOidnError(IntPtr userPtr, OidnError code, string message)
+		{
+			if (string.IsNullOrWhiteSpace(message))
+				Debug.LogError(code);
+			else
+				Debug.LogError($"{code} : {message}");
+		}
 
 		void OnDestroy()
 		{
@@ -373,6 +379,7 @@ namespace RaytracerInOneWeekend
 			sphereBuffer.SafeDispose();
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
+			triangleBuffer.SafeDispose();
 
 			float3Buffers.ReturnAll();
 			float3Buffers.Capacity = 0;
@@ -1098,11 +1105,11 @@ namespace RaytracerInOneWeekend
 			sphereBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Sphere));
 			rectBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Rect));
 			boxBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Box));
+			triangleBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Triangle));
 
-			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x =>
-				x.Material.Type == MaterialType.DiffuseLight));
+			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
 
-			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, importanceSamplingIndex = 0;
+			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0, importanceSamplingIndex = 0;
 			foreach (EntityData e in ActiveEntities)
 			{
 				Vector2 sizeFactor = Vector2.one;
@@ -1127,6 +1134,13 @@ namespace RaytracerInOneWeekend
 						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
 						sizeFactor *= e.BoxData.Size;
 						contentPointer = (Box*) boxBuffer.GetUnsafePtr() + boxIndex++;
+						break;
+
+					case EntityType.Triangle:
+						triangleBuffer[triangleIndex] = new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
+						// TODO
+						//sizeFactor *= e.TriangleData.Size;
+						contentPointer = (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++;
 						break;
 				}
 
@@ -1317,6 +1331,9 @@ namespace RaytracerInOneWeekend
 								break;
 							case EntityType.Rect:
 								entityData.RectData = new RectData(radius.xy);
+								break;
+							case EntityType.Triangle:
+								// TODO
 								break;
 						}
 
