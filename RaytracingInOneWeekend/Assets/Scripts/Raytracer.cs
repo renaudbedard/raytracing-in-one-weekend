@@ -33,7 +33,9 @@ namespace RaytracerInOneWeekend
 	{
 		None,
 		OpenImageDenoise,
+#if ENABLE_OPTIX
 		NvidiaOptix
+#endif
 	}
 
 	partial class Raytracer : MonoBehaviour
@@ -124,6 +126,7 @@ namespace RaytracerInOneWeekend
 		OidnDevice oidnDevice;
 		OidnFilter oidnFilter;
 
+#if ENABLE_OPTIX
 		OptixDeviceContext optixDeviceContext;
 		OptixDenoiser optixDenoiser;
 		OptixDenoiserSizes optixDenoiserSizes;
@@ -134,6 +137,7 @@ namespace RaytracerInOneWeekend
 			optixColorBuffer = default,
 			optixAlbedoBuffer = default,
 			optixOutputBuffer = default;
+#endif
 
 		struct ScheduledJobData<T>
 		{
@@ -270,7 +274,6 @@ namespace RaytracerInOneWeekend
 		void InitDenoisers()
 		{
 			// Open Image Denoise
-
 			oidnDevice = OidnDevice.New(OidnDevice.Type.Default);
 			OidnDevice.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
 			OidnDevice.Commit(oidnDevice);
@@ -278,8 +281,8 @@ namespace RaytracerInOneWeekend
 			oidnFilter = OidnFilter.New(oidnDevice, "RT");
 			OidnFilter.Set(oidnFilter, "hdr", true);
 
-			// OptiX
-
+			// nVidia OptiX
+#if ENABLE_OPTIX
 			CudaError cudaError;
 			if ((cudaError = OptixApi.InitializeCuda()) != CudaError.Success)
 			{
@@ -321,6 +324,7 @@ namespace RaytracerInOneWeekend
 
 			if ((cudaError = CudaStream.Create(ref cudaStream)) != CudaError.Success)
 				Debug.LogError($"CUDA Stream creation failed : {cudaError}");
+#endif
 		}
 
 		[MonoPInvokeCallback(typeof(OidnErrorFunction))]
@@ -397,6 +401,7 @@ namespace RaytracerInOneWeekend
 			OidnFilter.Release(oidnFilter);
 			OidnDevice.Release(oidnDevice);
 
+#if ENABLE_OPTIX
 			OptixDenoiser.Destroy(optixDenoiser);
 			OptixDeviceContext.Destroy(optixDeviceContext);
 
@@ -413,6 +418,7 @@ namespace RaytracerInOneWeekend
 			Check(CudaBuffer.Deallocate(optixColorBuffer));
 			Check(CudaBuffer.Deallocate(optixAlbedoBuffer));
 			Check(CudaBuffer.Deallocate(optixOutputBuffer));
+#endif
 
 #if UNITY_EDITOR
 			if (scene.hideFlags == HideFlags.HideAndDontSave)
@@ -737,7 +743,11 @@ namespace RaytracerInOneWeekend
 				CancellationToken = cancellationBuffer,
 
 				DebugMode = denoiseMode == DenoiseMode.None,
+#if ENABLE_OPTIX
 				LdrAlbedo = denoiseMode == DenoiseMode.NvidiaOptix,
+#else
+				LdrAlbedo = false,
+#endif
 
 				InputColor = accumulateOutput.Color,
 				InputNormal = accumulateOutput.Normal,
@@ -809,6 +819,7 @@ namespace RaytracerInOneWeekend
 					break;
 				}
 
+#if ENABLE_OPTIX
 				case DenoiseMode.NvidiaOptix:
 				{
 					var denoiseJob = new OptixDenoiseJob
@@ -830,6 +841,7 @@ namespace RaytracerInOneWeekend
 					denoiseJobHandle = denoiseJob.Schedule(combinedDependency);
 					break;
 				}
+#endif
 			}
 
 			var copyOutputData = new PassOutputData
@@ -990,7 +1002,9 @@ namespace RaytracerInOneWeekend
 				colorAccumulationBuffer = default;
 				albedoAccumulationBuffer = normalAccumulationBuffer = default;
 
+#if ENABLE_OPTIX
 				RebuildOptixBuffers((uint2) lastBufferSize);
+#endif
 			}
 
 			if (frontBufferTexture.width != width || frontBufferTexture.height != height ||
@@ -1020,6 +1034,7 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
+#if ENABLE_OPTIX
 		unsafe void RebuildOptixBuffers(uint2 lastBufferSize)
 		{
 			var newBufferSize = (uint2) bufferSize;
@@ -1050,6 +1065,7 @@ namespace RaytracerInOneWeekend
 			OptixDenoiser.Setup(optixDenoiser, cudaStream, newBufferSize.x, newBufferSize.y, optixDenoiserState,
 				newSizes.StateSizeInBytes, optixScratchMemory, newSizes.RecommendedScratchSizeInBytes);
 		}
+#endif
 
 		void RebuildWorld()
 		{

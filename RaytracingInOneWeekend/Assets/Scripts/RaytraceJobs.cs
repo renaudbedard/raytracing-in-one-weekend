@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using OpenImageDenoise;
 using OptiX;
@@ -611,17 +612,12 @@ namespace RaytracerInOneWeekend
 
 	struct RecordTimeJob : IJob
 	{
-		[DllImport("Kernel32.dll", CallingConvention = CallingConvention.Winapi)]
-		static extern void GetSystemTimePreciseAsFileTime(out long filetime);
-
 		[ReadOnly] public int Index;
-
 		[WriteOnly] public NativeArray<long> Buffer;
 
 		public void Execute()
 		{
-			GetSystemTimePreciseAsFileTime(out long fileTime);
-			Buffer[Index] = fileTime;
+			Buffer[Index] = Stopwatch.GetTimestamp();
 		}
 	}
 }
