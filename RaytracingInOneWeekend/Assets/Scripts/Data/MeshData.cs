@@ -6,12 +6,12 @@ namespace RaytracerInOneWeekend
 	[Serializable]
 	class MeshData
 	{
-		[SerializeField] MeshFilter meshFilter;
+		[SerializeField] Mesh mesh;
 
-		public MeshFilter A
+		public Mesh Mesh
 		{
-			get => meshFilter;
-			set => meshFilter = value;
+			get => mesh;
+			set => mesh = value;
 		}
 	}
 }

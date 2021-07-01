@@ -1098,73 +1098,94 @@ namespace RaytracerInOneWeekend
 
 		unsafe void RebuildEntityBuffers()
 		{
-			int entityCount = ActiveEntities.Count;
+			var meshVertexList = new List<Vector3>();
+			var meshIndexList = new List<int>();
 
-			entityBuffer.EnsureCapacity(entityCount);
+			entityBuffer.EnsureCapacity(
+				ActiveEntities.Count(x => x.Type != EntityType.Mesh) +
+				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
 
 			sphereBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Sphere));
 			rectBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Rect));
 			boxBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Box));
-			triangleBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Triangle));
+			triangleBuffer.EnsureCapacity(
+				ActiveEntities.Count(x => x.Type == EntityType.Triangle) +
+				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
 
 			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
 
 			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0, importanceSamplingIndex = 0;
-			foreach (EntityData e in ActiveEntities)
+			void AddEntity(EntityData e, void* contentPointer, RigidTransform entityTransform, float2 entitySize, EntityType entityType)
 			{
-				Vector2 sizeFactor = Vector2.one;
-				void* contentPointer = null;
-				RigidTransform rigidTransform = new RigidTransform(e.Rotation, e.Position);
-
-				switch (e.Type)
-				{
-					case EntityType.Sphere:
-						sphereBuffer[sphereIndex] = new Sphere(e.SphereData.Radius);
-						sizeFactor *= e.SphereData.Radius;
-						contentPointer = (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++;
-						break;
-
-					case EntityType.Rect:
-						rectBuffer[rectIndex] = new Rect(e.RectData.Size);
-						sizeFactor *= e.RectData.Size;
-						contentPointer = (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++;
-						break;
-
-					case EntityType.Box:
-						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
-						sizeFactor *= e.BoxData.Size;
-						contentPointer = (Box*) boxBuffer.GetUnsafePtr() + boxIndex++;
-						break;
-
-					case EntityType.Triangle:
-						triangleBuffer[triangleIndex] = new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
-						// TODO
-						//sizeFactor *= e.TriangleData.Size;
-						contentPointer = (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++;
-						break;
-
-					case EntityType.Mesh:
-						// TODO
-						break;
-				}
-
 				MaterialData materialData = e.Material;
 
 				Material material = materialData
-					? new Material(materialData.Type, materialData.TextureScale * sizeFactor,
+					? new Material(materialData.Type, (float2) materialData.TextureScale * entitySize,
 						materialData.Albedo.GetRuntimeData(), materialData.Emission.GetRuntimeData(),
 						materialData.Roughness.GetRuntimeData(), materialData.RefractiveIndex, materialData.Density)
 					: default;
 
 				Entity entity = e.Moving
-					? new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material, e.DestinationOffset, e.TimeRange)
-					: new Entity(entityIndex, e.Type, contentPointer, rigidTransform, material);
+					? new Entity(entityIndex, entityType, contentPointer, entityTransform, material, e.DestinationOffset, e.TimeRange)
+					: new Entity(entityIndex, entityType, contentPointer, entityTransform, material);
 
 				entityBuffer[entityIndex++] = entity;
 
 				if (e.Material.Type == MaterialType.DiffuseLight)
 					importanceSamplingEntityBuffer[importanceSamplingIndex++] = entity;
 			}
+
+			foreach (EntityData e in ActiveEntities)
+			{
+				RigidTransform rigidTransform = new RigidTransform(e.Rotation, e.Position);
+				switch (e.Type)
+				{
+					case EntityType.Sphere:
+						sphereBuffer[sphereIndex] = new Sphere(e.SphereData.Radius);
+						AddEntity(e, (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++, rigidTransform,
+							e.SphereData.Radius, EntityType.Sphere);
+						break;
+
+					case EntityType.Rect:
+						rectBuffer[rectIndex] = new Rect(e.RectData.Size);
+						AddEntity(e, (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++, rigidTransform, e.RectData.Size,
+							EntityType.Rect);
+						break;
+
+					case EntityType.Box:
+						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
+						AddEntity(e, (Box*) boxBuffer.GetUnsafePtr() + boxIndex++, rigidTransform,
+							((float3) e.BoxData.Size).xy, EntityType.Box);
+						break;
+
+					case EntityType.Triangle:
+						triangleBuffer[triangleIndex] = new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
+						AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, rigidTransform, 1,
+							EntityType.Triangle);
+						break;
+
+					case EntityType.Mesh:
+						var mesh = e.MeshData.Mesh;
+						mesh.GetVertices(meshVertexList);
+						for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
+						{
+							mesh.GetIndices(meshIndexList, subMesh);
+							for (int i = 0; i < meshIndexList.Count; i += 3)
+							{
+								triangleBuffer[triangleIndex] = new Triangle(
+									meshVertexList[meshIndexList[i]],
+									meshVertexList[meshIndexList[i + 1]],
+									meshVertexList[meshIndexList[i + 2]]);
+
+								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++,
+									rigidTransform, 1, EntityType.Triangle);
+							}
+						}
+						break;
+				}
+			}
+
+			Debug.Log($"Rebuilt entity buffer of {entityBuffer.Length} entities");
 		}
 
 #if BVH

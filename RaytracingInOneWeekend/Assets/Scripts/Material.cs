@@ -16,7 +16,7 @@ namespace RaytracerInOneWeekend
 		ProbabilisticVolume
 	}
 
-	struct Material
+	readonly struct Material
 	{
 		public readonly MaterialType Type;
 		public readonly Texture Texture, Roughness;
