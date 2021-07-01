@@ -110,7 +110,7 @@ namespace RaytracerInOneWeekend
 
 			// if the determinant is negative the triangle is backfacing
 			// if the determinant is close to 0, the ray misses the triangle
-			if (det <= 0) return false;
+			if (det == 0) return false;
 
 			float invDet = 1 / det;
 

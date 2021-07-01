@@ -14,9 +14,77 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cameraPosition: {x: 0, y: 0, z: -2}
   cameraTarget: {x: 0, y: 0, z: 0}
-  cameraAperture: 0.1
-  cameraFieldOfView: 60
+  cameraAperture: 0.05
+  cameraFieldOfView: 75
   entities:
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 1, z: 0}
+      b: {x: -1, y: -1, z: 0}
+      c: {x: 1, y: -1, z: 0}
+    meshData:
+      mesh: {fileID: 6192547391499243942, guid: 36b025f0a48ae421b839c2ad31d0277e,
+        type: 3}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 1, z: 0}
+      b: {x: -1, y: -1, z: 0}
+      c: {x: 1, y: -1, z: 0}
+    meshData:
+      mesh: {fileID: -3111557506051347654, guid: 36b025f0a48ae421b839c2ad31d0277e,
+        type: 3}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 1, z: 0}
+      b: {x: -1, y: -1, z: 0}
+      c: {x: 1, y: -1, z: 0}
+    meshData:
+      mesh: {fileID: 883126711037108357, guid: 36b025f0a48ae421b839c2ad31d0277e, type: 3}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
   - name: 
     type: 5
     enabled: 1
@@ -39,10 +107,10 @@ MonoBehaviour:
     meshData:
       mesh: {fileID: 8022488761877085130, guid: 36b025f0a48ae421b839c2ad31d0277e,
         type: 3}
-    material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
   randomSeed: 1
   randomEntityGroups: []
-  skyType: 0
+  skyType: 1
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
-  skyCubemap: {fileID: 0}
+  skyCubemap: {fileID: 8900000, guid: 0814a04c54737d4439da427d24f76bfa, type: 3}
