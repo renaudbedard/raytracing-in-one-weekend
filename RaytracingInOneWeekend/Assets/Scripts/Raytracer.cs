@@ -1142,6 +1142,10 @@ namespace RaytracerInOneWeekend
 						//sizeFactor *= e.TriangleData.Size;
 						contentPointer = (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++;
 						break;
+
+					case EntityType.Mesh:
+						// TODO
+						break;
 				}
 
 				MaterialData materialData = e.Material;

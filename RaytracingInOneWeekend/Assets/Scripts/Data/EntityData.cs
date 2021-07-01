@@ -47,6 +47,9 @@ namespace RaytracerInOneWeekend
 		[ShowIf(nameof(type), EntityType.Triangle)]
 		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] TriangleData triangleData;
 
+		[ShowIf(nameof(type), EntityType.Mesh)]
+		[FoldoutGroup("$EntityTitle")] [SerializeField] [HideLabel] MeshData meshData;
+
 		[SerializeField]
 #if UNITY_EDITOR
 		[AssetList] [FoldoutGroup("$MaterialTitle")]
@@ -155,6 +158,12 @@ namespace RaytracerInOneWeekend
 		{
 			get => triangleData;
 			set => triangleData = value;
+		}
+
+		public MeshData MeshData
+		{
+			get => meshData;
+			set => meshData = value;
 		}
 
 #if UNITY_EDITOR
