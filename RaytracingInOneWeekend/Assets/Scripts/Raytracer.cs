@@ -1212,15 +1212,21 @@ namespace RaytracerInOneWeekend
 			bvhNodeBuffer.Clear();
 			bvhNodeMetadataBuffer.Clear();
 
-			var rootNode = new BvhNode(entityBuffer, bvhNodeBuffer, bvhNodeMetadataBuffer);
+			BvhNode rootNode;
+			using (new ScopedStopwatch("BvhNode creation"))
+				rootNode = new BvhNode(entityBuffer, bvhNodeBuffer, bvhNodeMetadataBuffer);
 			rootNode.Metadata->Id = bvhNodeBuffer.Length;
 			bvhNodeBuffer.AddNoResize(rootNode);
 
-			bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
-			BvhRoot->SetupPointers(bvhNodeBuffer);
+			using (new ScopedStopwatch("Node sorting"))
+				bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
+
+			using (new ScopedStopwatch("Setup pointers"))
+				BvhRoot->SetupPointers(bvhNodeBuffer);
 
 			// re-sort the entity buffer so it can be indexed
-			entityBuffer.Sort(new EntityIdComparer());
+			using (new ScopedStopwatch("Sort entities by ID"))
+				entityBuffer.Sort(new EntityIdComparer());
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
