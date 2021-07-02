@@ -130,25 +130,6 @@ namespace RaytracerInOneWeekend
 			}
 		}
 
-		public void SetupPointers(NativeList<BvhNode> nodes)
-		{
-			if (IsLeaf) return;
-
-			Left = Right = null;
-
-			for (int i = 0; i < nodes.Length; i++)
-			{
-				if (nodes[i].Metadata->Id == Metadata->LeftId) Left = (BvhNode*) nodes.GetUnsafePtr() + i;
-				if (nodes[i].Metadata->Id == Metadata->RightId) Right = (BvhNode*) nodes.GetUnsafePtr() + i;
-				if (Left != null && Right != null) break;
-			}
-
-			Assert.IsFalse(Left == null || Right == null, "Subnodes should not be null");
-
-			Left->SetupPointers(nodes);
-			Right->SetupPointers(nodes);
-		}
-
 		public IReadOnlyList<ValueTuple<AxisAlignedBoundingBox, int>> GetAllSubBounds(List<ValueTuple<AxisAlignedBoundingBox, int>> workingList = null)
 		{
 			if (workingList == null)
@@ -171,11 +152,19 @@ namespace RaytracerInOneWeekend
 		public int Id, LeftId, RightId, Depth, Order;
 	}
 
-	struct BvhNodeComparer : IComparer<BvhNode>
+	struct BvhNodeOrderComparer : IComparer<BvhNode>
 	{
 		public unsafe int Compare(BvhNode lhs, BvhNode rhs)
 		{
 			return lhs.Metadata->Order - rhs.Metadata->Order;
+		}
+	}
+
+	struct BvhNodeIdComparer : IComparer<BvhNode>
+	{
+		public unsafe int Compare(BvhNode lhs, BvhNode rhs)
+		{
+			return lhs.Metadata->Id - rhs.Metadata->Id;
 		}
 	}
 

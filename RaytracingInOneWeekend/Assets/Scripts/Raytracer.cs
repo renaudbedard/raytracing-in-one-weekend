@@ -1218,11 +1218,25 @@ namespace RaytracerInOneWeekend
 			rootNode.Metadata->Id = bvhNodeBuffer.Length;
 			bvhNodeBuffer.AddNoResize(rootNode);
 
-			using (new ScopedStopwatch("Node sorting"))
-				bvhNodeBuffer.AsArray().Sort(new BvhNodeComparer());
+			using (new ScopedStopwatch("Node sorting by Order"))
+				bvhNodeBuffer.AsArray().Sort(new BvhNodeOrderComparer());
 
 			using (new ScopedStopwatch("Setup pointers"))
-				BvhRoot->SetupPointers(bvhNodeBuffer);
+			{
+				var idToListIndex = new Dictionary<int, int>(bvhNodeBuffer.Length);
+				for (var i = 0; i < bvhNodeBuffer.Length; i++)
+					idToListIndex[bvhNodeBuffer[i].Metadata->Id] = i;
+
+				var bvhNodes = (BvhNode*) bvhNodeBuffer.GetUnsafePtr();
+				for (var i = 0; i < bvhNodeBuffer.Length; i++)
+				{
+					if (bvhNodes[i].IsLeaf)
+						continue;
+
+					bvhNodes[i].Left = bvhNodes + idToListIndex[bvhNodes[i].Metadata->LeftId];
+					bvhNodes[i].Right = bvhNodes + idToListIndex[bvhNodes[i].Metadata->RightId];
+				}
+			}
 
 			// re-sort the entity buffer so it can be indexed
 			using (new ScopedStopwatch("Sort entities by ID"))
