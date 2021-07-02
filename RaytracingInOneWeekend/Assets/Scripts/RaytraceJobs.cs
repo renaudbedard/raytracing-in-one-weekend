@@ -221,21 +221,21 @@ namespace RaytracerInOneWeekend
 					if (explicitSamplingTarget.HasValue && explicitSamplingTarget != rec.EntityId)
 						break;
 
-					Material material = Entities[rec.EntityId].Material;
-					float3 emission = material.Emit(rec.Point, rec.Normal, PerlinNoise);
+					Material* material = Entities[rec.EntityId].Material;
+					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
 
-					bool didScatter = material.Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
+					bool didScatter = material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
 					if (!firstNonSpecularHit)
 					{
-						if (material.IsPerfectSpecular)
+						if (material->IsPerfectSpecular)
 						{
 							// TODO: fresnel mix for dielectric, first diffuse bounce for metallic
 						}
 						else
 						{
-							sampleAlbedo = material.Type == MaterialType.DiffuseLight ? emission : albedo;
+							sampleAlbedo = material->Type == MaterialType.DiffuseLight ? emission : albedo;
 							sampleNormal = rec.Normal;
 							firstNonSpecularHit = true;
 						}
@@ -247,7 +247,7 @@ namespace RaytracerInOneWeekend
 						break;
 					}
 
-					if (ImportanceSampler.Mode == ImportanceSamplingMode.None || material.IsPerfectSpecular)
+					if (ImportanceSampler.Mode == ImportanceSamplingMode.None || material->IsPerfectSpecular)
 					{
 						*attenuationCursor++ = albedo;
 						ray = scatteredRay;
@@ -255,8 +255,7 @@ namespace RaytracerInOneWeekend
 					else
 					{
 						float3 outgoingLightDirection = -ray.Direction;
-						float scatterPdfValue =
-							material.Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
+						float scatterPdfValue = material->Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
 
 						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);

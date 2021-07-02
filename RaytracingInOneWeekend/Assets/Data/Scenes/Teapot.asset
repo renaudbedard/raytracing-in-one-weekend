@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
-  m_Name: Mesh Test
+  m_Name: Teapot
   m_EditorClassIdentifier: 
-  cameraPosition: {x: 0, y: 0, z: -2}
-  cameraTarget: {x: 0, y: 0, z: 0}
+  cameraPosition: {x: 4.8457766, y: 3.695496, z: -0.5769472}
+  cameraTarget: {x: 3.9791944, y: 3.2550316, z: -0.34237012}
   cameraAperture: 0.05
   cameraFieldOfView: 75
   entities:
@@ -39,7 +39,7 @@ MonoBehaviour:
     meshData:
       mesh: {fileID: 6192547391499243942, guid: 36b025f0a48ae421b839c2ad31d0277e,
         type: 3}
-    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+    material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
   - name: 
     type: 5
     enabled: 1
@@ -62,7 +62,7 @@ MonoBehaviour:
     meshData:
       mesh: {fileID: -3111557506051347654, guid: 36b025f0a48ae421b839c2ad31d0277e,
         type: 3}
-    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+    material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
   - name: 
     type: 5
     enabled: 1
@@ -84,7 +84,7 @@ MonoBehaviour:
       c: {x: 1, y: -1, z: 0}
     meshData:
       mesh: {fileID: 883126711037108357, guid: 36b025f0a48ae421b839c2ad31d0277e, type: 3}
-    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+    material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
   - name: 
     type: 5
     enabled: 1
@@ -107,10 +107,10 @@ MonoBehaviour:
     meshData:
       mesh: {fileID: 8022488761877085130, guid: 36b025f0a48ae421b839c2ad31d0277e,
         type: 3}
-    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+    material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
   randomSeed: 1
   randomEntityGroups: []
   skyType: 1
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
-  skyCubemap: {fileID: 8900000, guid: 0814a04c54737d4439da427d24f76bfa, type: 3}
+  skyCubemap: {fileID: 8900000, guid: 597c0052c00828740a2e88c7d6d3cb91, type: 3}

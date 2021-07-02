@@ -293,6 +293,13 @@ namespace RaytracerInOneWeekend
 							Matrix4x4.TRS(entity.Position, entity.Rotation, Vector3.one), material, 0,
 							material.FindPass("FORWARD"));
 						break;
+
+					case EntityType.Mesh:
+						MeshData m = entity.MeshData;
+						previewCommandBuffer.DrawMesh(m.Mesh,
+							Matrix4x4.TRS(entity.Position, entity.Rotation, Vector3.one), material, 0,
+							material.FindPass("FORWARD"));
+						break;
 				}
 			}
 		}
@@ -344,6 +351,12 @@ namespace RaytracerInOneWeekend
 					case EntityType.Box:
 						Gizmos.matrix = Matrix4x4.TRS(e.Position, e.Rotation, Vector3.one);
 						Gizmos.DrawCube(Vector3.zero, e.BoxData.Size);
+						Gizmos.matrix = Matrix4x4.identity;
+						break;
+
+					case EntityType.Mesh:
+						Gizmos.matrix = Matrix4x4.TRS(e.Position, e.Rotation, Vector3.one);
+						Gizmos.DrawMesh(e.MeshData.Mesh);
 						Gizmos.matrix = Matrix4x4.identity;
 						break;
 				}

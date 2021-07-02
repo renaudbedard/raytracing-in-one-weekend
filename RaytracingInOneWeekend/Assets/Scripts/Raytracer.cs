@@ -112,6 +112,7 @@ namespace RaytracerInOneWeekend
 		NativeArray<Box> boxBuffer;
 		NativeArray<Triangle> triangleBuffer;
 		NativeArray<Entity> entityBuffer, importanceSamplingEntityBuffer;
+		NativeArray<Material> materialBuffer;
 #if !BVH
 		NativeArray<Entity> World => entityBuffer;
 #endif
@@ -380,6 +381,7 @@ namespace RaytracerInOneWeekend
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
 			triangleBuffer.SafeDispose();
+			materialBuffer.SafeDispose();
 
 			float3Buffers.ReturnAll();
 			float3Buffers.Capacity = 0;
@@ -1100,6 +1102,7 @@ namespace RaytracerInOneWeekend
 		{
 			var meshVertexList = new List<Vector3>();
 			var meshIndexList = new List<int>();
+			var addedMaterials = new Dictionary<MaterialData, int>();
 
 			entityBuffer.EnsureCapacity(
 				ActiveEntities.Count(x => x.Type != EntityType.Mesh) +
@@ -1111,20 +1114,20 @@ namespace RaytracerInOneWeekend
 			triangleBuffer.EnsureCapacity(
 				ActiveEntities.Count(x => x.Type == EntityType.Triangle) +
 				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
+			materialBuffer.EnsureCapacity(ActiveEntities.Select(x => x.Material).Distinct().Count());
 
 			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
 
-			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0, importanceSamplingIndex = 0;
-			void AddEntity(EntityData e, void* contentPointer, RigidTransform entityTransform, float2 entitySize, EntityType entityType)
+			int entityIndex = 0,
+				sphereIndex = 0,
+				rectIndex = 0,
+				boxIndex = 0,
+				triangleIndex = 0,
+				importanceSamplingIndex = 0,
+				materialIndex = 0;
+
+			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform, EntityType entityType)
 			{
-				MaterialData materialData = e.Material;
-
-				Material material = materialData
-					? new Material(materialData.Type, (float2) materialData.TextureScale * entitySize,
-						materialData.Albedo.GetRuntimeData(), materialData.Emission.GetRuntimeData(),
-						materialData.Roughness.GetRuntimeData(), materialData.RefractiveIndex, materialData.Density)
-					: default;
-
 				Entity entity = e.Moving
 					? new Entity(entityIndex, entityType, contentPointer, entityTransform, material, e.DestinationOffset, e.TimeRange)
 					: new Entity(entityIndex, entityType, contentPointer, entityTransform, material);
@@ -1135,6 +1138,22 @@ namespace RaytracerInOneWeekend
 					importanceSamplingEntityBuffer[importanceSamplingIndex++] = entity;
 			}
 
+			Material* AddOrGetMaterial(MaterialData materialData, float2 entitySize)
+			{
+				if (addedMaterials.TryGetValue(materialData, out int i))
+					return (Material*) materialBuffer.GetUnsafeReadOnlyPtr() + i;
+
+				Material material = materialData
+					? new Material(materialData.Type, (float2) materialData.TextureScale * entitySize,
+						materialData.Albedo.GetRuntimeData(), materialData.Emission.GetRuntimeData(),
+						materialData.Roughness.GetRuntimeData(), materialData.RefractiveIndex, materialData.Density)
+					: default;
+
+				addedMaterials[materialData] = materialIndex;
+				materialBuffer[materialIndex++] = material;
+				return (Material*) materialBuffer.GetUnsafeReadOnlyPtr() + (materialIndex - 1);
+			}
+
 			foreach (EntityData e in ActiveEntities)
 			{
 				RigidTransform rigidTransform = new RigidTransform(e.Rotation, e.Position);
@@ -1142,30 +1161,27 @@ namespace RaytracerInOneWeekend
 				{
 					case EntityType.Sphere:
 						sphereBuffer[sphereIndex] = new Sphere(e.SphereData.Radius);
-						AddEntity(e, (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++, rigidTransform,
-							e.SphereData.Radius, EntityType.Sphere);
+						AddEntity(e, (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++, AddOrGetMaterial(e.Material, e.SphereData.Radius), rigidTransform, EntityType.Sphere);
 						break;
 
 					case EntityType.Rect:
 						rectBuffer[rectIndex] = new Rect(e.RectData.Size);
-						AddEntity(e, (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++, rigidTransform, e.RectData.Size,
-							EntityType.Rect);
+						AddEntity(e, (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++, AddOrGetMaterial(e.Material, e.RectData.Size), rigidTransform, EntityType.Rect);
 						break;
 
 					case EntityType.Box:
 						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
-						AddEntity(e, (Box*) boxBuffer.GetUnsafePtr() + boxIndex++, rigidTransform,
-							((float3) e.BoxData.Size).xy, EntityType.Box);
+						AddEntity(e, (Box*) boxBuffer.GetUnsafePtr() + boxIndex++, AddOrGetMaterial(e.Material, ((float3) e.BoxData.Size).xy), rigidTransform, EntityType.Box);
 						break;
 
 					case EntityType.Triangle:
 						triangleBuffer[triangleIndex] = new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
-						AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, rigidTransform, 1,
-							EntityType.Triangle);
+						AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, AddOrGetMaterial(e.Material, 1), rigidTransform, EntityType.Triangle);
 						break;
 
 					case EntityType.Mesh:
 						var mesh = e.MeshData.Mesh;
+						var material = AddOrGetMaterial(e.Material, 1);
 						mesh.GetVertices(meshVertexList);
 						for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
 						{
@@ -1177,8 +1193,7 @@ namespace RaytracerInOneWeekend
 									meshVertexList[meshIndexList[i + 1]],
 									meshVertexList[meshIndexList[i + 2]]);
 
-								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++,
-									rigidTransform, 1, EntityType.Triangle);
+								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, material, rigidTransform, EntityType.Triangle);
 							}
 						}
 						break;

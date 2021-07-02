@@ -14,7 +14,7 @@ namespace RaytracerInOneWeekend
 		public readonly RigidTransform OriginTransform;
 		public readonly float3 DestinationOffset;
 		public readonly float2 TimeRange;
-		public readonly Material Material;
+		public readonly Material* Material;
 #if BVH
 		// TODO: this is only used in the BVH generation step, and not at runtime
 		public readonly AxisAlignedBoundingBox Bounds;
@@ -22,7 +22,7 @@ namespace RaytracerInOneWeekend
 
 		[NativeDisableUnsafePtrRestriction] readonly void* content;
 
-		public Entity(int id, EntityType type, void* contentPointer, RigidTransform originTransform, Material material,
+		public Entity(int id, EntityType type, void* contentPointer, RigidTransform originTransform, Material* material,
 			float3 destinationOffset = default, float2 timeRange = default)
 		{
 			Id = id;
@@ -90,7 +90,7 @@ namespace RaytracerInOneWeekend
 			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
 				return false;
 
-			if (Material.Type == MaterialType.ProbabilisticVolume)
+			if (Material->Type == MaterialType.ProbabilisticVolume)
 			{
 				float entryDistance = distance;
 				if (!HitContent(entitySpaceRay, entryDistance + 0.001f, tMax, out float exitDistance, out _))
@@ -101,7 +101,7 @@ namespace RaytracerInOneWeekend
 				}
 
 				float distanceInsideBoundary = exitDistance - entryDistance;
-				float volumeHitDistance = -(1 / Material.Density) * log(rng.NextFloat());
+				float volumeHitDistance = -(1 / Material->Density) * log(rng.NextFloat());
 
 				if (volumeHitDistance < distanceInsideBoundary)
 				{
