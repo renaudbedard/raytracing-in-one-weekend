@@ -33,7 +33,7 @@ namespace RaytracerInOneWeekend
 			return -1;
 		}
 
-		private static readonly PartitionAxis[][] Permutations =
+		static readonly PartitionAxis[][] Permutations =
 		{
 			new PartitionAxis[0],
 			new [] { PartitionAxis.X },
@@ -50,14 +50,17 @@ namespace RaytracerInOneWeekend
 
 	unsafe struct BvhNode
 	{
+		public const int MaxDepth = 12;
+
 		public readonly AxisAlignedBoundingBox Bounds;
-		public readonly int EntityId;
+		public readonly Entity* EntitiesStart;
+		public readonly int EntityCount;
 		[NativeDisableUnsafePtrRestriction] public BvhNode* Left, Right;
 		public readonly BvhNodeMetadata* Metadata;
 
-		public bool IsLeaf => EntityId != -1;
+		public bool IsLeaf => EntitiesStart != null;
 
-		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, NativeList<BvhNodeMetadata> metadata,
+		public BvhNode(NativeSlice<Entity> entities, NativeList<BvhNode> nodes, NativeList<BvhNodeMetadata> metadata, NativeList<Entity> bvhEntities,
 			int depth = 0, int rank = 0, int parentNodeId = 0) : this()
 		{
 			metadata.AddNoResize(default);
@@ -85,48 +88,54 @@ namespace RaytracerInOneWeekend
 			entities.Sort(new EntityBoundsComparer(biggestPartition));
 			int biggestAxis = biggestPartition.GetAxisId();
 
-			switch (entities.Length)
+			if (depth == MaxDepth || entities.Length == 1)
 			{
-				case 1:
-					EntityId = entities[0].Id;
-					Bounds = entities[0].Bounds;
-					break;
+				EntitiesStart = (Entity*) bvhEntities.GetUnsafePtr() + bvhEntities.Length;
+				// TODO: Sorting desc by entity size would make sense here
+				bvhEntities.AddRangeNoResize(entities.GetUnsafePtr(), entities.Length);
 
-				default:
-					EntityId = -1;
+				Bounds = entities[0].Bounds;
+				for (int i = 1; i < entities.Length; i++)
+					Bounds = AxisAlignedBoundingBox.Enclose(Bounds, entities[i].Bounds);
 
-					int partitionLength = 0;
-					float partitionStart = entities[0].Bounds.Min[biggestAxis];
+				EntityCount = entities.Length;
+			}
+			else
+			{
+				EntitiesStart = null;
+				EntityCount = 0;
 
-					// decide the size of the partition according to the size of the entities
-					for (var i = 0; i < entities.Length; i++)
+				int partitionLength = 0;
+				float partitionStart = entities[0].Bounds.Min[biggestAxis];
+
+				// decide the size of the partition according to the size of the entities
+				for (var i = 0; i < entities.Length; i++)
+				{
+					Entity entity = entities[i];
+					partitionLength++;
+					AxisAlignedBoundingBox bounds = entity.Bounds;
+					if (bounds.Min[biggestAxis] - partitionStart > biggestPartitionSize / 2 ||
+						bounds.Size[biggestAxis] > biggestPartitionSize / 2)
 					{
-						Entity entity = entities[i];
-						partitionLength++;
-						AxisAlignedBoundingBox bounds = entity.Bounds;
-						if (bounds.Min[biggestAxis] - partitionStart > biggestPartitionSize / 2 ||
-							bounds.Size[biggestAxis] > biggestPartitionSize / 2)
-						{
-							break;
-						}
+						break;
 					}
+				}
 
-					// ensure we have at least 1 entity in each partition
-					if (partitionLength == entities.Length)
-						partitionLength--;
+				// ensure we have at least 1 entity in each partition
+				if (partitionLength == entities.Length)
+					partitionLength--;
 
-					var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, partitionLength), nodes, metadata,
-						depth + 1, 0, Metadata->Id);
-					Metadata->LeftId = leftNode.Metadata->Id = nodes.Length;
-					nodes.AddNoResize(leftNode);
+				var leftNode = new BvhNode(new NativeSlice<Entity>(entities, 0, partitionLength), nodes, metadata, bvhEntities,
+					depth + 1, 0, Metadata->Id);
+				Metadata->LeftId = leftNode.Metadata->Id = nodes.Length;
+				nodes.AddNoResize(leftNode);
 
-					var rightNode = new BvhNode(new NativeSlice<Entity>(entities, partitionLength), nodes, metadata,
-						depth + 1, 1, Metadata->Id);
-					Metadata->RightId = rightNode.Metadata->Id = nodes.Length;
-					nodes.AddNoResize(rightNode);
+				var rightNode = new BvhNode(new NativeSlice<Entity>(entities, partitionLength), nodes, metadata, bvhEntities,
+					depth + 1, 1, Metadata->Id);
+				Metadata->RightId = rightNode.Metadata->Id = nodes.Length;
+				nodes.AddNoResize(rightNode);
 
-					Bounds = AxisAlignedBoundingBox.Enclose(leftNode.Bounds, rightNode.Bounds);
-					break;
+				Bounds = AxisAlignedBoundingBox.Enclose(leftNode.Bounds, rightNode.Bounds);
 			}
 		}
 
@@ -160,23 +169,14 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	struct BvhNodeIdComparer : IComparer<BvhNode>
-	{
-		public unsafe int Compare(BvhNode lhs, BvhNode rhs)
-		{
-			return lhs.Metadata->Id - rhs.Metadata->Id;
-		}
-	}
-
 	readonly struct EntityBoundsComparer : IComparer<Entity>
 	{
-		readonly PartitionAxis axis;
+		readonly int axisId;
 
-		public EntityBoundsComparer(PartitionAxis axis) => this.axis = axis;
+		public EntityBoundsComparer(PartitionAxis axis) => axisId = axis.GetAxisId();
 
 		public int Compare(Entity lhs, Entity rhs)
 		{
-			int axisId = axis.GetAxisId();
 			return (int) sign(lhs.Bounds.Min[axisId] - rhs.Bounds.Min[axisId]);
 		}
 	}

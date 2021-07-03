@@ -168,9 +168,13 @@ namespace RaytracerInOneWeekend
 			if (n.IsLeaf)
 			{
 #if FULL_DIAGNOSTICS
-				diagnostics.CandidateCount++;
+				diagnostics.CandidateCount += n.EntityCount;
 #endif
-				return entities[n.EntityId].Hit(r, tMin, tMax, ref rng, out rec);
+				for (int i = 0; i < n.EntityCount; i++)
+					if ((n.EntitiesStart + i)->Hit(r, tMin, tMax, ref rng, out rec))
+						return true;
+
+				return false;
 			}
 
 #if FULL_DIAGNOSTICS

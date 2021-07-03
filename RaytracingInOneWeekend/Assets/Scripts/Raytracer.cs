@@ -123,6 +123,7 @@ namespace RaytracerInOneWeekend
 #if BVH
 		NativeList<BvhNode> bvhNodeBuffer;
 		NativeList<BvhNodeMetadata> bvhNodeMetadataBuffer;
+		NativeList<Entity> bvhEntities;
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 
@@ -399,6 +400,7 @@ namespace RaytracerInOneWeekend
 			boolBuffers.Capacity = 0;
 
 #if BVH
+			bvhEntities.SafeDispose();
 			bvhNodeBuffer.SafeDispose();
 			bvhNodeMetadataBuffer.SafeDispose();
 #endif
@@ -1208,13 +1210,15 @@ namespace RaytracerInOneWeekend
 		{
 			bvhNodeBuffer.EnsureCapacity(entityBuffer.Length * 2);
 			bvhNodeMetadataBuffer.EnsureCapacity(entityBuffer.Length * 2);
+			bvhEntities.EnsureCapacity(entityBuffer.Length);
 
 			bvhNodeBuffer.Clear();
 			bvhNodeMetadataBuffer.Clear();
+			bvhEntities.Clear();
 
 			BvhNode rootNode;
 			using (new ScopedStopwatch("BvhNode creation"))
-				rootNode = new BvhNode(entityBuffer, bvhNodeBuffer, bvhNodeMetadataBuffer);
+				rootNode = new BvhNode(entityBuffer, bvhNodeBuffer, bvhNodeMetadataBuffer, bvhEntities);
 			rootNode.Metadata->Id = bvhNodeBuffer.Length;
 			bvhNodeBuffer.AddNoResize(rootNode);
 
@@ -1237,10 +1241,6 @@ namespace RaytracerInOneWeekend
 					bvhNodes[i].Right = bvhNodes + idToListIndex[bvhNodes[i].Metadata->RightId];
 				}
 			}
-
-			// re-sort the entity buffer so it can be indexed
-			using (new ScopedStopwatch("Sort entities by ID"))
-				entityBuffer.Sort(new EntityIdComparer());
 
 			Debug.Log($"Rebuilt BVH ({bvhNodeBuffer.Length} nodes for {entityBuffer.Length} entities)");
 		}
