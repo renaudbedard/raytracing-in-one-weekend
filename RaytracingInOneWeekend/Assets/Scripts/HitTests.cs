@@ -1,4 +1,5 @@
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
@@ -148,7 +149,7 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_RECURSIVE
-		public static unsafe bool Hit(this BvhNode n, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
 			ref RandomSource rng,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
@@ -170,19 +171,26 @@ namespace RaytracerInOneWeekend
 #if FULL_DIAGNOSTICS
 				diagnostics.CandidateCount += n.EntityCount;
 #endif
+				bool anyHit = false;
 				for (int i = 0; i < n.EntityCount; i++)
-					if ((n.EntitiesStart + i)->Hit(r, tMin, tMax, ref rng, out rec))
-						return true;
-
-				return false;
+				{
+					bool thisHit = (n.EntitiesStart + i)->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
+					if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
+					{
+						anyHit = true;
+						rec = thisRec;
+						rec.EntityPtr = n.EntitiesStart + i;
+					}
+				}
+				return anyHit;
 			}
 
 #if FULL_DIAGNOSTICS
-			bool hitLeft = n.Left->Hit(entities, r, tMin, tMax, ref rng, ref diagnostics, out HitRecord leftRecord);
-			bool hitRight = n.Right->Hit(entities, r, tMin, tMax, ref rng, ref diagnostics, out HitRecord rightRecord);
+			bool hitLeft = n.Left->Hit(r, tMin, tMax, ref rng, ref diagnostics, out HitRecord leftRecord);
+			bool hitRight = n.Right->Hit(r, tMin, tMax, ref rng, ref diagnostics, out HitRecord rightRecord);
 #else
-			bool hitLeft = n.Left->Hit(entities, r, tMin, tMax, ref rng, out HitRecord leftRecord);
-			bool hitRight = n.Right->Hit(entities, r, tMin, tMax, ref rng, out HitRecord rightRecord);
+			bool hitLeft = n.Left->Hit(r, tMin, tMax, ref rng, out HitRecord leftRecord);
+			bool hitRight = n.Right->Hit(r, tMin, tMax, ref rng, out HitRecord rightRecord);
 #endif
 
 			if (!hitLeft && !hitRight)
@@ -205,16 +213,18 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
-		public static unsafe bool Hit(this BvhNode node, NativeArray<Entity> entities, Ray r, float tMin, float tMax,
+		public static unsafe bool Hit(this BvhNode node, Ray r, float tMin, float tMax,
 			ref RandomSource rng, AccumulateJob.WorkingArea workingArea,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
 			out HitRecord rec)
 		{
+			rec = default;
+
 			int candidateCount = 0, nodeStackHeight = 1;
 			BvhNode** nodeStackTail = workingArea.Nodes;
-			Entity* candidateListTail = workingArea.Entities - 1, candidateListHead = workingArea.Entities;
+			Entity** candidateListTail = workingArea.Entities - 1, candidateListHead = workingArea.Entities;
 			float3 rayInvDirection = rcp(r.Direction);
 
 			*nodeStackTail = &node;
@@ -227,10 +237,23 @@ namespace RaytracerInOneWeekend
 				if (!nodePtr->Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 					continue;
 
+#if FULL_DIAGNOSTICS
+				diagnostics.BoundsHitCount++;
+#endif
+
 				if (nodePtr->IsLeaf)
 				{
-					*++candidateListTail = entities[nodePtr->EntityId];
-					candidateCount++;
+					int entityCount = nodePtr->EntityCount;
+					Entity* entityPtr = nodePtr->EntitiesStart;
+
+					// TODO: This could be a memcpy
+					for (int i = 0; i < entityCount; i++)
+						*++candidateListTail = entityPtr++;
+
+					candidateCount += entityCount;
+#if FULL_DIAGNOSTICS
+					diagnostics.CandidateCount += entityCount;
+#endif
 				}
 				else
 				{
@@ -241,116 +264,24 @@ namespace RaytracerInOneWeekend
 			}
 
 			if (candidateCount == 0)
-			{
-				rec = default;
 				return false;
-			}
 
-#if BVH_SIMD
-			// TODO: this is fully broken
-			// skip SIMD codepath if there's only one
-			if (candidateCount == 1)
-				return candidateListHead->Hit(r, tMin, tMax, out rec);
-
-			var simdSpheresHead = (Sphere4*) wa.Vectors;
-			int simdBlockCount = (int) ceil(candidateCount / 4.0f);
-
-			float4 a = dot(r.Direction, r.Direction);
-			int4 curId = int4(0, 1, 2, 3), hitId = -1;
-			float4 hitT = tMax;
-
-			Sphere4* blockCursor = simdSpheresHead;
-			Entity* candidateCursor = candidateListHead;
-			int candidateIndex = 0;
-			for (int i = 0; i < simdBlockCount; i++)
+			// iterative candidate tests
+			bool anyHit = false;
+			for (int i = 0; i < candidateCount; i++)
 			{
-				for (int j = 0; j < 4; j++)
-				{
-					if (candidateIndex < candidateCount)
-					{
-						Sphere* sphereData = candidateCursor->AsSphere;
-						float3 center = sphereData->Center(r.Time);
-						blockCursor->CenterX[j] = center.x;
-						blockCursor->CenterY[j] = center.y;
-						blockCursor->CenterZ[j] = center.z;
-						blockCursor->SquaredRadius[j] = sphereData->SquaredRadius;
-						++candidateCursor;
-						++candidateIndex;
-					}
-					else
-					{
-						blockCursor->CenterX[j] = float.MaxValue;
-						blockCursor->CenterY[j] = float.MaxValue;
-						blockCursor->CenterZ[j] = float.MaxValue;
-						blockCursor->SquaredRadius[j] = 0;
-					}
-				}
-
-				float4 ocX = r.Origin.x - blockCursor->CenterX,
-					ocY = r.Origin.y - blockCursor->CenterY,
-					ocZ = r.Origin.z - blockCursor->CenterZ;
-
-				float4 b = ocX * r.Direction.x + ocY * r.Direction.y + ocZ * r.Direction.z;
-				float4 c = ocX * ocX + ocY * ocY + ocZ * ocZ - blockCursor->SquaredRadius;
-				float4 discriminant = b * b - a * c;
-
-				bool4 discriminantTest = discriminant > 0;
-
-				if (any(discriminantTest))
-				{
-					float4 sqrtDiscriminant = sqrt(discriminant);
-
-					float4 t0 = (-b - sqrtDiscriminant) / a;
-					float4 t1 = (-b + sqrtDiscriminant) / a;
-
-					float4 t = select(t1, t0, t0 > tMin);
-					bool4 mask = discriminantTest & t > tMin & t < hitT;
-
-					hitId = select(hitId, curId, mask);
-					hitT = select(hitT, t, mask);
-				}
-
-				curId += 4;
-				++blockCursor;
-			}
-
-			if (all(hitId == -1))
-			{
-				rec = default;
-				return false;
-			}
-
-			float minDistance = cmin(hitT);
-			int laneMask = bitmask(hitT == minDistance);
-			int firstLane = tzcnt(laneMask);
-			int closestId = hitId[firstLane];
-			Sphere* closestSphere = candidateListHead[closestId].AsSphere;
-			float3 point = r.GetPoint(minDistance);
-
-			rec = new HitRecord(minDistance, point,
-				(point - closestSphere->Center(r.Time)) / closestSphere->Radius,
-				closestSphere->Material);
-
-			return true;
-
-#else
-			// iterative candidate tests (non-SIMD)
-			bool anyHit = candidateListHead->Hit(r, tMin, tMax, ref rng, out rec);
-			for (int i = 1; i < candidateCount; i++)
-			{
-				bool thisHit = candidateListHead[i].Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
+				bool thisHit = candidateListHead[i]->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
 				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
 				{
 					anyHit = true;
 					rec = thisRec;
+					rec.EntityPtr = candidateListHead[i];
 				}
 			}
 			if (anyHit)
 				return true;
 
-			rec = default;
 			return false;
-#endif
 		}
 #endif
 	}

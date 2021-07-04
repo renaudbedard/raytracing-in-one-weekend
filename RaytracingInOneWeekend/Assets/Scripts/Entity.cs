@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -9,7 +8,6 @@ namespace RaytracerInOneWeekend
 {
 	readonly unsafe struct Entity
 	{
-		public readonly int Id;
 		public readonly EntityType Type;
 		public readonly RigidTransform OriginTransform;
 		public readonly float3 DestinationOffset;
@@ -22,10 +20,9 @@ namespace RaytracerInOneWeekend
 
 		[NativeDisableUnsafePtrRestriction] readonly void* content;
 
-		public Entity(int id, EntityType type, void* contentPointer, RigidTransform originTransform, Material* material,
+		public Entity(EntityType type, void* contentPointer, RigidTransform originTransform, Material* material,
 			float3 destinationOffset = default, float2 timeRange = default)
 		{
-			Id = id;
 			Type = type;
 			OriginTransform = originTransform;
 			content = contentPointer;
@@ -69,7 +66,7 @@ namespace RaytracerInOneWeekend
 				out RigidTransform transformAtTime, out _))
 			{
 				// TODO: normal is disregarded for isotropic materials
-				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)), Id);
+				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)));
 				return true;
 			}
 
@@ -168,10 +165,5 @@ namespace RaytracerInOneWeekend
 			new RigidTransform(OriginTransform.rot,
 				OriginTransform.pos +
 				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, t), 0.0f, 1.0f));
-	}
-
-	readonly struct EntityIdComparer : IComparer<Entity>
-	{
-		public int Compare(Entity x, Entity y) => x.Id.CompareTo(y.Id);
 	}
 }

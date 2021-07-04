@@ -11,9 +11,9 @@ namespace OpenImageDenoise
 	public static class OidnApi
 	{
 #if UNITY_EDITOR_OSX
-		public const string LibraryFilename = "libOpenImageDenoise.1.4.1";
+		public const string LibraryFilename = "OpenImageDenoise.1.4.1";
 #else
-		public const string LibraryFilename = "OpenImageDenoise.dll";
+		public const string LibraryFilename = "OpenImageDenoise";
 #endif
 	}
 

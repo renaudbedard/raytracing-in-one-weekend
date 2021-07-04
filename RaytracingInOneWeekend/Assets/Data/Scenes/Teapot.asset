@@ -17,7 +17,7 @@ MonoBehaviour:
   cameraAperture: 0.05
   cameraFieldOfView: 75
   entities:
-  - name: 
+  - name: Body
     type: 5
     enabled: 1
     position: {x: 0, y: 0, z: 0}
@@ -40,7 +40,7 @@ MonoBehaviour:
       mesh: {fileID: 6192547391499243942, guid: 36b025f0a48ae421b839c2ad31d0277e,
         type: 3}
     material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
-  - name: 
+  - name: Lid
     type: 5
     enabled: 1
     position: {x: 0, y: 0, z: 0}
@@ -63,7 +63,7 @@ MonoBehaviour:
       mesh: {fileID: -3111557506051347654, guid: 36b025f0a48ae421b839c2ad31d0277e,
         type: 3}
     material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
-  - name: 
+  - name: Handle
     type: 5
     enabled: 1
     position: {x: 0, y: 0, z: 0}
@@ -85,7 +85,7 @@ MonoBehaviour:
     meshData:
       mesh: {fileID: 883126711037108357, guid: 36b025f0a48ae421b839c2ad31d0277e, type: 3}
     material: {fileID: 11400000, guid: 9124d4705856b43e099420dc6c136019, type: 2}
-  - name: 
+  - name: Spout
     type: 5
     enabled: 1
     position: {x: 0, y: 0, z: 0}

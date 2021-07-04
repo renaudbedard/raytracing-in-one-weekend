@@ -56,7 +56,7 @@ namespace RaytracerInOneWeekend
 				return false;
 
 			array.SafeDispose();
-			array = new NativeArray<T>(size, Allocator.Persistent);
+			array = new NativeArray<T>(size, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 			return true;
 		}
 

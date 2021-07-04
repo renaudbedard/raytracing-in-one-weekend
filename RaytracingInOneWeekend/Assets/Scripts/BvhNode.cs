@@ -109,13 +109,12 @@ namespace RaytracerInOneWeekend
 				float partitionStart = entities[0].Bounds.Min[biggestAxis];
 
 				// decide the size of the partition according to the size of the entities
-				for (var i = 0; i < entities.Length; i++)
+				foreach (Entity entity in entities)
 				{
-					Entity entity = entities[i];
 					partitionLength++;
 					AxisAlignedBoundingBox bounds = entity.Bounds;
 					if (bounds.Min[biggestAxis] - partitionStart > biggestPartitionSize / 2 ||
-						bounds.Size[biggestAxis] > biggestPartitionSize / 2)
+					    bounds.Size[biggestAxis] > biggestPartitionSize / 2)
 					{
 						break;
 					}

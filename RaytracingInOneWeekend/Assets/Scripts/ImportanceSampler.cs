@@ -18,7 +18,7 @@ namespace RaytracerInOneWeekend
 		public ImportanceSamplingMode Mode;
 
 		public unsafe void Sample(Ray materialScatterRay, float3 outgoingLightDirection, HitRecord rec, Material* material, ref RandomSource rng,
-			out Ray scatterRay, out float pdfValue, out int? targetEntityId)
+			out Ray scatterRay, out float pdfValue, out Entity* targetEntityId)
 		{
 			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
 			int chosenOption = rng.NextInt(0, totalOptions);
@@ -33,7 +33,7 @@ namespace RaytracerInOneWeekend
 				float3 pointOnEntity = chosenEntity->RandomPoint(materialScatterRay.Time, ref rng);
 				scatterRay = new Ray(materialScatterRay.Origin,
 					normalize(pointOnEntity - materialScatterRay.Origin));
-				targetEntityId = chosenEntity->Id;
+				targetEntityId = chosenEntity;
 			}
 
 			pdfValue = 0;

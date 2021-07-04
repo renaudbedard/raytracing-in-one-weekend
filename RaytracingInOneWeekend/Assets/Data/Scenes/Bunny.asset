@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
   m_Name: Bunny
   m_EditorClassIdentifier: 
-  cameraPosition: {x: -3.9131107, y: 2.932016, z: -0.68739164}
-  cameraTarget: {x: -3.0004556, y: 2.52415, z: -0.6608219}
+  cameraPosition: {x: -0.26502886, y: 2.9916248, z: 1.9172778}
+  cameraTarget: {x: -0.14560728, y: 2.2969267, z: 1.2079589}
   cameraAperture: 0.05
   cameraFieldOfView: 75
   entities:

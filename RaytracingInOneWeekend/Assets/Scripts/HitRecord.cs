@@ -7,14 +7,13 @@ namespace RaytracerInOneWeekend
 		public readonly float Distance;
 		public readonly float3 Point;
 		public readonly float3 Normal;
-		public readonly int EntityId;
+		public Entity* EntityPtr;
 
-		public HitRecord(float distance, float3 point, float3 normal, int entityId)
+		public HitRecord(float distance, float3 point, float3 normal) : this()
 		{
 			Distance = distance;
 			Point = point;
 			Normal = normal;
-			EntityId = entityId;
 		}
 	}
 }

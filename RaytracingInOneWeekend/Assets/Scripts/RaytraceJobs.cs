@@ -47,7 +47,7 @@ namespace RaytracerInOneWeekend
 		public struct WorkingArea
 		{
 			public BvhNode** Nodes;
-			public Entity* Entities;
+			public Entity** Entities;
 		}
 #endif
 		[ReadOnly] public float2 Size;
@@ -116,7 +116,7 @@ namespace RaytracerInOneWeekend
 
 #if BVH_ITERATIVE
 			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
-			Entity* entities = stackalloc Entity[Entities.Length];
+			Entity** entities = stackalloc Entity*[Entities.Length];
 
 			var workingArea = new WorkingArea
 			{
@@ -186,7 +186,7 @@ namespace RaytracerInOneWeekend
 			float3* attenuationCursor = attenuationStack;
 
 			int depth = 0;
-			int? explicitSamplingTarget = null;
+			Entity* explicitSamplingTarget = null;
 
 			bool firstNonSpecularHit = false;
 			sampleNormal = sampleAlbedo = default;
@@ -196,7 +196,7 @@ namespace RaytracerInOneWeekend
 			for (; depth < TraceDepth; depth++)
 			{
 #if BVH
-				bool hit = BvhRoot->Hit(Entities,
+				bool hit = BvhRoot->Hit(
 #else
 				bool hit = Entities.Hit(
 #endif
@@ -218,10 +218,10 @@ namespace RaytracerInOneWeekend
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
 					// we explicitely sampled an entity and could not hit it -- early out of this sample
-					if (explicitSamplingTarget.HasValue && explicitSamplingTarget != rec.EntityId)
+					if (explicitSamplingTarget != null && explicitSamplingTarget != rec.EntityPtr)
 						break;
 
-					Material* material = Entities[rec.EntityId].Material;
+					Material* material = rec.EntityPtr->Material;
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
 
