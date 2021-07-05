@@ -251,13 +251,13 @@ namespace RaytracerInOneWeekend
 					for (int i = 0; i < entityCount; i++)
 					{
 						// TODO: We should be able to preallocate for entityCount
-						if (!hitCandidates.TryPush(entityPtr))
+						if (!hitCandidates.TryPush(entityPtr + i))
 						{
 							var pb = stackalloc PointerBlock<Entity>[1];
 							var p = stackalloc Entity*[hitCandidates.TailBlock->Capacity * 2];
 							*pb = new PointerBlock<Entity>(p, hitCandidates.TailBlock->Capacity * 2, hitCandidates.TailBlock);
 							hitCandidates.TailBlock->NextBlock = pb;
-							hitCandidates.Push(entityPtr);
+							hitCandidates.Push(entityPtr + i);
 						}
 					}
 

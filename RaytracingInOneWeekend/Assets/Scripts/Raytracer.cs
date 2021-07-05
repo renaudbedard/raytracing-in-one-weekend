@@ -48,7 +48,7 @@ namespace RaytracerInOneWeekend
 		[Title("Settings")] [SerializeField] [Range(1, 100)]
 		int interlacing = 2;
 
-		[SerializeField] [EnableIf("bvhEnabled")] [Range(1, 32)] int maxBvhDepth = 12;
+		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(1, 32)] int maxBvhDepth = 12;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
