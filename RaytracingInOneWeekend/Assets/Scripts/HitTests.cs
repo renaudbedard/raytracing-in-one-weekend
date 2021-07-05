@@ -221,15 +221,18 @@ namespace RaytracerInOneWeekend
 		{
 			rec = default;
 
-			var np = stackalloc BvhNode*[1] { &node };
-			var nodesToTraverse = new PointerBlock<BvhNode>(np, 1) { ChainLength = 1 };
+			var np = stackalloc BvhNode*[1];
+			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
+			var nodesToTraverse = new PointerBlockChain<BvhNode>(npb);
+			nodesToTraverse.Push(&node);
 
 			var ep = stackalloc Entity*[1];
-			var hitCandidates = new PointerBlock<Entity>(ep, 1);
+			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
+			var hitCandidates = new PointerBlockChain<Entity>(epb);
 
 			float3 rayInvDirection = rcp(r.Direction);
 
-			while (nodesToTraverse.ChainLength > 0)
+			while (nodesToTraverse.Length > 0)
 			{
 				BvhNode* nodePtr = nodesToTraverse.Pop();
 
@@ -248,15 +251,13 @@ namespace RaytracerInOneWeekend
 					for (int i = 0; i < entityCount; i++)
 					{
 						// TODO: We should be able to preallocate for entityCount
-						if (!hitCandidates.TryPush(entityPtr, out PointerBlock<Entity>* parentPtr))
+						if (!hitCandidates.TryPush(entityPtr))
 						{
 							var pb = stackalloc PointerBlock<Entity>[1];
-							int targetCapacity = (parentPtr == null ? hitCandidates : *parentPtr).Capacity * 2;
-							var p = stackalloc Entity*[targetCapacity];
-							*pb = new PointerBlock<Entity>(p, targetCapacity);
-							if (parentPtr == null) hitCandidates.NextBlock = pb;
-							else parentPtr->NextBlock = pb;
-							hitCandidates.TryPush(entityPtr, out _);
+							var p = stackalloc Entity*[hitCandidates.TailBlock->Capacity * 2];
+							*pb = new PointerBlock<Entity>(p, hitCandidates.TailBlock->Capacity * 2, hitCandidates.TailBlock);
+							hitCandidates.TailBlock->NextBlock = pb;
+							hitCandidates.Push(entityPtr);
 						}
 					}
 
@@ -267,32 +268,28 @@ namespace RaytracerInOneWeekend
 				else
 				{
 					// TODO: We should be able to preallocate for 2
-					if (!nodesToTraverse.TryPush(nodePtr->Left, out PointerBlock<BvhNode>* parentPtr))
+					if (!nodesToTraverse.TryPush(nodePtr->Left))
 					{
 						var pb = stackalloc PointerBlock<BvhNode>[1];
-						int targetCapacity = (parentPtr == null ? nodesToTraverse : *parentPtr).Capacity * 2;
-						var p = stackalloc BvhNode*[targetCapacity];
-						*pb = new PointerBlock<BvhNode>(p, targetCapacity);
-						if (parentPtr == null) nodesToTraverse.NextBlock = pb;
-						else parentPtr->NextBlock = pb;
-						nodesToTraverse.TryPush(nodePtr->Left, out _);
+						var p = stackalloc BvhNode*[nodesToTraverse.TailBlock->Capacity * 2];
+						*pb = new PointerBlock<BvhNode>(p, nodesToTraverse.TailBlock->Capacity * 2, nodesToTraverse.TailBlock);
+						nodesToTraverse.TailBlock->NextBlock = pb;
+						nodesToTraverse.Push(nodePtr->Left);
 					}
-					if (!nodesToTraverse.TryPush(nodePtr->Right, out parentPtr))
+					if (!nodesToTraverse.TryPush(nodePtr->Right))
 					{
 						var pb = stackalloc PointerBlock<BvhNode>[1];
-						int targetCapacity = (parentPtr == null ? nodesToTraverse : *parentPtr).Capacity * 2;
-						var p = stackalloc BvhNode*[targetCapacity];
-						*pb = new PointerBlock<BvhNode>(p, targetCapacity);
-						if (parentPtr == null) nodesToTraverse.NextBlock = pb;
-						else parentPtr->NextBlock = pb;
-						nodesToTraverse.TryPush(nodePtr->Right, out _);
+						var p = stackalloc BvhNode*[nodesToTraverse.TailBlock->Capacity * 2];
+						*pb = new PointerBlock<BvhNode>(p, nodesToTraverse.TailBlock->Capacity * 2, nodesToTraverse.TailBlock);
+						nodesToTraverse.TailBlock->NextBlock = pb;
+						nodesToTraverse.Push(nodePtr->Right);
 					}
 				}
 			}
 
 			// iterative candidate tests
 			bool anyHit = false;
-			while (hitCandidates.ChainLength > 0)
+			while (hitCandidates.Length > 0)
 			{
 				var hitCandidate = hitCandidates.Pop();
 				bool thisHit = hitCandidate->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);

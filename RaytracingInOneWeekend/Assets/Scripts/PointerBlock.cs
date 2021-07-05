@@ -1,85 +1,90 @@
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine.Assertions;
 
 namespace RaytracerInOneWeekend
 {
-	// TODO: Seperate head block from other blocks, keep tail block pointer around
-	public unsafe struct PointerBlock<T> where T : unmanaged
+	public unsafe struct PointerBlockChain<T> where T : unmanaged
 	{
-		public readonly T** Data;
-		public readonly int Capacity;
+		public int Length { get; private set; }
 
-		public int ChainLength;
-		public PointerBlock<T>* NextBlock;
+		private PointerBlock<T>* tailBlock;
+		private T** tail;
 
-		public PointerBlock(T** data, int capacity) : this()
+		public PointerBlock<T>* TailBlock => tailBlock;
+
+		public PointerBlockChain(PointerBlock<T>* firstBlock) : this()
 		{
-			Assert.IsTrue(capacity >= 1, "Capacity must be at least 1");
-			Capacity = capacity;
-			Data = data;
+			Assert.IsTrue(firstBlock != null, "First block must be allocated");
+			tailBlock = firstBlock;
+			tail = firstBlock->Data - 1; // This will never be accessed
 		}
 
-		bool TrySet(int index, T* value, out PointerBlock<T>* parentBlock)
+		public void Push(T* value)
 		{
-			parentBlock = null;
-			if (index < Capacity)
+			if (tail == tailBlock->Data + (tailBlock->Capacity - 1))
 			{
-				Data[index] = value;
-				return true;
+				Assert.IsFalse(tailBlock->NextBlock == null, "No space in tail block, use TryPush instead");
+				tailBlock = tailBlock->NextBlock;
+				tail = tailBlock->Data;
 			}
-			if (NextBlock == null) return false;
-			index -= Capacity;
-			parentBlock = NextBlock;
+			else
+				++tail;
 
-			while (true)
+			*tail = value;
+			Length++;
+		}
+
+		public bool TryPush(T* value)
+		{
+			if (tail == tailBlock->Data + (tailBlock->Capacity - 1))
 			{
-				if (index < parentBlock->Capacity)
-				{
-					parentBlock->Data[index] = value;
-					return true;
-				}
-
-				if (parentBlock->NextBlock == null)
+				if (tailBlock->NextBlock == null)
 					return false;
 
-				index -= parentBlock->Capacity;
-				parentBlock = parentBlock->NextBlock;
+				tailBlock = tailBlock->NextBlock;
+				tail = tailBlock->Data;
 			}
-		}
+			else
+				++tail;
 
-		public T* Head => Data[0];
-
-		public T* Tail
-		{
-			get
-			{
-				var parentBlock = this;
-				int tailIndex = ChainLength - 1;
-				while (tailIndex >= parentBlock.Capacity)
-				{
-					Assert.IsFalse(parentBlock.NextBlock == null, "No more blocks!");
-					tailIndex -= parentBlock.Capacity;
-					parentBlock = *parentBlock.NextBlock;
-				}
-				return parentBlock.Data[tailIndex];
-			}
-		}
-
-		public bool TryPush(T* value, out PointerBlock<T>* parentBlock)
-		{
-			if (!TrySet(ChainLength, value, out parentBlock))
-				return false;
-
-			ChainLength++;
+			*tail = value;
+			Length++;
 			return true;
 		}
 
 		public T* Pop()
 		{
-			Assert.IsTrue(ChainLength > 0, "Nothing to pop!");
-			var tailValue = Tail;
-			ChainLength--;
-			return tailValue;
+			Assert.IsTrue(Length > 0, "Nothing to pop!");
+
+			T* previousTail = *tail;
+
+			if (tail == tailBlock->Data && Length > 1)
+			{
+				tailBlock = tailBlock->PreviousBlock;
+				Assert.IsFalse(tailBlock == null, "No previous block found");
+				tail = tailBlock->Data + (tailBlock->Capacity - 1);
+			}
+			else
+				--tail;
+
+			Length--;
+			return previousTail;
+		}
+	}
+
+	public unsafe struct PointerBlock<T> where T : unmanaged
+	{
+		public readonly int Capacity;
+		public readonly T** Data;
+		public readonly PointerBlock<T>* PreviousBlock;
+
+		public PointerBlock<T>* NextBlock;
+
+		public PointerBlock(T** data, int capacity, PointerBlock<T>* previousBlock = null) : this()
+		{
+			Assert.IsTrue(capacity >= 1, "Capacity must be at least 1");
+			Capacity = capacity;
+			Data = data;
+			PreviousBlock = previousBlock;
 		}
 	}
 }
