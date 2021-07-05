@@ -221,9 +221,8 @@ namespace RaytracerInOneWeekend
 		{
 			rec = default;
 
-			var np = stackalloc BvhNode*[1];
-			var nodesToTraverse = new PointerBlock<BvhNode>(np, 1);
-			nodesToTraverse.TryPush(&node, out _);
+			var np = stackalloc BvhNode*[1] { &node };
+			var nodesToTraverse = new PointerBlock<BvhNode>(np, 1) { ChainLength = 1 };
 
 			var ep = stackalloc Entity*[1];
 			var hitCandidates = new PointerBlock<Entity>(ep, 1);
