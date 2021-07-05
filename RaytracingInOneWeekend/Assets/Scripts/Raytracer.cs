@@ -1307,21 +1307,12 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		unsafe bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			BvhNode** nodes = stackalloc BvhNode*[bvhNodeBuffer.Length];
-			Entity** entities = stackalloc Entity*[bvhEntities.Length];
-
-			var workingArea = new AccumulateJob.WorkingArea
-			{
-				Nodes = nodes,
-				Entities = entities,
-			};
-
 			var rng = new RandomSource(noiseColor, new Random(scene.RandomSeed),
 				blueNoise.GetRuntimeData(scene.RandomSeed).GetPerPixelData((uint2) bufferSize / 2));
 
 #if FULL_DIAGNOSTICS
 			Diagnostics _ = default;
-			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, ref _, out hitRec);
+			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, ref _, out hitRec);
 #else
 			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
 #endif

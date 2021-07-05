@@ -1,6 +1,5 @@
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -214,7 +213,7 @@ namespace RaytracerInOneWeekend
 
 #elif BVH_ITERATIVE
 		public static unsafe bool Hit(this BvhNode node, Ray r, float tMin, float tMax,
-			ref RandomSource rng, AccumulateJob.WorkingArea workingArea,
+			ref RandomSource rng,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
@@ -222,17 +221,18 @@ namespace RaytracerInOneWeekend
 		{
 			rec = default;
 
-			int candidateCount = 0, nodeStackHeight = 1;
-			BvhNode** nodeStackTail = workingArea.Nodes;
-			Entity** candidateListTail = workingArea.Entities - 1, candidateListHead = workingArea.Entities;
+			var np = stackalloc BvhNode*[1];
+			var nodesToTraverse = new PointerBlock<BvhNode>(np, 1);
+			nodesToTraverse.TryPush(&node, out _);
+
+			var ep = stackalloc Entity*[1];
+			var hitCandidates = new PointerBlock<Entity>(ep, 1);
+
 			float3 rayInvDirection = rcp(r.Direction);
 
-			*nodeStackTail = &node;
-
-			while (nodeStackHeight > 0)
+			while (nodesToTraverse.ChainLength > 0)
 			{
-				BvhNode* nodePtr = *nodeStackTail--;
-				nodeStackHeight--;
+				BvhNode* nodePtr = nodesToTraverse.Pop();
 
 				if (!nodePtr->Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 					continue;
@@ -246,36 +246,56 @@ namespace RaytracerInOneWeekend
 					int entityCount = nodePtr->EntityCount;
 					Entity* entityPtr = nodePtr->EntitiesStart;
 
-					// TODO: This could be a memcpy
 					for (int i = 0; i < entityCount; i++)
-						*++candidateListTail = entityPtr++;
+					{
+						// TODO: We should be able to preallocate for entityCount
+						if (!hitCandidates.TryPush(entityPtr, out var parent))
+						{
+							var pb = stackalloc PointerBlock<Entity>[1];
+							var p = stackalloc Entity*[parent->Capacity * 2];
+							*pb = new PointerBlock<Entity>(p, parent->Capacity * 2);
+							parent->NextBlock = pb;
+							hitCandidates.TryPush(entityPtr, out _);
+						}
+					}
 
-					candidateCount += entityCount;
 #if FULL_DIAGNOSTICS
 					diagnostics.CandidateCount += entityCount;
 #endif
 				}
 				else
 				{
-					*++nodeStackTail = nodePtr->Left;
-					*++nodeStackTail = nodePtr->Right;
-					nodeStackHeight += 2;
+					// TODO: We should be able to preallocate for 2
+					if (!nodesToTraverse.TryPush(nodePtr->Left, out var parent))
+					{
+						var pb = stackalloc PointerBlock<BvhNode>[1];
+						var p = stackalloc BvhNode*[parent->Capacity * 2];
+						*pb = new PointerBlock<BvhNode>(p, parent->Capacity * 2);
+						parent->NextBlock = pb;
+						nodesToTraverse.TryPush(nodePtr->Left, out _);
+					}
+					if (!nodesToTraverse.TryPush(nodePtr->Right, out parent))
+					{
+						var pb = stackalloc PointerBlock<BvhNode>[1];
+						var p = stackalloc BvhNode*[parent->Capacity * 2];
+						*pb = new PointerBlock<BvhNode>(p, parent->Capacity * 2);
+						parent->NextBlock = pb;
+						nodesToTraverse.TryPush(nodePtr->Right, out _);
+					}
 				}
 			}
 
-			if (candidateCount == 0)
-				return false;
-
 			// iterative candidate tests
 			bool anyHit = false;
-			for (int i = 0; i < candidateCount; i++)
+			while (hitCandidates.ChainLength > 0)
 			{
-				bool thisHit = candidateListHead[i]->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
+				var hitCandidate = hitCandidates.Pop();
+				bool thisHit = hitCandidate->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
 				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
 				{
 					anyHit = true;
 					rec = thisRec;
-					rec.EntityPtr = candidateListHead[i];
+					rec.EntityPtr = hitCandidate;
 				}
 			}
 			if (anyHit)

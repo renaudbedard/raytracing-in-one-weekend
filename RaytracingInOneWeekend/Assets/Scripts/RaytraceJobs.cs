@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using OpenImageDenoise;
 using Unity.Burst;
 using Unity.Collections;
@@ -8,7 +7,6 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using Debug = UnityEngine.Debug;
 using Random = Unity.Mathematics.Random;
 
 #if ENABLE_OPTIX
@@ -38,7 +36,7 @@ namespace RaytracerInOneWeekend
 	}
 #endif
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
@@ -48,12 +46,6 @@ namespace RaytracerInOneWeekend
 		{
 			public PointerBlock<BvhNode> Nodes;
 			public PointerBlock<Entity> Entities;
-		}
-		public struct PointerBlock<T> where T : unmanaged
-		{
-			public T** Data;
-			public int Length;
-			public PointerBlock<T>* NextBlock;
 		}
 #endif
 		[ReadOnly] public float2 Size;
@@ -120,17 +112,6 @@ namespace RaytracerInOneWeekend
 
 			var rng = new RandomSource(NoiseColor, whiteNoise, blueNoise);
 
-#if BVH_ITERATIVE
-			BvhNode** nodes = stackalloc BvhNode*[NodeCount];
-			Entity** entities = stackalloc Entity*[Entities.Length];
-
-			var workingArea = new WorkingArea
-			{
-				Nodes = nodes,
-				Entities = entities,
-			};
-#endif
-
 #if PATH_DEBUGGING
 			int2 intCoordinates = (int2) coordinates;
 			bool doDebugPaths = all(intCoordinates == DebugCoordinates);
@@ -150,9 +131,6 @@ namespace RaytracerInOneWeekend
 				Ray eyeRay = Camera.GetRay(normalizedCoordinates, ref rng);
 
 				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack,
-#if BVH_ITERATIVE
-					workingArea,
-#endif
 #if PATH_DEBUGGING
 					doDebugPaths && s == 0, s,
 #endif
@@ -180,9 +158,6 @@ namespace RaytracerInOneWeekend
 		}
 
 		bool Sample(Ray eyeRay, ref RandomSource rng, float3* emissionStack, float3* attenuationStack,
-#if BVH_ITERATIVE
-			WorkingArea workingArea,
-#endif
 #if PATH_DEBUGGING
 			bool doDebugPaths, int sampleIndex,
 #endif
@@ -207,9 +182,6 @@ namespace RaytracerInOneWeekend
 				bool hit = Entities.Hit(
 #endif
 					ray, 0, float.PositiveInfinity, ref rng,
-#if BVH_ITERATIVE
-					workingArea,
-#endif
 #if FULL_DIAGNOSTICS && BVH
 					ref diagnostics,
 #endif
@@ -327,7 +299,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct CombineJob : IJobParallelFor
 	{
 		static readonly float3 NoSamplesColor = new float3(1, 0, 1);
@@ -392,7 +364,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct ClearBufferJob<T> : IJob where T : unmanaged
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
@@ -408,7 +380,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct CopyFloat3BufferJob : IJob
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
@@ -425,7 +397,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct CopyFloat4BufferJob : IJob
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
@@ -555,7 +527,7 @@ namespace RaytracerInOneWeekend
 	}
 #endif
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct FinalizeTexturesJob : IJobParallelFor
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
@@ -603,7 +575,7 @@ namespace RaytracerInOneWeekend
 		}
 	}
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct ReduceRayCountJob : IJob
 	{
 		[ReadOnly] public NativeArray<Diagnostics> Diagnostics;
