@@ -248,12 +248,14 @@ namespace RaytracerInOneWeekend
 					for (int i = 0; i < entityCount; i++)
 					{
 						// TODO: We should be able to preallocate for entityCount
-						if (!hitCandidates.TryPush(entityPtr, out var parent))
+						if (!hitCandidates.TryPush(entityPtr, out PointerBlock<Entity>* parentPtr))
 						{
 							var pb = stackalloc PointerBlock<Entity>[1];
-							var p = stackalloc Entity*[parent->Capacity * 2];
-							*pb = new PointerBlock<Entity>(p, parent->Capacity * 2);
-							parent->NextBlock = pb;
+							int targetCapacity = (parentPtr == null ? hitCandidates : *parentPtr).Capacity * 2;
+							var p = stackalloc Entity*[targetCapacity];
+							*pb = new PointerBlock<Entity>(p, targetCapacity);
+							if (parentPtr == null) hitCandidates.NextBlock = pb;
+							else parentPtr->NextBlock = pb;
 							hitCandidates.TryPush(entityPtr, out _);
 						}
 					}
@@ -265,20 +267,24 @@ namespace RaytracerInOneWeekend
 				else
 				{
 					// TODO: We should be able to preallocate for 2
-					if (!nodesToTraverse.TryPush(nodePtr->Left, out var parent))
+					if (!nodesToTraverse.TryPush(nodePtr->Left, out PointerBlock<BvhNode>* parentPtr))
 					{
 						var pb = stackalloc PointerBlock<BvhNode>[1];
-						var p = stackalloc BvhNode*[parent->Capacity * 2];
-						*pb = new PointerBlock<BvhNode>(p, parent->Capacity * 2);
-						parent->NextBlock = pb;
+						int targetCapacity = (parentPtr == null ? nodesToTraverse : *parentPtr).Capacity * 2;
+						var p = stackalloc BvhNode*[targetCapacity];
+						*pb = new PointerBlock<BvhNode>(p, targetCapacity);
+						if (parentPtr == null) nodesToTraverse.NextBlock = pb;
+						else parentPtr->NextBlock = pb;
 						nodesToTraverse.TryPush(nodePtr->Left, out _);
 					}
-					if (!nodesToTraverse.TryPush(nodePtr->Right, out parent))
+					if (!nodesToTraverse.TryPush(nodePtr->Right, out parentPtr))
 					{
 						var pb = stackalloc PointerBlock<BvhNode>[1];
-						var p = stackalloc BvhNode*[parent->Capacity * 2];
-						*pb = new PointerBlock<BvhNode>(p, parent->Capacity * 2);
-						parent->NextBlock = pb;
+						int targetCapacity = (parentPtr == null ? nodesToTraverse : *parentPtr).Capacity * 2;
+						var p = stackalloc BvhNode*[targetCapacity];
+						*pb = new PointerBlock<BvhNode>(p, targetCapacity);
+						if (parentPtr == null) nodesToTraverse.NextBlock = pb;
+						else parentPtr->NextBlock = pb;
 						nodesToTraverse.TryPush(nodePtr->Right, out _);
 					}
 				}

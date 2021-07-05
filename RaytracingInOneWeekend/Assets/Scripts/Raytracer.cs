@@ -1314,7 +1314,7 @@ namespace RaytracerInOneWeekend
 			Diagnostics _ = default;
 			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, ref _, out hitRec);
 #else
-			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, workingArea, out hitRec);
+			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
 #endif
 		}
 

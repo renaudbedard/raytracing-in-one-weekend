@@ -11,6 +11,7 @@ using Random = Unity.Mathematics.Random;
 
 #if ENABLE_OPTIX
 using OptiX;
+using Debug = UnityEngine.Debug;
 #endif
 
 namespace RaytracerInOneWeekend

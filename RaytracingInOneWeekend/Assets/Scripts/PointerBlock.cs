@@ -1,3 +1,4 @@
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine.Assertions;
 
 namespace RaytracerInOneWeekend
@@ -20,10 +21,16 @@ namespace RaytracerInOneWeekend
 
 		bool TrySet(int index, T* value, out PointerBlock<T>* parentBlock)
 		{
-			var copy = stackalloc PointerBlock<T>[1];
-			*copy = this;
+			parentBlock = null;
+			if (index < Capacity)
+			{
+				Data[index] = value;
+				return true;
+			}
+			if (NextBlock == null) return false;
+			index -= Capacity;
+			parentBlock = NextBlock;
 
-			parentBlock = copy;
 			while (true)
 			{
 				if (index < parentBlock->Capacity)
