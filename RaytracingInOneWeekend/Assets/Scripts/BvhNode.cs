@@ -50,7 +50,7 @@ namespace RaytracerInOneWeekend
 
 	unsafe struct BvhNode
 	{
-		public const int MaxDepth = 12;
+		public static int MaxDepth = 16;
 
 		public readonly AxisAlignedBoundingBox Bounds;
 		public readonly Entity* EntitiesStart;

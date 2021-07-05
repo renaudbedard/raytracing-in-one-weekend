@@ -17,14 +17,13 @@ using float3 = Unity.Mathematics.float3;
 using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
-
 #if ENABLE_OPTIX
 using OptiX;
 #endif
-
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
+
 #else
 using OdinMock;
 using OdinReadOnly = OdinMock.ReadOnlyAttribute;
@@ -43,14 +42,13 @@ namespace RaytracerInOneWeekend
 
 	partial class Raytracer : MonoBehaviour
 	{
-		[Title("References")]
-		[SerializeField] UnityEngine.Camera targetCamera = null;
-		[SerializeField] BlueNoise blueNoise = null;
+		[Title("References")] [SerializeField] UnityEngine.Camera targetCamera;
+		[SerializeField] BlueNoise blueNoise;
 
-		[Title("Settings")]
-		[SerializeField] [Range(1, 100)]
+		[Title("Settings")] [SerializeField] [Range(1, 100)]
 		int interlacing = 2;
 
+		[SerializeField] [EnableIf("bvhEnabled")] [Range(1, 32)] int maxBvhDepth = 12;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
@@ -66,12 +64,12 @@ namespace RaytracerInOneWeekend
 		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
 #endif
 
-		[Title("World")]
-		[InlineEditor(DrawHeader = false)] [SerializeField]
+		[Title("World")] [InlineEditor(DrawHeader = false)] [SerializeField]
 		internal SceneData scene = null;
 
-		[Title("Debug")]
-		[SerializeField] [DisableInPlayMode] Shader viewRangeShader = null;
+		[Title("Debug")] [SerializeField] [DisableInPlayMode]
+		Shader viewRangeShader = null;
+
 		[OdinReadOnly] public float AccumulatedSamples;
 
 		[UsedImplicitly] [OdinReadOnly] public float MillionRaysPerSecond,
@@ -124,7 +122,14 @@ namespace RaytracerInOneWeekend
 		NativeList<BvhNode> bvhNodeBuffer;
 		NativeList<BvhNodeMetadata> bvhNodeMetadataBuffer;
 		NativeList<Entity> bvhEntities;
+
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
+#endif
+		[UsedImplicitly] bool BvhEnabled =>
+#if BVH
+			true;
+#else
+			false;
 #endif
 
 		readonly PerlinNoise perlinNoise = new PerlinNoise();
@@ -137,12 +142,7 @@ namespace RaytracerInOneWeekend
 		OptixDenoiser optixDenoiser;
 		OptixDenoiserSizes optixDenoiserSizes;
 		CudaStream cudaStream;
-
-		CudaBuffer optixScratchMemory = default,
-			optixDenoiserState = default,
-			optixColorBuffer = default,
-			optixAlbedoBuffer = default,
-			optixOutputBuffer = default;
+		CudaBuffer optixScratchMemory, optixDenoiserState, optixColorBuffer, optixAlbedoBuffer, optixOutputBuffer;
 #endif
 
 		struct ScheduledJobData<T>
@@ -239,20 +239,16 @@ namespace RaytracerInOneWeekend
 			channelPropertyId = Shader.PropertyToID("_Channel");
 			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
 
-			float3Buffers = new Pool<NativeArray<float3>>(() =>
-					new NativeArray<float3>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+			float3Buffers = new Pool<NativeArray<float3>>(() => new NativeArray<float3>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<float3>") { Capacity = 64 };
 
-			float4Buffers = new Pool<NativeArray<float4>>(() =>
-					new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+			float4Buffers = new Pool<NativeArray<float4>>(() => new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<float4>") { Capacity = 16 };
 
-			intBuffers = new Pool<NativeArray<int>>(() =>
-					new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+			intBuffers = new Pool<NativeArray<int>>(() => new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<int>") { Capacity = 4 };
 
-			longBuffers = new Pool<NativeArray<long>>(() =>
-					new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+			longBuffers = new Pool<NativeArray<long>>(() => new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<long>") { Capacity = 4 };
 
 			boolBuffers = new Pool<NativeArray<bool>>(() => new NativeArray<bool>(1, Allocator.Persistent),
@@ -371,7 +367,12 @@ namespace RaytracerInOneWeekend
 			foreach (var jobData in scheduledDenoiseJobs) jobData.Cancel();
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Cancel();
 
-			foreach (var jobData in scheduledAccumulateJobs) { jobData.Handle.Complete(); jobData.OutputData.ReduceRayCountJobHandle.Complete(); }
+			foreach (var jobData in scheduledAccumulateJobs)
+			{
+				jobData.Handle.Complete();
+				jobData.OutputData.ReduceRayCountJobHandle.Complete();
+			}
+
 			foreach (var jobData in scheduledCombineJobs) jobData.Handle.Complete();
 			foreach (var jobData in scheduledDenoiseJobs) jobData.Handle.Complete();
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Handle.Complete();
@@ -450,7 +451,8 @@ namespace RaytracerInOneWeekend
 			bool cameraDirty = targetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
-			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
+			bool samplesPerPixelDecreased =
+				lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
 			                       samplingModeChanged || samplesPerPixelDecreased;
@@ -459,10 +461,22 @@ namespace RaytracerInOneWeekend
 			{
 				int i = 0;
 				bool ShouldCancel() => i++ > 0 || traceAborted;
-				foreach (var jobData in scheduledAccumulateJobs) { if (ShouldCancel()) jobData.Cancel(); } i = 0;
-				foreach (var jobData in scheduledCombineJobs) { if (ShouldCancel()) jobData.Cancel(); } i = 0;
-				foreach (var jobData in scheduledDenoiseJobs) { if (ShouldCancel()) jobData.Cancel(); } i = 0;
-				foreach (var jobData in scheduledFinalizeJobs) { if (ShouldCancel()) jobData.Cancel(); } i = 0;
+				foreach (var jobData in scheduledAccumulateJobs)
+					if (ShouldCancel()) jobData.Cancel();
+
+				i = 0;
+				foreach (var jobData in scheduledCombineJobs)
+					if (ShouldCancel()) jobData.Cancel();
+
+				i = 0;
+				foreach (var jobData in scheduledDenoiseJobs)
+					if (ShouldCancel()) jobData.Cancel();
+
+				i = 0;
+				foreach (var jobData in scheduledFinalizeJobs)
+					if (ShouldCancel()) jobData.Cancel();
+
+				i = 0;
 
 				foreach (var jobData in scheduledAccumulateJobs) jobData.Handle.Complete();
 				foreach (var jobData in scheduledCombineJobs) jobData.Handle.Complete();
@@ -660,8 +674,8 @@ namespace RaytracerInOneWeekend
 					NodeCount = bvhNodeBuffer.Length,
 #endif
 #if PATH_DEBUGGING
-				DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
-				DebugCoordinates = int2 (bufferSize / 2)
+					DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
+					DebugCoordinates = int2 (bufferSize / 2)
 #endif
 				};
 			}
@@ -671,18 +685,31 @@ namespace RaytracerInOneWeekend
 			JobHandle accumulateJobHandle;
 			if (interlacing > 1)
 			{
-				using (var handles = new NativeArray<JobHandle>(4, Allocator.Temp)
+				using var handles = new NativeArray<JobHandle>(4, Allocator.Temp)
 				{
-					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
-					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
-					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
-					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }.Schedule(dependency ?? default)
-				})
-				{
-					JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
-					JobHandle startTimerJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 0 }.Schedule(combinedDependencies);
-					accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
-				}
+					[0] = new CopyFloat4BufferJob
+					{
+						CancellationToken = cancellationBuffer, Input = colorAccumulationBuffer,
+						Output = colorOutputBuffer
+					}.Schedule(dependency ?? default),
+					[1] = new CopyFloat3BufferJob
+					{
+						CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer,
+						Output = normalOutputBuffer
+					}.Schedule(dependency ?? default),
+					[2] = new CopyFloat3BufferJob
+					{
+						CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer,
+						Output = albedoOutputBuffer
+					}.Schedule(dependency ?? default),
+					[3] = new ClearBufferJob<Diagnostics>
+							{ CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }
+						.Schedule(dependency ?? default)
+				};
+
+				JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
+				JobHandle startTimerJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 0 }.Schedule(combinedDependencies);
+				accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
 			}
 			else
 			{
@@ -694,7 +721,8 @@ namespace RaytracerInOneWeekend
 
 			NativeArray<int> reducedRayCountBuffer = intBuffers.Take();
 			JobHandle reduceRayCountJobHandle = new ReduceRayCountJob
-				{ Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountBuffer }.Schedule(accumulateJobHandle);
+					{ Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountBuffer }
+				.Schedule(accumulateJobHandle);
 
 			var outputData = new AccumulateOutputData
 			{
@@ -707,12 +735,16 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
+				new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorOutputBuffer, Output = outputData.Color }
+					.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalOutputBuffer, Output = outputData.Normal }
+					.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }
+					.Schedule(accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
-			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer, albedoInputBuffer = albedoAccumulationBuffer;
+			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
+				albedoInputBuffer = albedoAccumulationBuffer;
 
 			scheduledAccumulateJobs.Enqueue(new ScheduledJobData<AccumulateOutputData>
 			{
@@ -733,11 +765,13 @@ namespace RaytracerInOneWeekend
 			normalAccumulationBuffer = normalOutputBuffer;
 			albedoAccumulationBuffer = albedoOutputBuffer;
 
-			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel || previewAfterBatch)
+			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel ||
+			    previewAfterBatch)
 				ScheduleCombine(combinedDependency, outputData);
 
 			// schedule another accumulate (but no more than one)
-			if (!dependency.HasValue && AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing < samplesPerPixel)
+			if (!dependency.HasValue &&
+			    AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing < samplesPerPixel)
 				ScheduleAccumulate(false, JobHandle.CombineDependencies(combinedDependency, reduceRayCountJobHandle));
 
 			JobHandle.ScheduleBatchedJobs();
@@ -927,7 +961,8 @@ namespace RaytracerInOneWeekend
 		unsafe void SwapBuffers()
 		{
 			float bufferMin = float.MaxValue, bufferMax = float.MinValue;
-			Diagnostics* diagnosticsPtr = (Diagnostics*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(diagnosticsBuffer);
+			Diagnostics* diagnosticsPtr =
+				(Diagnostics*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(diagnosticsBuffer);
 
 			switch (bufferView)
 			{
@@ -964,9 +999,15 @@ namespace RaytracerInOneWeekend
 
 			switch (bufferView)
 			{
-				case BufferView.Front: frontBufferTexture.Apply(false); break;
-				case BufferView.Normals: normalsTexture.Apply(false); break;
-				case BufferView.Albedo: albedoTexture.Apply(false); break;
+				case BufferView.Front:
+					frontBufferTexture.Apply(false);
+					break;
+				case BufferView.Normals:
+					normalsTexture.Apply(false);
+					break;
+				case BufferView.Albedo:
+					albedoTexture.Apply(false);
+					break;
 
 				default:
 					BufferMinValue = bufferMin;
@@ -983,9 +1024,15 @@ namespace RaytracerInOneWeekend
 
 				switch (bufferView)
 				{
-					case BufferView.Front: commandBuffer.Blit(frontBufferTexture, blitTarget); break;
-					case BufferView.Normals: commandBuffer.Blit(normalsTexture, blitTarget); break;
-					case BufferView.Albedo: commandBuffer.Blit(albedoTexture, blitTarget); break;
+					case BufferView.Front:
+						commandBuffer.Blit(frontBufferTexture, blitTarget);
+						break;
+					case BufferView.Normals:
+						commandBuffer.Blit(normalsTexture, blitTarget);
+						break;
+					case BufferView.Albedo:
+						commandBuffer.Blit(albedoTexture, blitTarget);
+						break;
 
 					default:
 						viewRangeMaterial.SetInt(channelPropertyId, (int) bufferView - 1);
@@ -1118,7 +1165,8 @@ namespace RaytracerInOneWeekend
 				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
 			materialBuffer.EnsureCapacity(ActiveEntities.Select(x => x.Material).Distinct().Count());
 
-			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
+			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x =>
+				x.Material.Type == MaterialType.DiffuseLight));
 
 			int entityIndex = 0,
 				sphereIndex = 0,
@@ -1128,10 +1176,12 @@ namespace RaytracerInOneWeekend
 				importanceSamplingIndex = 0,
 				materialIndex = 0;
 
-			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform, EntityType entityType)
+			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform,
+				EntityType entityType)
 			{
 				Entity entity = e.Moving
-					? new Entity(entityType, contentPointer, entityTransform, material, e.DestinationOffset, e.TimeRange)
+					? new Entity(entityType, contentPointer, entityTransform, material, e.DestinationOffset,
+						e.TimeRange)
 					: new Entity(entityType, contentPointer, entityTransform, material);
 
 				entityBuffer[entityIndex++] = entity;
@@ -1163,22 +1213,27 @@ namespace RaytracerInOneWeekend
 				{
 					case EntityType.Sphere:
 						sphereBuffer[sphereIndex] = new Sphere(e.SphereData.Radius);
-						AddEntity(e, (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++, materialPtr, rigidTransform, EntityType.Sphere);
+						AddEntity(e, (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++, materialPtr, rigidTransform,
+							EntityType.Sphere);
 						break;
 
 					case EntityType.Rect:
 						rectBuffer[rectIndex] = new Rect(e.RectData.Size);
-						AddEntity(e, (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++, materialPtr, rigidTransform, EntityType.Rect);
+						AddEntity(e, (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++, materialPtr, rigidTransform,
+							EntityType.Rect);
 						break;
 
 					case EntityType.Box:
 						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
-						AddEntity(e, (Box*) boxBuffer.GetUnsafePtr() + boxIndex++, materialPtr, rigidTransform, EntityType.Box);
+						AddEntity(e, (Box*) boxBuffer.GetUnsafePtr() + boxIndex++, materialPtr, rigidTransform,
+							EntityType.Box);
 						break;
 
 					case EntityType.Triangle:
-						triangleBuffer[triangleIndex] = new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
-						AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr, rigidTransform, EntityType.Triangle);
+						triangleBuffer[triangleIndex] =
+							new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
+						AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr,
+							rigidTransform, EntityType.Triangle);
 						break;
 
 					case EntityType.Mesh:
@@ -1194,9 +1249,11 @@ namespace RaytracerInOneWeekend
 									meshVertexList[meshIndexList[i + 1]],
 									meshVertexList[meshIndexList[i + 2]]);
 
-								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr, rigidTransform, EntityType.Triangle);
+								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr,
+									rigidTransform, EntityType.Triangle);
 							}
 						}
+
 						break;
 				}
 			}
@@ -1207,6 +1264,8 @@ namespace RaytracerInOneWeekend
 #if BVH
 		unsafe void RebuildBvh()
 		{
+			BvhNode.MaxDepth = maxBvhDepth;
+
 			bvhNodeBuffer.EnsureCapacity(entityBuffer.Length * 2);
 			bvhNodeMetadataBuffer.EnsureCapacity(entityBuffer.Length * 2);
 			bvhEntities.EnsureCapacity(entityBuffer.Length);
@@ -1249,7 +1308,7 @@ namespace RaytracerInOneWeekend
 		unsafe bool HitWorld(Ray r, out HitRecord hitRec)
 		{
 			BvhNode** nodes = stackalloc BvhNode*[bvhNodeBuffer.Length];
-			Entity** entities = stackalloc Entity*[entityBuffer.Length];
+			Entity** entities = stackalloc Entity*[bvhEntities.Length];
 
 			var workingArea = new AccumulateJob.WorkingArea
 			{
@@ -1257,10 +1316,8 @@ namespace RaytracerInOneWeekend
 				Entities = entities,
 			};
 
-			var rng = new RandomSource(
-				noiseColor,
-				new Random(scene.RandomSeed),
-				blueNoise.GetRuntimeData(scene.RandomSeed).GetPerPixelData((uint2)(bufferSize / 2)));
+			var rng = new RandomSource(noiseColor, new Random(scene.RandomSeed),
+				blueNoise.GetRuntimeData(scene.RandomSeed).GetPerPixelData((uint2) bufferSize / 2));
 
 #if FULL_DIAGNOSTICS
 			Diagnostics _ = default;
@@ -1320,7 +1377,8 @@ namespace RaytracerInOneWeekend
 							group.DieletricChance,
 							group.LightChance);
 
-						float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric + probabilities.light;
+						float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric +
+						            probabilities.light;
 						probabilities.metal += probabilities.lambertian;
 						probabilities.dielectric += probabilities.metal;
 						probabilities.light += probabilities.dielectric;

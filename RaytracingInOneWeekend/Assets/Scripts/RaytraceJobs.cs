@@ -46,8 +46,14 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		public struct WorkingArea
 		{
-			public BvhNode** Nodes;
-			public Entity** Entities;
+			public PointerBlock<BvhNode> Nodes;
+			public PointerBlock<Entity> Entities;
+		}
+		public struct PointerBlock<T> where T : unmanaged
+		{
+			public T** Data;
+			public int Length;
+			public PointerBlock<T>* NextBlock;
 		}
 #endif
 		[ReadOnly] public float2 Size;
