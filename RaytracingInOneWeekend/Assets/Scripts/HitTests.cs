@@ -1,5 +1,4 @@
 using Unity.Mathematics;
-using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -213,28 +212,23 @@ namespace RaytracerInOneWeekend
 
 #elif BVH_ITERATIVE
 		public static unsafe bool Hit(this BvhNode node, Ray r, float tMin, float tMax,
-			ref RandomSource rng,
+			ref RandomSource rng, PointerBlockChain<BvhNode> nodeTraversalBuffer, PointerBlockChain<Entity> hitCandidateBuffer,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
 			out HitRecord rec)
 		{
 			rec = default;
-
-			var np = stackalloc BvhNode*[1];
-			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
-			var nodesToTraverse = new PointerBlockChain<BvhNode>(npb);
-			nodesToTraverse.Push(&node);
-
-			var ep = stackalloc Entity*[1];
-			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
-			var hitCandidates = new PointerBlockChain<Entity>(epb);
-
 			float3 rayInvDirection = rcp(r.Direction);
 
-			while (nodesToTraverse.Length > 0)
+			// TODO: Is this redundant?
+			nodeTraversalBuffer.Clear();
+			hitCandidateBuffer.Clear();
+
+			nodeTraversalBuffer.Push(&node);
+			while (nodeTraversalBuffer.Length > 0)
 			{
-				BvhNode* nodePtr = nodesToTraverse.Pop();
+				BvhNode* nodePtr = nodeTraversalBuffer.Pop();
 
 				if (!nodePtr->Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 					continue;
@@ -251,13 +245,13 @@ namespace RaytracerInOneWeekend
 					for (int i = 0; i < entityCount; i++)
 					{
 						// TODO: We should be able to preallocate for entityCount
-						if (!hitCandidates.TryPush(entityPtr + i))
+						if (!hitCandidateBuffer.TryPush(entityPtr + i))
 						{
 							var pb = stackalloc PointerBlock<Entity>[1];
-							var p = stackalloc Entity*[hitCandidates.TailBlock->Capacity * 2];
-							*pb = new PointerBlock<Entity>(p, hitCandidates.TailBlock->Capacity * 2, hitCandidates.TailBlock);
-							hitCandidates.TailBlock->NextBlock = pb;
-							hitCandidates.Push(entityPtr + i);
+							var p = stackalloc Entity*[hitCandidateBuffer.TailBlock->Capacity * 2];
+							*pb = new PointerBlock<Entity>(p, hitCandidateBuffer.TailBlock->Capacity * 2, hitCandidateBuffer.TailBlock);
+							hitCandidateBuffer.TailBlock->NextBlock = pb;
+							hitCandidateBuffer.Push(entityPtr + i);
 						}
 					}
 
@@ -268,30 +262,30 @@ namespace RaytracerInOneWeekend
 				else
 				{
 					// TODO: We should be able to preallocate for 2
-					if (!nodesToTraverse.TryPush(nodePtr->Left))
+					if (!nodeTraversalBuffer.TryPush(nodePtr->Left))
 					{
 						var pb = stackalloc PointerBlock<BvhNode>[1];
-						var p = stackalloc BvhNode*[nodesToTraverse.TailBlock->Capacity * 2];
-						*pb = new PointerBlock<BvhNode>(p, nodesToTraverse.TailBlock->Capacity * 2, nodesToTraverse.TailBlock);
-						nodesToTraverse.TailBlock->NextBlock = pb;
-						nodesToTraverse.Push(nodePtr->Left);
+						var p = stackalloc BvhNode*[nodeTraversalBuffer.TailBlock->Capacity * 2];
+						*pb = new PointerBlock<BvhNode>(p, nodeTraversalBuffer.TailBlock->Capacity * 2, nodeTraversalBuffer.TailBlock);
+						nodeTraversalBuffer.TailBlock->NextBlock = pb;
+						nodeTraversalBuffer.Push(nodePtr->Left);
 					}
-					if (!nodesToTraverse.TryPush(nodePtr->Right))
+					if (!nodeTraversalBuffer.TryPush(nodePtr->Right))
 					{
 						var pb = stackalloc PointerBlock<BvhNode>[1];
-						var p = stackalloc BvhNode*[nodesToTraverse.TailBlock->Capacity * 2];
-						*pb = new PointerBlock<BvhNode>(p, nodesToTraverse.TailBlock->Capacity * 2, nodesToTraverse.TailBlock);
-						nodesToTraverse.TailBlock->NextBlock = pb;
-						nodesToTraverse.Push(nodePtr->Right);
+						var p = stackalloc BvhNode*[nodeTraversalBuffer.TailBlock->Capacity * 2];
+						*pb = new PointerBlock<BvhNode>(p, nodeTraversalBuffer.TailBlock->Capacity * 2, nodeTraversalBuffer.TailBlock);
+						nodeTraversalBuffer.TailBlock->NextBlock = pb;
+						nodeTraversalBuffer.Push(nodePtr->Right);
 					}
 				}
 			}
 
 			// iterative candidate tests
 			bool anyHit = false;
-			while (hitCandidates.Length > 0)
+			while (hitCandidateBuffer.Length > 0)
 			{
-				var hitCandidate = hitCandidates.Pop();
+				var hitCandidate = hitCandidateBuffer.Pop();
 				bool thisHit = hitCandidate->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
 				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
 				{

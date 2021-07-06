@@ -175,6 +175,14 @@ namespace RaytracerInOneWeekend
 
 			Ray ray = eyeRay;
 
+            var np = stackalloc BvhNode*[1];
+            var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
+            var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
+
+            var ep = stackalloc Entity*[1];
+            var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
+            var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
+
 			for (; depth < TraceDepth; depth++)
 			{
 #if BVH
@@ -183,6 +191,9 @@ namespace RaytracerInOneWeekend
 				bool hit = Entities.Hit(
 #endif
 					ray, 0, float.PositiveInfinity, ref rng,
+#if BVH_ITERATIVE
+					nodeTraversalBuffer, hitCandidateBuffer,
+#endif
 #if FULL_DIAGNOSTICS && BVH
 					ref diagnostics,
 #endif
@@ -196,7 +207,7 @@ namespace RaytracerInOneWeekend
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
-					// we explicitely sampled an entity and could not hit it -- early out of this sample
+					// we explicitly sampled an entity and could not hit it -- early out of this sample
 					if (explicitSamplingTarget != null && explicitSamplingTarget != rec.EntityPtr)
 						break;
 

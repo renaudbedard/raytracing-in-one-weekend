@@ -6,16 +6,25 @@ namespace RaytracerInOneWeekend
 	{
 		public int Length { get; private set; }
 
-		private PointerBlock<T>* tailBlock;
-		private T** tail;
+		readonly PointerBlock<T>* headBlock;
+
+		PointerBlock<T>* tailBlock;
+		T** tail;
 
 		public PointerBlock<T>* TailBlock => tailBlock;
 
 		public PointerBlockChain(PointerBlock<T>* firstBlock) : this()
 		{
 			Assert.IsTrue(firstBlock != null, "First block must be allocated");
-			tailBlock = firstBlock;
+			headBlock = tailBlock = firstBlock;
 			tail = firstBlock->Data - 1; // This will never be accessed
+		}
+
+		public void Clear()
+		{
+			Length = 0;
+			tailBlock = headBlock;
+			tail = headBlock->Data - 1;
 		}
 
 		public void Push(T* value)
