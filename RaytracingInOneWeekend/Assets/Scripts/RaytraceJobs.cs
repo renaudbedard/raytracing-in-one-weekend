@@ -2,16 +2,17 @@ using System;
 using System.Diagnostics;
 using OpenImageDenoise;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
+using Debug = UnityEngine.Debug;
 
 #if ENABLE_OPTIX
 using OptiX;
-using Debug = UnityEngine.Debug;
 #endif
 
 namespace RaytracerInOneWeekend
@@ -148,6 +149,7 @@ namespace RaytracerInOneWeekend
 			OutputDiagnostics[index] = diagnostics;
 		}
 
+		[SkipLocalsInit]
 		bool Sample(Ray eyeRay, ref RandomSource rng, float3* emissionStack, float3* attenuationStack,
 #if PATH_DEBUGGING
 			bool doDebugPaths, int sampleIndex,
@@ -165,9 +167,7 @@ namespace RaytracerInOneWeekend
 
 			Ray ray = eyeRay;
 
-			Debug.Log("BvhNode ===========================================");
-
-            var np = stackalloc BvhNode*[1];
+			var np = stackalloc BvhNode*[1];
             var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
             var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
 

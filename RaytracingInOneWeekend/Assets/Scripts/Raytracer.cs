@@ -571,9 +571,9 @@ namespace RaytracerInOneWeekend
 			Vector3 origin = cameraTransform.localPosition;
 			Vector3 lookAt = origin + cameraTransform.forward;
 
-			//if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
-			//	focusDistance = hitRec.Distance;
-			//else
+			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
+				focusDistance = hitRec.Distance;
+			else
 				focusDistance = 1;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,

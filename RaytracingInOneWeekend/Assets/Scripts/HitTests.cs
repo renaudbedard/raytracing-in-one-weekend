@@ -1,3 +1,4 @@
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
@@ -212,6 +213,7 @@ namespace RaytracerInOneWeekend
 		}
 
 #elif BVH_ITERATIVE
+		[SkipLocalsInit]
 		public static unsafe bool Hit(this BvhNode node, Ray r, float tMin, float tMax,
 			ref RandomSource rng, PointerBlockChain<BvhNode> nodeTraversalBuffer, PointerBlockChain<Entity> hitCandidateBuffer,
 #if FULL_DIAGNOSTICS
@@ -222,7 +224,6 @@ namespace RaytracerInOneWeekend
 			rec = default;
 			float3 rayInvDirection = rcp(r.Direction);
 
-			// TODO: Is this redundant?
 			nodeTraversalBuffer.Clear();
 			hitCandidateBuffer.Clear();
 
