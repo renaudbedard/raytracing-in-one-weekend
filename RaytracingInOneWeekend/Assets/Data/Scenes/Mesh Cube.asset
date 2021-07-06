@@ -10,18 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
-  m_Name: Polysphere Test
+  m_Name: Mesh Cube
   m_EditorClassIdentifier: 
-  cameraPosition: {x: 0, y: 0, z: -1.25}
-  cameraTarget: {x: 0, y: 0, z: 0}
-  cameraAperture: 0.1
-  cameraFieldOfView: 60
+  cameraPosition: {x: 0.9564886, y: 1.0216246, z: 0.924705}
+  cameraTarget: {x: 0.4049083, y: 0.3531795, z: 0.4257654}
+  cameraAperture: 0.05
+  cameraFieldOfView: 59.2
   entities:
   - name: 
     type: 5
     enabled: 1
     position: {x: 0, y: 0, z: 0}
-    rotation: {x: 0, y: 180, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
     moving: 0
     destinationOffset: {x: 0, y: 0, z: 0}
     timeRange: {x: 0, y: 0}
@@ -37,11 +37,11 @@ MonoBehaviour:
       b: {x: -1, y: -1, z: 0}
       c: {x: 1, y: -1, z: 0}
     meshData:
-      mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 11400000, guid: df4ea467d01bf44eda21b38d92677ae9, type: 2}
+      mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
   randomSeed: 1
   randomEntityGroups: []
-  skyType: 0
+  skyType: 1
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
-  skyCubemap: {fileID: 0}
+  skyCubemap: {fileID: 8900000, guid: 58504c8e226a95944ad302949069e850, type: 3}

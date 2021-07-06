@@ -42,13 +42,6 @@ namespace RaytracerInOneWeekend
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
 
-#if BVH_ITERATIVE
-		public struct WorkingArea
-		{
-			public PointerBlock<BvhNode> Nodes;
-			public PointerBlock<Entity> Entities;
-		}
-#endif
 		[ReadOnly] public float2 Size;
 		[ReadOnly] public int SliceOffset;
 		[ReadOnly] public int SliceDivider;
@@ -59,17 +52,14 @@ namespace RaytracerInOneWeekend
 		[ReadOnly] public int TraceDepth;
 		[ReadOnly] public bool SubPixelJitter;
 		[ReadOnly] public ImportanceSampler ImportanceSampler;
-		[ReadOnly] public NativeArray<Entity> Entities;
 #if BVH
-		[ReadOnly] [NativeDisableUnsafePtrRestriction]
-		public BvhNode* BvhRoot;
+		[ReadOnly] [NativeDisableUnsafePtrRestriction] public BvhNode* BvhRoot;
+#else
+		[ReadOnly] public NativeArray<Entity> Entities;
 #endif
 		[ReadOnly] public PerlinNoiseRuntimeData PerlinNoise;
 		[ReadOnly] public BlueNoiseRuntimeData BlueNoise;
 		[ReadOnly] public NoiseColor NoiseColor;
-#if BVH_ITERATIVE
-		[ReadOnly] public int NodeCount;
-#endif
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
 		[ReadOnly] public NativeArray<float3> InputAlbedo;
@@ -174,6 +164,8 @@ namespace RaytracerInOneWeekend
 			sampleNormal = sampleAlbedo = default;
 
 			Ray ray = eyeRay;
+
+			Debug.Log("BvhNode ===========================================");
 
             var np = stackalloc BvhNode*[1];
             var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };

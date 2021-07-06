@@ -558,7 +558,7 @@ PlayerSettings:
   webGLThreadsSupport: 0
   webGLDecompressionFallback: 0
   scriptingDefineSymbols:
-    1: ODIN_INSPECTOR;ODIN_INSPECTOR_3;BVH_RECURSIVE;BVH;ENABLE_OPTIX
+    1: ODIN_INSPECTOR;ODIN_INSPECTOR_3;BVH_ITERATIVE;ENABLE_OPTIX;BVH
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

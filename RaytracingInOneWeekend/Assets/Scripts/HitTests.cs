@@ -1,4 +1,5 @@
 using Unity.Mathematics;
+using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -247,9 +248,9 @@ namespace RaytracerInOneWeekend
 						// TODO: We should be able to preallocate for entityCount
 						if (!hitCandidateBuffer.TryPush(entityPtr + i))
 						{
-							var pb = stackalloc PointerBlock<Entity>[1];
-							var p = stackalloc Entity*[hitCandidateBuffer.TailBlock->Capacity * 2];
-							*pb = new PointerBlock<Entity>(p, hitCandidateBuffer.TailBlock->Capacity * 2, hitCandidateBuffer.TailBlock);
+							int newBlockCapacity = hitCandidateBuffer.TailBlock->Capacity * 2;
+							var p = stackalloc Entity*[newBlockCapacity];
+							var pb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(p, newBlockCapacity, hitCandidateBuffer.TailBlock) };
 							hitCandidateBuffer.TailBlock->NextBlock = pb;
 							hitCandidateBuffer.Push(entityPtr + i);
 						}
@@ -264,17 +265,17 @@ namespace RaytracerInOneWeekend
 					// TODO: We should be able to preallocate for 2
 					if (!nodeTraversalBuffer.TryPush(nodePtr->Left))
 					{
-						var pb = stackalloc PointerBlock<BvhNode>[1];
-						var p = stackalloc BvhNode*[nodeTraversalBuffer.TailBlock->Capacity * 2];
-						*pb = new PointerBlock<BvhNode>(p, nodeTraversalBuffer.TailBlock->Capacity * 2, nodeTraversalBuffer.TailBlock);
+						int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
+						var p = stackalloc BvhNode*[newBlockCapacity];
+						var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
 						nodeTraversalBuffer.TailBlock->NextBlock = pb;
 						nodeTraversalBuffer.Push(nodePtr->Left);
 					}
 					if (!nodeTraversalBuffer.TryPush(nodePtr->Right))
 					{
-						var pb = stackalloc PointerBlock<BvhNode>[1];
-						var p = stackalloc BvhNode*[nodeTraversalBuffer.TailBlock->Capacity * 2];
-						*pb = new PointerBlock<BvhNode>(p, nodeTraversalBuffer.TailBlock->Capacity * 2, nodeTraversalBuffer.TailBlock);
+						int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
+						var p = stackalloc BvhNode*[newBlockCapacity];
+						var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
 						nodeTraversalBuffer.TailBlock->NextBlock = pb;
 						nodeTraversalBuffer.Push(nodePtr->Right);
 					}

@@ -17,13 +17,14 @@ using float3 = Unity.Mathematics.float3;
 using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using RigidTransform = Unity.Mathematics.RigidTransform;
+
 #if ENABLE_OPTIX
 using OptiX;
 #endif
+
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
-
 #else
 using OdinMock;
 using OdinReadOnly = OdinMock.ReadOnlyAttribute;
@@ -48,7 +49,7 @@ namespace RaytracerInOneWeekend
 		[Title("Settings")] [SerializeField] [Range(1, 100)]
 		int interlacing = 2;
 
-		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(1, 32)] int maxBvhDepth = 12;
+		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [OnValueChanged("@scene.MarkDirty()")] int maxBvhDepth = 16;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
@@ -570,9 +571,9 @@ namespace RaytracerInOneWeekend
 			Vector3 origin = cameraTransform.localPosition;
 			Vector3 lookAt = origin + cameraTransform.forward;
 
-			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
-				focusDistance = hitRec.Distance;
-			else
+			//if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
+			//	focusDistance = hitRec.Distance;
+			//else
 				focusDistance = 1;
 
 			var raytracingCamera = new Camera(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
@@ -655,9 +656,10 @@ namespace RaytracerInOneWeekend
 					SampleCount = min(samplesPerPixel, samplesPerBatch),
 					TraceDepth = traceDepth,
 					SubPixelJitter = subPixelJitter,
-					Entities = entityBuffer,
 #if BVH
 					BvhRoot = BvhRoot,
+#else
+					Entities = entityBuffer,
 #endif
 					PerlinNoise = perlinNoise.GetRuntimeData(),
 					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
@@ -670,9 +672,6 @@ namespace RaytracerInOneWeekend
 							? ImportanceSamplingMode.None
 							: importanceSampling
 					},
-#if BVH_ITERATIVE
-					NodeCount = bvhNodeBuffer.Length,
-#endif
 #if PATH_DEBUGGING
 					DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
 					DebugCoordinates = int2 (bufferSize / 2)
@@ -687,24 +686,11 @@ namespace RaytracerInOneWeekend
 			{
 				using var handles = new NativeArray<JobHandle>(4, Allocator.Temp)
 				{
-					[0] = new CopyFloat4BufferJob
-					{
-						CancellationToken = cancellationBuffer, Input = colorAccumulationBuffer,
-						Output = colorOutputBuffer
-					}.Schedule(dependency ?? default),
-					[1] = new CopyFloat3BufferJob
-					{
-						CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer,
-						Output = normalOutputBuffer
-					}.Schedule(dependency ?? default),
-					[2] = new CopyFloat3BufferJob
-					{
-						CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer,
-						Output = albedoOutputBuffer
-					}.Schedule(dependency ?? default),
-					[3] = new ClearBufferJob<Diagnostics>
-							{ CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }
-						.Schedule(dependency ?? default)
+					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
+					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
+					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
+					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }
+					.Schedule(dependency ?? default)
 				};
 
 				JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
@@ -735,12 +721,9 @@ namespace RaytracerInOneWeekend
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorOutputBuffer, Output = outputData.Color }
-					.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalOutputBuffer, Output = outputData.Normal }
-					.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }
-					.Schedule(accumulateJobHandle));
+				new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
 			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
