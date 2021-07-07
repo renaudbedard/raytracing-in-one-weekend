@@ -60,7 +60,7 @@ namespace RaytracerInOneWeekend
 			return true;
 		}
 
-		public static void EnsureCapacity<T>(this ref NativeList<T> list, int size) where T : struct
+		public static void EnsureCapacity<T>(this ref NativeList<T> list, int size) where T : unmanaged
 		{
 			if (!list.IsCreated)
 			{
@@ -81,7 +81,7 @@ namespace RaytracerInOneWeekend
 			UnsafeUtility.MemClear(array.GetUnsafePtr(), array.Length * sizeof(T));
 		}
 
-		public static void SafeDispose<T>(this ref NativeList<T> list) where T : struct
+		public static void SafeDispose<T>(this ref NativeList<T> list) where T : unmanaged
 		{
 			if (list.IsCreated) list.Dispose();
 		}

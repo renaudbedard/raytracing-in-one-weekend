@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
+using Debug = UnityEngine.Debug;
 using static Unity.Mathematics.math;
 
 namespace RaytracerInOneWeekend
@@ -210,96 +212,6 @@ namespace RaytracerInOneWeekend
 
 			rec = rightRecord;
 			return true;
-		}
-
-#elif BVH_ITERATIVE
-		[SkipLocalsInit]
-		public static unsafe bool Hit(this BvhNode node, Ray r, float tMin, float tMax,
-			ref RandomSource rng, PointerBlockChain<BvhNode> nodeTraversalBuffer, PointerBlockChain<Entity> hitCandidateBuffer,
-#if FULL_DIAGNOSTICS
-			ref Diagnostics diagnostics,
-#endif
-			out HitRecord rec)
-		{
-			rec = default;
-			float3 rayInvDirection = rcp(r.Direction);
-
-			nodeTraversalBuffer.Clear();
-			hitCandidateBuffer.Clear();
-
-			nodeTraversalBuffer.Push(&node);
-			while (nodeTraversalBuffer.Length > 0)
-			{
-				BvhNode* nodePtr = nodeTraversalBuffer.Pop();
-
-				if (!nodePtr->Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
-					continue;
-
-#if FULL_DIAGNOSTICS
-				diagnostics.BoundsHitCount++;
-#endif
-
-				if (nodePtr->IsLeaf)
-				{
-					int entityCount = nodePtr->EntityCount;
-					Entity* entityPtr = nodePtr->EntitiesStart;
-
-					for (int i = 0; i < entityCount; i++)
-					{
-						// TODO: We should be able to preallocate for entityCount
-						if (!hitCandidateBuffer.TryPush(entityPtr + i))
-						{
-							int newBlockCapacity = hitCandidateBuffer.TailBlock->Capacity * 2;
-							var p = stackalloc Entity*[newBlockCapacity];
-							var pb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(p, newBlockCapacity, hitCandidateBuffer.TailBlock) };
-							hitCandidateBuffer.TailBlock->NextBlock = pb;
-							hitCandidateBuffer.Push(entityPtr + i);
-						}
-					}
-
-#if FULL_DIAGNOSTICS
-					diagnostics.CandidateCount += entityCount;
-#endif
-				}
-				else
-				{
-					// TODO: We should be able to preallocate for 2
-					if (!nodeTraversalBuffer.TryPush(nodePtr->Left))
-					{
-						int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
-						var p = stackalloc BvhNode*[newBlockCapacity];
-						var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
-						nodeTraversalBuffer.TailBlock->NextBlock = pb;
-						nodeTraversalBuffer.Push(nodePtr->Left);
-					}
-					if (!nodeTraversalBuffer.TryPush(nodePtr->Right))
-					{
-						int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
-						var p = stackalloc BvhNode*[newBlockCapacity];
-						var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
-						nodeTraversalBuffer.TailBlock->NextBlock = pb;
-						nodeTraversalBuffer.Push(nodePtr->Right);
-					}
-				}
-			}
-
-			// iterative candidate tests
-			bool anyHit = false;
-			while (hitCandidateBuffer.Length > 0)
-			{
-				var hitCandidate = hitCandidateBuffer.Pop();
-				bool thisHit = hitCandidate->Hit(r, tMin, tMax, ref rng, out HitRecord thisRec);
-				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
-				{
-					anyHit = true;
-					rec = thisRec;
-					rec.EntityPtr = hitCandidate;
-				}
-			}
-			if (anyHit)
-				return true;
-
-			return false;
 		}
 #endif
 	}

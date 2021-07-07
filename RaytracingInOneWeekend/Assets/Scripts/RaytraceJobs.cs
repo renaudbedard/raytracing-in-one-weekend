@@ -10,6 +10,7 @@ using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
 using Debug = UnityEngine.Debug;
+using UnityEngine.Assertions;
 
 #if ENABLE_OPTIX
 using OptiX;
@@ -38,7 +39,7 @@ namespace RaytracerInOneWeekend
 	}
 #endif
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance, Debug = true)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
 		[ReadOnly] public NativeArray<bool> CancellationToken;
@@ -167,29 +168,140 @@ namespace RaytracerInOneWeekend
 
 			Ray ray = eyeRay;
 
+#if BVH_ITERATIVE
+			int totalMemory = 0;
+
 			var np = stackalloc BvhNode*[1];
-            var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
-            var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
+			totalMemory += sizeof(BvhNode*);
+			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
+			totalMemory += sizeof(PointerBlock<BvhNode>);
+			var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
 
             var ep = stackalloc Entity*[1];
-            var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
-            var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
+			totalMemory += sizeof(Entity*);
+			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
+			totalMemory += sizeof(PointerBlock<Entity>);
+			var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
+#endif
 
 			for (; depth < TraceDepth; depth++)
 			{
+#if BVH_ITERATIVE
+				HitRecord rec = default;
+				float3 rayInvDirection = rcp(ray.Direction);
+
+				nodeTraversalBuffer.Clear();
+				hitCandidateBuffer.Clear();
+
+				nodeTraversalBuffer.Push(BvhRoot);
+				Debug.Log($"Added root node to traversal buffer, now {nodeTraversalBuffer.Length}");
+
+				while (nodeTraversalBuffer.Length > 0)
+				{
+					BvhNode* nodePtr = nodeTraversalBuffer.Pop();
+					Debug.Log($"Popped 1 node from traversal buffer, now {nodeTraversalBuffer.Length}");
+
+					if (!nodePtr->Bounds.Hit(ray.Origin, rayInvDirection, 0, float.PositiveInfinity))
+						continue;
+
+#if FULL_DIAGNOSTICS
+					diagnostics.BoundsHitCount++;
+#endif
+
+					if (nodePtr->IsLeaf)
+					{
+						int entityCount = nodePtr->EntityCount;
+						Entity* entityPtr = nodePtr->EntitiesStart;
+
+						for (int i = 0; i < entityCount; i++, ++entityPtr)
+						{
+							// TODO: We should be able to preallocate for entityCount
+							if (!hitCandidateBuffer.TryPush(entityPtr))
+							{
+								var tailBlockDataPtr = hitCandidateBuffer.TailBlock->Data;
+								int newBlockCapacity = hitCandidateBuffer.TailBlock->Capacity * 2;
+								Debug.Log($"Growing hit candidate buffer by {newBlockCapacity} elements");
+								var p = stackalloc Entity*[newBlockCapacity];
+								Debug.Log($"New Entity* : {(int)p:x8} - {(int)p + sizeof(Entity*)*newBlockCapacity:x8}");
+								totalMemory += sizeof(Entity*) * newBlockCapacity;
+								var pb = stackalloc PointerBlock<Entity>[1];
+								Debug.Log($"Tail : {(int)hitCandidateBuffer.TailBlock:x8} - {(int)hitCandidateBuffer.TailBlock + sizeof(PointerBlock<Entity>):x8}");
+								Debug.Log($"New PointerBlock : {(int)pb:x8} - {(int)pb + sizeof(PointerBlock<Entity>):x8}");
+								pb[0] = new PointerBlock<Entity>(p, newBlockCapacity, hitCandidateBuffer.TailBlock);
+								if (tailBlockDataPtr != hitCandidateBuffer.TailBlock->Data)
+								{
+									Debug.LogError("Tail block data pointer changed!");
+									sampleColor = 0;
+									return false;
+								}
+								totalMemory += sizeof(PointerBlock<Entity>);
+								hitCandidateBuffer.TailBlock->NextBlock = pb;
+								hitCandidateBuffer.Push(entityPtr);
+							}
+						}
+						Debug.Log($"Added {entityCount} entities to candidate list, now {hitCandidateBuffer.Length}");
+
+#if FULL_DIAGNOSTICS
+						diagnostics.CandidateCount += entityCount;
+#endif
+					}
+					else
+					{
+						// TODO: We should be able to preallocate for 2
+						if (!nodeTraversalBuffer.TryPush(nodePtr->Left))
+						{
+							int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
+							Debug.Log($"Growing node traversal buffer by {newBlockCapacity} elements");
+							var p = stackalloc BvhNode*[newBlockCapacity];
+							totalMemory += sizeof(BvhNode*) * newBlockCapacity;
+							var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
+							totalMemory += sizeof(PointerBlock<BvhNode>);
+							nodeTraversalBuffer.TailBlock->NextBlock = pb;
+							nodeTraversalBuffer.Push(nodePtr->Left);
+						}
+						if (!nodeTraversalBuffer.TryPush(nodePtr->Right))
+						{
+							int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
+							Debug.Log($"Growing node traversal buffer by {newBlockCapacity} elements");
+							var p = stackalloc BvhNode*[newBlockCapacity];
+							totalMemory += sizeof(BvhNode*) * newBlockCapacity;
+							var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
+							totalMemory += sizeof(PointerBlock<BvhNode>);
+							nodeTraversalBuffer.TailBlock->NextBlock = pb;
+							nodeTraversalBuffer.Push(nodePtr->Right);
+						}
+						Debug.Log($"Added 2 nodes to traversal buffer, now {nodeTraversalBuffer.Length}");
+					}
+				}
+
+				Debug.Log($"Finished traversing BVH ({nodeTraversalBuffer.Length} nodes in buffer); will test {hitCandidateBuffer.Length} hit candidates");
+				Debug.Log($"Total stackalloc memory : {totalMemory} bytes");
+
+				// iterative candidate tests
+				bool hit = false;
+				while (hitCandidateBuffer.Length > 0)
+				{
+					var hitCandidate = hitCandidateBuffer.Pop();
+					bool thisHit = hitCandidate->Hit(ray, 0, float.PositiveInfinity, ref rng, out HitRecord thisRec);
+					if (thisHit && (!hit || thisRec.Distance < rec.Distance))
+					{
+						hit = true;
+						rec = thisRec;
+						rec.EntityPtr = hitCandidate;
+					}
+				}
+#else
 #if BVH
 				bool hit = BvhRoot->Hit(
 #else
 				bool hit = Entities.Hit(
 #endif
-					ray, 0, float.PositiveInfinity, ref rng,
-#if BVH_ITERATIVE
-					nodeTraversalBuffer, hitCandidateBuffer,
-#endif
+				ray, 0, float.PositiveInfinity, ref rng,
 #if FULL_DIAGNOSTICS && BVH
 					ref diagnostics,
 #endif
 					out HitRecord rec);
+#endif
 
 				diagnostics.RayCount++;
 

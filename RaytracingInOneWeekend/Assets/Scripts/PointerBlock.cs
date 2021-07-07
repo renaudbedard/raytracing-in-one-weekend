@@ -1,4 +1,5 @@
 using UnityEngine.Assertions;
+using Debug = UnityEngine.Debug;
 
 namespace RaytracerInOneWeekend
 {
@@ -25,20 +26,27 @@ namespace RaytracerInOneWeekend
 			Length = 0;
 			tailBlock = headBlock;
 			tail = headBlock->Data - 1;
-			headBlock->NextBlock = null;
+
+			// TODO: Would be interesting to re-sort blocks by size descending here
 		}
 
 		public void Push(T* value)
 		{
+			Debug.Log($"Pushing value in block of {tailBlock->Capacity} ({(int)tailBlock:x8}), currently at {tail - tailBlock->Data} ({(int)tail:x8} - {(int)tailBlock->Data:x8})");
+
 			if (tail - tailBlock->Data == tailBlock->Capacity - 1)
 			{
 				Assert.IsFalse(tailBlock->NextBlock == null, "No space in tail block, use TryPush instead");
 				Assert.IsTrue(tailBlock == tailBlock->NextBlock->PreviousBlock, "Block chain is invalid");
 				tailBlock = tailBlock->NextBlock;
 				tail = tailBlock->Data;
+				Debug.Log($"Moved to next block (of {tailBlock->Capacity})");
 			}
 			else
+			{
 				++tail;
+				Debug.Log($"Advanced tail in current block, now at {tail - tailBlock->Data}");
+			}
 
 			*tail = value;
 			Length++;
@@ -46,16 +54,25 @@ namespace RaytracerInOneWeekend
 
 		public bool TryPush(T* value)
 		{
+			Debug.Log($"Trying to push value in block of {tailBlock->Capacity} ({(int)tailBlock:x8}), currently at {tail - tailBlock->Data} ({(int)tail:x8} - {(int)tailBlock->Data:x8})");
+
 			if (tail - tailBlock->Data == tailBlock->Capacity - 1)
 			{
 				if (tailBlock->NextBlock == null)
+				{
+					Debug.Log("No more space in tail block and next block is null; failed");
 					return false;
+				}
 
 				tailBlock = tailBlock->NextBlock;
 				tail = tailBlock->Data;
+				Debug.Log($"Moved to next block (of {tailBlock->Capacity})");
 			}
 			else
+			{
 				++tail;
+				Debug.Log($"Advanced tail in current block, now at {tail - tailBlock->Data}");
+			}
 
 			*tail = value;
 			Length++;

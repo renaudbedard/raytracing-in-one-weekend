@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Mesh Cube
   m_EditorClassIdentifier: 
   cameraPosition: {x: 0.9564886, y: 1.0216246, z: 0.924705}
-  cameraTarget: {x: 0.4049083, y: 0.3531795, z: 0.4257654}
+  cameraTarget: {x: 0.4049083, y: 0.52, z: 0.4257654}
   cameraAperture: 0.05
   cameraFieldOfView: 59.2
   entities:

@@ -1290,25 +1290,9 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 		unsafe bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			var rng = new RandomSource(noiseColor, new Random(scene.RandomSeed),
-				blueNoise.GetRuntimeData(scene.RandomSeed).GetPerPixelData((uint2) bufferSize / 2));
-
-			var np = stackalloc BvhNode*[1];
-			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
-			var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
-
-			var ep = stackalloc Entity*[1];
-			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
-			var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
-
-#if FULL_DIAGNOSTICS
-			Diagnostics _ = default;
-			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, nodeTraversalBuffer, hitCandidateBuffer,
-				ref _, out hitRec);
-#else
-			return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, nodeTraversalBuffer, hitCandidateBuffer,
-				out hitRec);
-#endif
+			// TODO
+			hitRec = default;
+			return false;
 		}
 
 #else // !BVH_ITERATIVE
