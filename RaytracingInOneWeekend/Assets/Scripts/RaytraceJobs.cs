@@ -39,9 +39,14 @@ namespace RaytracerInOneWeekend
 	}
 #endif
 
-	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance, Debug = true)]
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
+#if BVH_ITERATIVE
+		const int FirstBlockBvhNodeCount = 16;
+		const int FirstBlockHitCandidateCount = 16;
+#endif
+
 		[ReadOnly] public NativeArray<bool> CancellationToken;
 
 		[ReadOnly] public float2 Size;
@@ -171,15 +176,15 @@ namespace RaytracerInOneWeekend
 #if BVH_ITERATIVE
 			int totalMemory = 0;
 
-			var np = stackalloc BvhNode*[1];
-			totalMemory += sizeof(BvhNode*);
-			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, 1) };
+			var np = stackalloc BvhNode*[FirstBlockBvhNodeCount];
+			totalMemory += sizeof(BvhNode*) * FirstBlockBvhNodeCount;
+			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, FirstBlockBvhNodeCount) };
 			totalMemory += sizeof(PointerBlock<BvhNode>);
 			var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
 
-            var ep = stackalloc Entity*[1];
-			totalMemory += sizeof(Entity*);
-			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, 1) };
+            var ep = stackalloc Entity*[FirstBlockHitCandidateCount];
+			totalMemory += sizeof(Entity*) * FirstBlockHitCandidateCount;
+			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, FirstBlockHitCandidateCount) };
 			totalMemory += sizeof(PointerBlock<Entity>);
 			var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
 #endif

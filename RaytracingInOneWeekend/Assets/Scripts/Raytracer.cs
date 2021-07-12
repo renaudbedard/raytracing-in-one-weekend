@@ -284,8 +284,8 @@ namespace RaytracerInOneWeekend
 			oidnFilter = OidnFilter.New(oidnDevice, "RT");
 			OidnFilter.Set(oidnFilter, "hdr", true);
 
-			// nVidia OptiX
 #if ENABLE_OPTIX
+			// nVidia OptiX
 			CudaError cudaError;
 			if ((cudaError = OptixApi.InitializeCuda()) != CudaError.Success)
 			{

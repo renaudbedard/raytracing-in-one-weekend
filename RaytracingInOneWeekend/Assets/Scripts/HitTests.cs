@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Unity.Burst.CompilerServices;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 using Debug = UnityEngine.Debug;
@@ -140,7 +141,7 @@ namespace RaytracerInOneWeekend
 		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)
 		{
 			bool hitAnything = false;
-			rec = new HitRecord(tMax, 0, 0, default);
+			rec = new HitRecord(tMax, 0, 0);
 
 			for (var i = 0; i < entities.Length; i++)
 			{
