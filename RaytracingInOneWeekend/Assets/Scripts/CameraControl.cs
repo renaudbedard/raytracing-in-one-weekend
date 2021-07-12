@@ -63,8 +63,7 @@ namespace RaytracerInOneWeekend
 				if (mouseDelta != Vector2.zero)
 				{
 					var mouseMovement = mouseDelta;
-					mouseMovement /= Screen.dpi;
-					mouseMovement *= 5;
+					mouseMovement *= 5.0f / 96;
 
 					transform.Rotate(-mouseMovement.y, mouseMovement.x, 0, Space.Self);
 
@@ -76,8 +75,7 @@ namespace RaytracerInOneWeekend
 				if (mouseDelta != Vector2.zero)
 				{
 					var mouseMovement = mouseDelta;
-					mouseMovement /= Screen.dpi;
-					mouseMovement *= 10;
+					mouseMovement *= 10.0f / 96;
 
 					transform.RotateAround(orbitCenter, transform.right, -mouseMovement.y);
 					transform.RotateAround(orbitCenter, transform.up, mouseMovement.x);

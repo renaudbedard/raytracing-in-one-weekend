@@ -1133,6 +1133,7 @@ namespace RaytracerInOneWeekend
 		unsafe void RebuildEntityBuffers()
 		{
 			var meshVertexList = new List<Vector3>();
+			var meshNormalList = new List<Vector3>();
 			var meshIndexList = new List<int>();
 			var addedMaterials = new Dictionary<MaterialData, int>();
 
@@ -1222,6 +1223,7 @@ namespace RaytracerInOneWeekend
 					case EntityType.Mesh:
 						var mesh = e.MeshData.Mesh;
 						mesh.GetVertices(meshVertexList);
+						mesh.GetNormals(meshNormalList);
 						for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
 						{
 							mesh.GetIndices(meshIndexList, subMesh);
@@ -1230,7 +1232,10 @@ namespace RaytracerInOneWeekend
 								triangleBuffer[triangleIndex] = new Triangle(
 									meshVertexList[meshIndexList[i]],
 									meshVertexList[meshIndexList[i + 1]],
-									meshVertexList[meshIndexList[i + 2]]);
+									meshVertexList[meshIndexList[i + 2]],
+									meshNormalList[meshIndexList[i]],
+									meshNormalList[meshIndexList[i + 1]],
+									meshNormalList[meshIndexList[i + 2]]);
 
 								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr,
 									rigidTransform, EntityType.Triangle);

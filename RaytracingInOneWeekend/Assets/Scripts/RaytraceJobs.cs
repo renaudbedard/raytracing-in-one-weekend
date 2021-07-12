@@ -321,6 +321,9 @@ namespace RaytracerInOneWeekend
 
 					bool didScatter = material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
+					if (depth == 0)
+						sampleNormal = rec.Normal;
+
 					if (!firstNonSpecularHit)
 					{
 						if (material->IsPerfectSpecular)

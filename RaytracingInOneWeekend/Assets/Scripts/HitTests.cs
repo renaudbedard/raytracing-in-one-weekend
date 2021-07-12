@@ -106,10 +106,10 @@ namespace RaytracerInOneWeekend
 			// from "Fast, Minimum Storage Ray/Triangle Intersection" (Möller & Trumbore)
 			// https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
 			distance = 0;
-			normal = tri.Normal;
+			normal = 0;
 
-			float3 pvec = cross(r.Direction, tri.AC);
-			float det = dot(tri.AB, pvec);
+			float3 pvec = cross(r.Direction, tri.Data[0]);
+			float det = dot(tri.Data[1], pvec);
 
 			// if the determinant is negative the triangle is backfacing
 			// if the determinant is close to 0, the ray misses the triangle
@@ -117,17 +117,21 @@ namespace RaytracerInOneWeekend
 
 			float invDet = 1 / det;
 
-			float3 tvec = r.Origin - tri.A;
+			float3 tvec = r.Origin - tri.Data[2];
 			float u = dot(tvec, pvec) * invDet;
 			if (u < 0 || u > 1) return false;
 
-			float3 qvec = cross(tvec, tri.AB);
+			float3 qvec = cross(tvec, tri.Data[1]);
 			float v = dot(r.Direction, qvec) * invDet;
 			if (v < 0 || u + v > 1) return false;
 
-			distance = dot(tri.AC, qvec) * invDet;
+			distance = dot(tri.Data[0], qvec) * invDet;
 			if (distance < tMin || distance > tMax) return false;
 
+			// interpolate normals based on barycentric coordinates
+			// https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates
+			float3 barycentricCoords = float3(1 - u - v, u, v);
+			normal = mul(tri.Normals, barycentricCoords);
 			return true;
 		}
 
