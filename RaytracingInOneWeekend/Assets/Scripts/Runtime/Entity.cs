@@ -2,6 +2,7 @@ using System;
 using JetBrains.Annotations;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace Runtime
@@ -19,7 +20,9 @@ namespace Runtime
 	readonly unsafe struct Entity
 	{
 		public readonly EntityType Type;
+		public readonly bool Moving;
 		public readonly RigidTransform OriginTransform;
+		public readonly RigidTransform InverseTransform;
 		public readonly float3 DestinationOffset;
 		public readonly float2 TimeRange;
 		public readonly Material* Material;
@@ -31,15 +34,21 @@ namespace Runtime
 		[NativeDisableUnsafePtrRestriction] readonly void* content;
 
 		public Entity(EntityType type, void* contentPointer, RigidTransform originTransform, Material* material,
-			float3 destinationOffset = default, float2 timeRange = default)
+			bool moving = false, float3 destinationOffset = default, float2 timeRange = default) : this()
 		{
 			Type = type;
-			OriginTransform = originTransform;
 			content = contentPointer;
+			Moving = moving;
 			TimeRange = timeRange;
+			OriginTransform = originTransform;
 			DestinationOffset = destinationOffset;
 			TimeRange = timeRange;
 			Material = material;
+
+			if (!moving)
+				InverseTransform = inverse(OriginTransform);
+			else
+				Assert.AreNotEqual(timeRange.x, timeRange.y, "Time range cannot be empty for moving entities.");
 
 #if BVH
 			switch (Type)
@@ -87,8 +96,18 @@ namespace Runtime
 		bool HitInternal(Ray ray, float tMin, float tMax, ref RandomSource rng,
 			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay)
 		{
-			transformAtTime = TransformAtTime(ray.Time);
-			RigidTransform inverseTransform = inverse(transformAtTime);
+			RigidTransform inverseTransform;
+
+			if (!Moving)
+			{
+				transformAtTime = OriginTransform;
+				inverseTransform = InverseTransform;
+			}
+			else
+			{
+				transformAtTime = TransformAtTime(ray.Time);
+				inverseTransform = inverse(transformAtTime);
+			}
 
 			entitySpaceRay = new Ray(
 				transform(inverseTransform, ray.Origin),

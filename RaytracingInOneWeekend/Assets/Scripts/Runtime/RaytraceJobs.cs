@@ -46,7 +46,6 @@ namespace Runtime
 		const int FirstBlockBvhNodeCount = 16;
 		const int FirstBlockHitCandidateCount = 16;
 #endif
-
 		[ReadOnly] public NativeArray<bool> CancellationToken;
 
 		[ReadOnly] public float2 Size;
@@ -301,7 +300,7 @@ namespace Runtime
 #else
 				bool hit = Entities.Hit(
 #endif
-				ray, 0, float.PositiveInfinity, ref rng,
+					ray, 0, float.PositiveInfinity, ref rng,
 #if FULL_DIAGNOSTICS && BVH
 					ref diagnostics,
 #endif
@@ -401,7 +400,6 @@ namespace Runtime
 						sampleAlbedo = hitSkyColor;
 						sampleNormal = -ray.Direction;
 					}
-
 					break;
 				}
 			}

@@ -56,7 +56,7 @@ namespace Unity
 		[Title("Settings")] [SerializeField] [Range(1, 100)]
 		int interlacing = 2;
 
-		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [OnValueChanged("@scene.MarkDirty()")] int maxBvhDepth = 16;
+		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [OnValueChanged("@scene.MarkDirty()")] [UsedImplicitly] int maxBvhDepth = 16;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
@@ -1162,11 +1162,10 @@ namespace Unity
 			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0,
 				importanceSamplingIndex = 0, materialIndex = 0;
 
-			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform,
-				EntityType entityType)
+			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform, EntityType entityType)
 			{
 				Entity entity = e.Moving
-					? new Entity(entityType, contentPointer, entityTransform, material, e.DestinationOffset, e.TimeRange)
+					? new Entity(entityType, contentPointer, entityTransform, material, true, e.DestinationOffset, e.TimeRange)
 					: new Entity(entityType, contentPointer, entityTransform, material);
 
 				entityBuffer[entityIndex++] = entity;

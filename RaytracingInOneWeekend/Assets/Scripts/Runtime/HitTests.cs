@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-
+using Debug = UnityEngine.Debug;
 #if BASIC
 using Unity.Collections;
 #endif
@@ -116,7 +116,6 @@ namespace Runtime
 			// if the determinant is negative the triangle is backfacing
 			// if the determinant is close to 0, the ray misses the triangle
 			if (det == 0) return false;
-
 			float invDet = 1 / det;
 
 			float3 tvec = r.Origin - tri.Data[2];
