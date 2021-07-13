@@ -56,14 +56,13 @@ namespace Unity
 		public readonly AxisAlignedBoundingBox Bounds;
 		public readonly Entity* EntitiesStart;
 		public readonly int EntityCount, Depth;
-		public readonly BvhNodeData Left, Right, Parent;
+		public readonly BvhNodeData Left, Right;
 
 		public bool IsLeaf => EntitiesStart != null;
 
-		public BvhNodeData(NativeSlice<Entity> entities, NativeList<Entity> bvhEntities, int depth = 0, BvhNodeData parent = null)
+		public BvhNodeData(NativeSlice<Entity> entities, NativeList<Entity> bvhEntities, int depth = 0)
 		{
 			Depth = depth;
-			Parent = parent;
 
 			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
 			foreach (Entity entity in entities)
@@ -120,8 +119,8 @@ namespace Unity
 				if (partitionLength == entities.Length)
 					partitionLength--;
 
-				Left = new BvhNodeData(new NativeSlice<Entity>(entities, 0, partitionLength), bvhEntities, depth + 1, this);
-				Right = new BvhNodeData(new NativeSlice<Entity>(entities, partitionLength), bvhEntities, depth + 1, this);
+				Left = new BvhNodeData(new NativeSlice<Entity>(entities, 0, partitionLength), bvhEntities, depth + 1);
+				Right = new BvhNodeData(new NativeSlice<Entity>(entities, partitionLength), bvhEntities, depth + 1);
 
 				Bounds = AxisAlignedBoundingBox.Enclose(Left.Bounds, Right.Bounds);
 			}
@@ -150,16 +149,6 @@ namespace Unity
 			}
 
 			return workingList;
-		}
-	}
-
-	struct BvhNodeOrderComparer : IComparer<BvhNodeData>
-	{
-		public int Compare(BvhNodeData lhs, BvhNodeData rhs)
-		{
-			// TODO
-			//return lhs.Order - rhs.Order;
-			return 0;
 		}
 	}
 

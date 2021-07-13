@@ -1266,27 +1266,24 @@ namespace Unity
 			if (editorOnly)
 				return;
 
-			using (new ScopedStopwatch("BVH Runtime Data Baking"))
+			bvhNodeBuffer.EnsureCapacity(nodeCount);
+			int nodeIndex = nodeCount - 1;
+
+			// Runtime BVH is inserted BACKWARDS while traversing postorder, which means the first node will be the root
+			BvhNode* WalkBvh(BvhNodeData nodeData)
 			{
-				bvhNodeBuffer.EnsureCapacity(nodeCount);
-				int nodeIndex = nodeCount - 1;
+				BvhNode* leftNode = null, rightNode = null;
 
-				BvhNode* WalkBvh(BvhNodeData nodeData)
+				if (!nodeData.IsLeaf)
 				{
-					BvhNode* leftNode = null, rightNode = null;
-
-					if (!nodeData.IsLeaf)
-					{
-						leftNode = WalkBvh(nodeData.Left);
-						rightNode = WalkBvh(nodeData.Right);
-					}
-
-					bvhNodeBuffer[nodeIndex] = new BvhNode(nodeData.Bounds, nodeData.EntitiesStart, nodeData.EntityCount, leftNode, rightNode);
-					return (BvhNode*) bvhNodeBuffer.GetUnsafePtr() + nodeIndex--;
+					leftNode = WalkBvh(nodeData.Left);
+					rightNode = WalkBvh(nodeData.Right);
 				}
 
-				WalkBvh(bvhRootData);
+				bvhNodeBuffer[nodeIndex] = new BvhNode(nodeData.Bounds, nodeData.EntitiesStart, nodeData.EntityCount, leftNode, rightNode);
+				return (BvhNode*) bvhNodeBuffer.GetUnsafePtr() + nodeIndex--;
 			}
+			WalkBvh(bvhRootData);
 		}
 #endif // BVH
 
