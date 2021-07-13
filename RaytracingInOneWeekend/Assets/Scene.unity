@@ -190,7 +190,7 @@ MonoBehaviour:
   previewBvh: 0
   bufferView: 0
   previewMaterials:
-  - {fileID: 1419778999}
+  - {fileID: 1354980566}
   targetCamera: {fileID: 1056194786}
   blueNoise:
     NoiseTextures:
@@ -203,18 +203,18 @@ MonoBehaviour:
     - {fileID: 2800000, guid: 6395de0f2fdc63243bcef65ce7b270ed, type: 3}
     - {fileID: 2800000, guid: 988f9d5b639439b4cbe6e83118df1bd3, type: 3}
   interlacing: 1
-  maxBvhDepth: 2
-  resolutionScaling: 0.1
-  samplesPerPixel: 1
+  maxBvhDepth: 32
+  resolutionScaling: 1
+  samplesPerPixel: 1000
   samplesPerBatch: 1
-  traceDepth: 2
+  traceDepth: 16
   importanceSampling: 0
   denoiseMode: 0
   noiseColor: 1
-  subPixelJitter: 0
+  subPixelJitter: 1
   previewAfterBatch: 1
   stopWhenCompleted: 1
-  scene: {fileID: 11400000, guid: 0c127160090bf334fb829f1810c16f48, type: 2}
+  scene: {fileID: 11400000, guid: e2ffa2d3723f64486ba6bc315f456bc4, type: 2}
   viewRangeShader: {fileID: 4800000, guid: ca41bab96b2791e4a8cefb20b49bae59, type: 3}
   AccumulatedSamples: 0
   MillionRaysPerSecond: 0
@@ -250,10 +250,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cb02af1b72547dc9b5d89c2b36356c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hitTestingMode: 4
+  hitTestingMode: 3
   fullDiagnostics: 0
   pathDebugging: 0
-  enableNvidiaOptix: 1
+  enableNvidiaOptix: 0
 --- !u!1 &1056194785
 GameObject:
   m_ObjectHideFlags: 0
@@ -298,7 +298,7 @@ Camera:
     height: 1
   near clip plane: 0.01
   far clip plane: 10000
-  field of view: 75
+  field of view: 60
   orthographic: 0
   orthographic size: 1
   m_Depth: 0
@@ -323,8 +323,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1056194785}
-  m_LocalRotation: {x: 0.028285809, y: 0.92744094, z: -0.36594287, w: 0.07168719}
-  m_LocalPosition: {x: 0.11, y: 2.11, z: 1.05}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -1.25}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 315422819}
@@ -519,7 +519,7 @@ Material:
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _UpVector: {r: 0, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
---- !u!21 &1419778999
+--- !u!21 &1354980566
 Material:
   serializedVersion: 6
   m_ObjectHideFlags: 0
@@ -603,7 +603,7 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 0}
+    - _Color: {r: 0.1, g: 0.2, b: 0.5, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 0.99999994}
     - _EmissionColorUI: {r: 0, g: 0, b: 0, a: 1}
     - _EmissionColorWithMapUI: {r: 1, g: 1, b: 1, a: 1}

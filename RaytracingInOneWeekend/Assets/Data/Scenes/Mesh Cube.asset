@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
   m_Name: Mesh Cube
   m_EditorClassIdentifier: 
-  cameraPosition: {x: 0.9564886, y: 1.0216246, z: 0.924705}
-  cameraTarget: {x: 0.4049083, y: 0.52, z: 0.4257654}
+  cameraPosition: {x: 0.9461713, y: 0.63310456, z: -0.96243906}
+  cameraTarget: {x: 0.3466034, y: 0.11117113, z: -0.35572344}
   cameraAperture: 0.05
-  cameraFieldOfView: 59.2
+  cameraFieldOfView: 62.9
   entities:
   - name: 
     type: 5
