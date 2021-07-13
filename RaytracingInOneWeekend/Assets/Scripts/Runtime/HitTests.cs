@@ -1,5 +1,11 @@
+using System.Diagnostics;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
+
+#if BASIC
+using Unity.Collections;
+#endif
 
 namespace Runtime
 {
@@ -133,21 +139,22 @@ namespace Runtime
 
 #if BASIC
 		// iterative entity array hit test
-		public static bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)
+		public static unsafe bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)
 		{
-			bool hitAnything = false;
+			bool anyHit = false;
 			rec = new HitRecord(tMax, 0, 0);
 
 			for (var i = 0; i < entities.Length; i++)
 			{
-				if (entities[i].Hit(r, tMin, rec.Distance, ref rng, out HitRecord thisRec))
+				var thisHit = entities[i].Hit(r, tMin, rec.Distance, ref rng, out HitRecord thisRec);
+				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
 				{
-					hitAnything = true;
+					anyHit = true;
 					rec = thisRec;
+					rec.EntityPtr = (Entity*) entities.GetUnsafeReadOnlyPtr() + i;
 				}
 			}
-
-			return hitAnything;
+			return anyHit;
 		}
 
 #elif BVH_RECURSIVE

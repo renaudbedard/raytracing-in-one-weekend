@@ -10,6 +10,7 @@ using Unity.Mathematics;
 using Util;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
+using Debug = UnityEngine.Debug;
 
 #if ENABLE_OPTIX
 using OptiX;
