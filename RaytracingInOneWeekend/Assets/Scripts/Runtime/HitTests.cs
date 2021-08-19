@@ -1,8 +1,7 @@
-using System.Diagnostics;
-using Unity.Collections.LowLevel.Unsafe;
+using System.Runtime.CompilerServices;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using Debug = UnityEngine.Debug;
+
 #if BASIC
 using Unity.Collections;
 #endif
@@ -11,6 +10,20 @@ namespace Runtime
 {
 	static class HitTests
 	{
+		public static bool Hit(this AxisAlignedBoundingBox aabb, float3 rayOrigin, float3 rayInvDirection, float tMin, float tMax)
+		{
+			// optimized algorithm from Roman Wiche
+			// https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
+
+			float3 t0 = (aabb.Min - rayOrigin) * rayInvDirection;
+			float3 t1 = (aabb.Max - rayOrigin) * rayInvDirection;
+
+			tMin = max(tMin, cmax(min(t0, t1)));
+			tMax = min(tMax, cmin(max(t0, t1)));
+
+			return tMin < tMax;
+		}
+
 		public static bool Hit(this Sphere s, Ray r, float tMin, float tMax, out float distance, out float3 normal)
 		{
 			float squaredRadius = s.SquaredRadius;
