@@ -1,5 +1,4 @@
-using UnityEngine.Assertions;
-using Debug = UnityEngine.Debug;
+using static Unity.Mathematics.math;
 
 namespace Util
 {
@@ -12,11 +11,8 @@ namespace Util
 		PointerBlock<T>* tailBlock;
 		T** tail;
 
-		public PointerBlock<T>* TailBlock => tailBlock;
-
 		public PointerBlockChain(PointerBlock<T>* firstBlock) : this()
 		{
-			// Assert.IsTrue(firstBlock != null, "First block must be allocated");
 			headBlock = firstBlock;
 			Clear();
 		}
@@ -32,64 +28,44 @@ namespace Util
 
 		public void Push(T* value)
 		{
-			// Debug.Log($"Pushing value in block of {tailBlock->Capacity} ({(int)tailBlock:x8}), currently at {tail - tailBlock->Data} ({(int)tail:x8} - {(int)tailBlock->Data:x8})");
-
 			if (tail - tailBlock->Data == tailBlock->Capacity - 1)
 			{
-				// Assert.IsFalse(tailBlock->NextBlock == null, "No space in tail block, use TryPush instead");
-				// Assert.IsTrue(tailBlock == tailBlock->NextBlock->PreviousBlock, "Block chain is invalid");
 				tailBlock = tailBlock->NextBlock;
 				tail = tailBlock->Data;
-				// Debug.Log($"Moved to next block (of {tailBlock->Capacity})");
 			}
 			else
-			{
 				++tail;
-				// Debug.Log($"Advanced tail in current block, now at {tail - tailBlock->Data}");
-			}
 
 			*tail = value;
 			Length++;
 		}
 
-		public bool TryPush(T* value)
+		public int GetRequiredAllocationSize(int count, out PointerBlock<T>* parentBlock)
 		{
-			// Debug.Log($"Trying to push value in block of {tailBlock->Capacity} ({(int)tailBlock:x8}), currently at {tail - tailBlock->Data} ({(int)tail:x8} - {(int)tailBlock->Data:x8})");
+			parentBlock = tailBlock;
 
-			if (tail - tailBlock->Data == tailBlock->Capacity - 1)
-			{
-				if (tailBlock->NextBlock == null)
-				{
-					// Debug.Log("No more space in tail block and next block is null; failed");
-					return false;
-				}
+			// Amount in current block
+			int spaceLeftInCurrentBlock = tailBlock->Capacity - (int) (tail + 1 - tailBlock->Data);
+			count -= spaceLeftInCurrentBlock;
+			if (count <= 0) return 0;
 
-				tailBlock = tailBlock->NextBlock;
-				tail = tailBlock->Data;
-				// Debug.Log($"Moved to next block (of {tailBlock->Capacity})");
-			}
-			else
+			// Amount in subsequent blocks
+			while (parentBlock->NextBlock != null)
 			{
-				++tail;
-				// Debug.Log($"Advanced tail in current block, now at {tail - tailBlock->Data}");
+				parentBlock = parentBlock->NextBlock;
+				count -= parentBlock->Capacity;
+				if (count <= 0) return 0;
 			}
 
-			*tail = value;
-			Length++;
-
-			return true;
+			return max(count, parentBlock->Capacity * 2);
 		}
 
 		public T* Pop()
 		{
-			// Assert.IsTrue(Length > 0, "Nothing to pop!");
-
 			T* previousTail = *tail;
 
 			if (tail == tailBlock->Data && Length > 1)
 			{
-				// Assert.IsTrue(tailBlock->PreviousBlock != null, "No previous block");
-				// Assert.IsTrue(tailBlock->PreviousBlock->NextBlock == tailBlock, "Block chain is invalid (previous block does not link back to tail block)");
 				tailBlock = tailBlock->PreviousBlock;
 				tail = tailBlock->Data + (tailBlock->Capacity - 1);
 			}
@@ -112,7 +88,6 @@ namespace Util
 
 		public PointerBlock(T** data, int capacity, PointerBlock<T>* previousBlock = null) : this()
 		{
-			// Assert.IsTrue(capacity >= 1, "Capacity must be at least 1");
 			Capacity = capacity;
 			Data = data;
 			PreviousBlock = previousBlock;

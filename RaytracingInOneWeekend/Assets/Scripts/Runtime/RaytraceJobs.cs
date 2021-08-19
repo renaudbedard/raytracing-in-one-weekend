@@ -173,18 +173,12 @@ namespace Runtime
 			Ray ray = eyeRay;
 
 #if BVH_ITERATIVE
-			int totalMemory = 0;
-
 			var np = stackalloc BvhNode*[FirstBlockBvhNodeCount];
-			totalMemory += sizeof(BvhNode*) * FirstBlockBvhNodeCount;
 			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, FirstBlockBvhNodeCount) };
-			totalMemory += sizeof(PointerBlock<BvhNode>);
 			var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
 
             var ep = stackalloc Entity*[FirstBlockHitCandidateCount];
-			totalMemory += sizeof(Entity*) * FirstBlockHitCandidateCount;
 			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, FirstBlockHitCandidateCount) };
-			totalMemory += sizeof(PointerBlock<Entity>);
 			var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
 #endif
 
@@ -198,12 +192,10 @@ namespace Runtime
 				hitCandidateBuffer.Clear();
 
 				nodeTraversalBuffer.Push(BvhRoot);
-				// Debug.Log($"Added root node to traversal buffer, now {nodeTraversalBuffer.Length}");
 
 				while (nodeTraversalBuffer.Length > 0)
 				{
 					BvhNode* nodePtr = nodeTraversalBuffer.Pop();
-					// Debug.Log($"Popped 1 node from traversal buffer, now {nodeTraversalBuffer.Length}");
 
 					if (!nodePtr->Bounds.Hit(ray.Origin, rayInvDirection, 0, float.PositiveInfinity))
 						continue;
@@ -215,35 +207,17 @@ namespace Runtime
 					if (nodePtr->IsLeaf)
 					{
 						int entityCount = nodePtr->EntityCount;
-						Entity* entityPtr = nodePtr->EntitiesStart;
-
-						for (int i = 0; i < entityCount; i++, ++entityPtr)
+						int toAllocate = hitCandidateBuffer.GetRequiredAllocationSize(entityCount, out var parentBlock);
+						if (toAllocate > 0)
 						{
-							// TODO: We should be able to preallocate for entityCount
-							if (!hitCandidateBuffer.TryPush(entityPtr))
-							{
-								var tailBlockDataPtr = hitCandidateBuffer.TailBlock->Data;
-								int newBlockCapacity = hitCandidateBuffer.TailBlock->Capacity * 2;
-								// Debug.Log($"Growing hit candidate buffer by {newBlockCapacity} elements");
-								var p = stackalloc Entity*[newBlockCapacity];
-								// Debug.Log($"New Entity* : {(int)p:x8} - {(int)p + sizeof(Entity*)*newBlockCapacity:x8}");
-								totalMemory += sizeof(Entity*) * newBlockCapacity;
-								var pb = stackalloc PointerBlock<Entity>[1];
-								// Debug.Log($"Tail : {(int)hitCandidateBuffer.TailBlock:x8} - {(int)hitCandidateBuffer.TailBlock + sizeof(PointerBlock<Entity>):x8}");
-								// Debug.Log($"New PointerBlock : {(int)pb:x8} - {(int)pb + sizeof(PointerBlock<Entity>):x8}");
-								pb[0] = new PointerBlock<Entity>(p, newBlockCapacity, hitCandidateBuffer.TailBlock);
-								if (tailBlockDataPtr != hitCandidateBuffer.TailBlock->Data)
-								{
-									// Debug.LogError("Tail block data pointer changed!");
-									sampleColor = 0;
-									return false;
-								}
-								totalMemory += sizeof(PointerBlock<Entity>);
-								hitCandidateBuffer.TailBlock->NextBlock = pb;
-								hitCandidateBuffer.Push(entityPtr);
-							}
+							var p = stackalloc Entity*[toAllocate];
+							var pb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(p, toAllocate, parentBlock) };
+							parentBlock->NextBlock = pb;
 						}
-						// Debug.Log($"Added {entityCount} entities to candidate list, now {hitCandidateBuffer.Length}");
+
+						Entity* entityPtr = nodePtr->EntitiesStart;
+						for (int i = 0; i < entityCount; i++, ++entityPtr)
+							hitCandidateBuffer.Push(entityPtr);
 
 #if FULL_DIAGNOSTICS
 						diagnostics.CandidateCount += entityCount;
@@ -251,35 +225,18 @@ namespace Runtime
 					}
 					else
 					{
-						// TODO: We should be able to preallocate for 2
-						if (!nodeTraversalBuffer.TryPush(nodePtr->Left))
+						int toAllocate = nodeTraversalBuffer.GetRequiredAllocationSize(2, out var parentBlock);
+						if (toAllocate > 0)
 						{
-							int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
-							// Debug.Log($"Growing node traversal buffer by {newBlockCapacity} elements");
-							var p = stackalloc BvhNode*[newBlockCapacity];
-							totalMemory += sizeof(BvhNode*) * newBlockCapacity;
-							var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
-							totalMemory += sizeof(PointerBlock<BvhNode>);
-							nodeTraversalBuffer.TailBlock->NextBlock = pb;
-							nodeTraversalBuffer.Push(nodePtr->Left);
+							var p = stackalloc BvhNode*[toAllocate];
+							var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, toAllocate, parentBlock) };
+							parentBlock->NextBlock = pb;
 						}
-						if (!nodeTraversalBuffer.TryPush(nodePtr->Right))
-						{
-							int newBlockCapacity = nodeTraversalBuffer.TailBlock->Capacity * 2;
-							// Debug.Log($"Growing node traversal buffer by {newBlockCapacity} elements");
-							var p = stackalloc BvhNode*[newBlockCapacity];
-							totalMemory += sizeof(BvhNode*) * newBlockCapacity;
-							var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, newBlockCapacity, nodeTraversalBuffer.TailBlock) };
-							totalMemory += sizeof(PointerBlock<BvhNode>);
-							nodeTraversalBuffer.TailBlock->NextBlock = pb;
-							nodeTraversalBuffer.Push(nodePtr->Right);
-						}
-						// Debug.Log($"Added 2 nodes to traversal buffer, now {nodeTraversalBuffer.Length}");
+
+						nodeTraversalBuffer.Push(nodePtr->Left);
+						nodeTraversalBuffer.Push(nodePtr->Right);
 					}
 				}
-
-				// Debug.Log($"Finished traversing BVH ({nodeTraversalBuffer.Length} nodes in buffer); will test {hitCandidateBuffer.Length} hit candidates");
-				// Debug.Log($"Total stackalloc memory : {totalMemory} bytes");
 
 				// iterative candidate tests
 				bool hit = false;
