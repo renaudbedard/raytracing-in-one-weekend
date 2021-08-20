@@ -188,6 +188,9 @@ namespace Runtime
 				HitRecord rec = default;
 				float3 rayInvDirection = rcp(ray.Direction);
 
+				// Convert NaN to INFINITY, since Burst thinks that divisions by 0 = NaN
+				rayInvDirection = select(rayInvDirection, INFINITY, isnan(rayInvDirection));
+
 				nodeTraversalBuffer.Clear();
 				hitCandidateBuffer.Clear();
 
