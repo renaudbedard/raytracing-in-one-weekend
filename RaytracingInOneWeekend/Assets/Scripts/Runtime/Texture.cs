@@ -164,7 +164,7 @@ namespace Runtime
 					throw new InvalidOperationException();
 			}
 
-			int2 coords = clamp((int2) (float2(u, v) * FaceSize), 0, FaceSize - 1);
+			int2 coords = min((int2) (float2(u, v) * FaceSize), FaceSize - 1);
 			pFaceData += coords.y * FaceSize.x * PixelStride + coords.x * PixelStride;
 
 			switch (ChannelType)

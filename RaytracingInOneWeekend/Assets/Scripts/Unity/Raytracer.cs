@@ -1284,23 +1284,12 @@ namespace Unity
 			}
 			WalkBvh(bvhRootData);
 		}
-#endif // BVH
 
-#if BVH_ITERATIVE
-		unsafe bool HitWorld(Ray r, out HitRecord hitRec)
-		{
-			// TODO
-			hitRec = default;
-			return false;
-		}
-
-#else // !BVH_ITERATIVE
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
 			var rng = new RandomSource(noiseColor, new Random(frameSeed),
 				blueNoise.GetRuntimeData(frameSeed).GetPerPixelData((uint2) bufferSize / 2));
 
-#if BVH_RECURSIVE
 			unsafe
 			{
 #if FULL_DIAGNOSTICS
@@ -1310,11 +1299,10 @@ namespace Unity
 				return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
 #endif // FULL_DIAGNOSTICS
 			}
-#else
-			return World.Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
-#endif // BVH_RECURSIVE
 		}
-#endif // BVH_ITERATIVE
+#else
+		public bool HitWorld(Ray r, out HitRecord hitRec) => World.Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
+#endif // BVH
 
 		void CollectActiveEntities()
 		{

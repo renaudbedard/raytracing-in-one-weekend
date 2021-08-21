@@ -169,7 +169,7 @@ namespace Runtime
 			return anyHit;
 		}
 
-#elif BVH_RECURSIVE
+#else
 		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
 			ref RandomSource rng,
 #if FULL_DIAGNOSTICS
