@@ -139,32 +139,24 @@ namespace Runtime
 			bool positive = vector[firstLane] >= 0;
 
 			float u, v;
-			int2 coords;
 			byte* pFaceData;
-
 			switch (firstLane)
 			{
 				case 0: // x
 					u = (((positive ? -vector.z : vector.z) / absVector.x) + 1) / 2;
 					v = ((-vector.y / absVector.x) + 1) / 2;
-
-					coords = (int2) (float2(u, v) * FaceSize);
 					pFaceData = positive ? PositiveX : NegativeX;
 					break;
 
 				case 1: // y
 					u = ((vector.x / absVector.y) + 1) / 2;
 					v = (((positive ? vector.z : -vector.z) / absVector.y) + 1) / 2;
-
-					coords = (int2) (float2(u, v) * FaceSize);
 					pFaceData = positive ? PositiveY : NegativeY;
 					break;
 
 				case 2: // z
 					u = (((positive ? vector.x : -vector.x) / absVector.z) + 1) / 2;
 					v = ((-vector.y / absVector.z) + 1) / 2;
-
-					coords = (int2) (float2(u, v) * FaceSize);
 					pFaceData = positive ? PositiveZ : NegativeZ;
 					break;
 
@@ -172,6 +164,7 @@ namespace Runtime
 					throw new InvalidOperationException();
 			}
 
+			int2 coords = clamp((int2) (float2(u, v) * FaceSize), 0, FaceSize - 1);
 			pFaceData += coords.y * FaceSize.x * PixelStride + coords.x * PixelStride;
 
 			switch (ChannelType)
