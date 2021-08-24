@@ -580,8 +580,6 @@ namespace Unity
 
 			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
-			else
-				focusDistance = 1;
 
 			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
 				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
