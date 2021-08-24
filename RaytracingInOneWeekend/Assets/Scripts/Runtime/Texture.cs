@@ -1,5 +1,6 @@
 using System;
 using JetBrains.Annotations;
+using Unity.Burst.CompilerServices;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
@@ -95,40 +96,38 @@ namespace Runtime
 
 	readonly unsafe struct Cubemap
 	{
-		public readonly int2 FaceSize;
-		public readonly ChannelType ChannelType;
-		public readonly int PixelStride;
+		private readonly int2 halfFaceSize, faceSizeMinusOne, pixelStrideVector;
+		private readonly ChannelType channelType;
+		private readonly int faceStride;
 
-		[NativeDisableUnsafePtrRestriction]
-		public readonly byte* NegativeX, PositiveX, NegativeY, PositiveY, NegativeZ, PositiveZ;
+		[NativeDisableUnsafePtrRestriction] private readonly byte* dataPointer;
 
 		public Cubemap(UnityEngine.Cubemap cubemap)
 		{
-			FaceSize = int2(cubemap.width, cubemap.height);
+			int2 faceSize = int2(cubemap.width, cubemap.height);
+			halfFaceSize = faceSize / 2;
+			faceSizeMinusOne = faceSize - 1;
 
+			int pixelStride;
 			switch (cubemap.graphicsFormat)
 			{
 				case GraphicsFormat.R16G16B16A16_SFloat:
-					ChannelType = ChannelType.SignedHalf;
-					PixelStride = (4 * 16) / 8;
+					channelType = ChannelType.SignedHalf;
+					pixelStride = 8; // 4 * 16 / 8
 					break;
 
-				default:
-					throw new NotSupportedException();
+				default: throw new NotSupportedException();
 			}
 
-			NegativeX = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.NegativeX).GetUnsafeReadOnlyPtr();
-			PositiveX = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveX).GetUnsafeReadOnlyPtr();
-			NegativeY = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.NegativeY).GetUnsafeReadOnlyPtr();
-			PositiveY = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveY).GetUnsafeReadOnlyPtr();
-			NegativeZ = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.NegativeZ).GetUnsafeReadOnlyPtr();
-			PositiveZ = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveZ).GetUnsafeReadOnlyPtr();
+			pixelStrideVector = int2(pixelStride, pixelStride * faceSize.x);
+			faceStride = pixelStride * faceSize.x * faceSize.y;
+			dataPointer = (byte*) cubemap.GetPixelData<byte>(0, CubemapFace.PositiveX).GetUnsafeReadOnlyPtr();
 		}
 
 		[Pure]
 		public float3 Sample(float3 vector)
 		{
-			if (NegativeX == (byte*) 0)
+			if (Hint.Unlikely(dataPointer == (byte*) 0))
 				return default;
 
 			// indexing math adapted from : https://scalibq.wordpress.com/2013/06/23/cubemaps/
@@ -138,36 +137,22 @@ namespace Runtime
 			int firstLane = tzcnt(laneMask);
 			bool positive = vector[firstLane] >= 0;
 
-			float u, v;
-			byte* pFaceData;
+			float2 uv;
 			switch (firstLane)
 			{
-				case 0: // x
-					u = (((positive ? -vector.z : vector.z) / absVector.x) + 1) / 2;
-					v = ((-vector.y / absVector.x) + 1) / 2;
-					pFaceData = positive ? PositiveX : NegativeX;
-					break;
-
-				case 1: // y
-					u = ((vector.x / absVector.y) + 1) / 2;
-					v = (((positive ? vector.z : -vector.z) / absVector.y) + 1) / 2;
-					pFaceData = positive ? PositiveY : NegativeY;
-					break;
-
-				case 2: // z
-					u = (((positive ? vector.x : -vector.x) / absVector.z) + 1) / 2;
-					v = ((-vector.y / absVector.z) + 1) / 2;
-					pFaceData = positive ? PositiveZ : NegativeZ;
-					break;
-
-				default:
-					throw new InvalidOperationException();
+				case 0: uv = float2(positive ? -vector.z : vector.z, -vector.y); break; // x
+				case 1: uv = float2(vector.x, positive ? vector.z : -vector.z); break;  // y
+				case 2: uv = float2(positive ? vector.x : -vector.x, -vector.y); break; // z
+				default: throw new InvalidOperationException();
 			}
+			uv /= absVector[firstLane];
 
-			int2 coords = min((int2) (float2(u, v) * FaceSize), FaceSize - 1);
-			pFaceData += coords.y * FaceSize.x * PixelStride + coords.x * PixelStride;
+			int2 coords = min((int2) ((uv + 1) * halfFaceSize), faceSizeMinusOne);
 
-			switch (ChannelType)
+			byte* pFaceData = dataPointer + (firstLane * 2 + (positive ? 0 : 1)) * faceStride;
+			pFaceData += dot(coords, pixelStrideVector);
+
+			switch (channelType)
 			{
 				case ChannelType.UnsignedByte:
 					return float3(pFaceData[0], pFaceData[1], pFaceData[2]) / 255;
@@ -176,8 +161,7 @@ namespace Runtime
 					var pTypedData = (half*) pFaceData;
 					return float3(pTypedData[0], pTypedData[1], pTypedData[2]);
 
-				default:
-					throw new InvalidOperationException();
+				default: throw new NotSupportedException();
 			}
 		}
 	}
