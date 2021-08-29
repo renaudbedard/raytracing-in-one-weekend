@@ -1257,8 +1257,9 @@ namespace Unity
 				bvhRootData = new BvhNodeData(entityBuffer, bvhEntities);
 				nodeCount = bvhRootData.ChildCount;
 			}
-
+#if PROFILING
 			CumulativeStopwatch.Log();
+#endif
 
 			Debug.Log($"Rebuilt BVH ({bvhRootData.ChildCount} nodes for {entityBuffer.Length} entities)");
 

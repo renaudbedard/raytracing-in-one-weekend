@@ -77,25 +77,28 @@ namespace Unity
 			var biggestPartition = PartitionAxis.None;
 			var biggestPartitionSize = float.MinValue;
 			float3 entireSize = entireBounds.Size;
-			using (new CumulativeStopwatch("Determine biggest partition"))
+			foreach (PartitionAxis partition in PartitionAxis.All.Enumerate())
 			{
-				foreach (PartitionAxis partition in PartitionAxis.All.Enumerate())
+				float size = entireSize[partition.GetAxisId()];
+				if (size > biggestPartitionSize)
 				{
-					float size = entireSize[partition.GetAxisId()];
-					if (size > biggestPartitionSize)
-					{
-						biggestPartition = partition;
-						biggestPartitionSize = size;
-					}
+					biggestPartition = partition;
+					biggestPartitionSize = size;
 				}
 			}
 
 			if (sortAxis != biggestPartition)
 				using (new CumulativeStopwatch("Sort entities"))
 				{
-					SortJob<Entity, EntityBoundsComparer> sortJob = entities.SortJob(new EntityBoundsComparer(biggestPartition));
-					JobHandle sortJobHandle = sortJob.Schedule();
-					sortJobHandle.Complete();
+					// Use a job for sorting, if we are above a certain threshold where it becomes faster to do so
+					if (entities.Length > 64)
+					{
+						SortJob<Entity, EntityBoundsComparer> sortJob = entities.SortJob(new EntityBoundsComparer(biggestPartition));
+						JobHandle sortJobHandle = sortJob.Schedule();
+						sortJobHandle.Complete();
+					}
+					else
+						entities.Sort(new EntityBoundsComparer(biggestPartition));
 				}
 
 			int biggestAxis = biggestPartition.GetAxisId();
