@@ -8,14 +8,14 @@ namespace OptiX
 	public struct SizeT
 	{
 #if UNITY_64
-		private ulong Value;
+		ulong Value;
 		public static implicit operator ulong(SizeT operand) => operand.Value;
 		public static implicit operator SizeT(ulong operand) => new SizeT { Value = operand };
 		public static implicit operator SizeT(uint operand) => new SizeT { Value = operand };
 		public static implicit operator SizeT(long operand) => new SizeT { Value = (ulong) operand };
 		public static implicit operator SizeT(int operand) => new SizeT { Value = (uint) operand };
 #else
-		private uint Value;
+		uint Value;
 		public static implicit operator uint(SizeT operand) => operand.Value;
 		public static implicit operator SizeT(uint operand) => new SizeT { Value = operand };
 #endif

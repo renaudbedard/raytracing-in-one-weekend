@@ -66,7 +66,7 @@ namespace Unity
 
 		MeshFilter previewSphere, previewRect, previewBox;
 
-		private readonly Pool<Mesh> triangleMeshes = new Pool<Mesh>(() =>
+		readonly Pool<Mesh> triangleMeshes = new Pool<Mesh>(() =>
 		{
 			var m = new Mesh { subMeshCount = 1 };
 			m.SetVertices(new Vector3[3]);

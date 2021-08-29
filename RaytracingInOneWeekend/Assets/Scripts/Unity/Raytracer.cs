@@ -127,7 +127,7 @@ namespace Unity
 #endif
 
 #if BVH
-		private BvhNodeData bvhRootData;
+		BvhNodeData bvhRootData;
 		NativeArray<BvhNode> bvhNodeBuffer;
 		NativeList<Entity> bvhEntities;
 
@@ -1257,6 +1257,8 @@ namespace Unity
 				bvhRootData = new BvhNodeData(entityBuffer, bvhEntities);
 				nodeCount = bvhRootData.ChildCount;
 			}
+
+			CumulativeStopwatch.Log();
 
 			Debug.Log($"Rebuilt BVH ({bvhRootData.ChildCount} nodes for {entityBuffer.Length} entities)");
 

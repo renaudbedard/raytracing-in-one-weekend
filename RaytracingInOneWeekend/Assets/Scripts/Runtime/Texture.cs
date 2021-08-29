@@ -96,11 +96,11 @@ namespace Runtime
 
 	readonly unsafe struct Cubemap
 	{
-		private readonly int2 halfFaceSize, faceSizeMinusOne, pixelStrideVector;
-		private readonly ChannelType channelType;
-		private readonly int faceStride;
+		readonly int2 halfFaceSize, faceSizeMinusOne, pixelStrideVector;
+		readonly ChannelType channelType;
+		readonly int faceStride;
 
-		[NativeDisableUnsafePtrRestriction] private readonly byte* dataPointer;
+		[NativeDisableUnsafePtrRestriction] readonly byte* dataPointer;
 
 		public Cubemap(UnityEngine.Cubemap cubemap)
 		{
