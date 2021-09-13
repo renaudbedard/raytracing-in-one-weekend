@@ -11,6 +11,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Util;
@@ -277,7 +278,6 @@ namespace Unity
 			InitDenoisers();
 			EnsureBuffersBuilt();
 			CleanCamera();
-
 			ScheduleAccumulate(true);
 		}
 
@@ -1113,6 +1113,9 @@ namespace Unity
 		}
 #endif
 
+		private static readonly ProfilerMarker rebuildEntityBuffersMarker = new ProfilerMarker("Rebuild Entity Buffers");
+		private static readonly ProfilerMarker rebuildBvhMarker = new ProfilerMarker("Rebuild BVH");
+
 		void RebuildWorld()
 		{
 #if UNITY_EDITOR
@@ -1125,9 +1128,11 @@ namespace Unity
 				if (!activeMaterials.Contains(entity.Material))
 					activeMaterials.Add(entity.Material);
 
-			RebuildEntityBuffers();
+			using (rebuildEntityBuffersMarker.Auto())
+				RebuildEntityBuffers();
 #if BVH
-			RebuildBvh();
+			using (rebuildBvhMarker.Auto())
+				RebuildBvh();
 #endif
 
 			perlinNoise.Generate(scene.RandomSeed);
@@ -1137,9 +1142,6 @@ namespace Unity
 
 		unsafe void RebuildEntityBuffers()
 		{
-			var meshVertexList = new List<Vector3>();
-			var meshNormalList = new List<Vector3>();
-			var meshIndexList = new List<int>();
 			var addedMaterials = new Dictionary<MaterialData, int>();
 
 			entityBuffer.EnsureCapacity(
@@ -1152,13 +1154,12 @@ namespace Unity
 			triangleBuffer.EnsureCapacity(
 				ActiveEntities.Count(x => x.Type == EntityType.Triangle) +
 				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
+
 			materialBuffer.EnsureCapacity(ActiveEntities.Select(x => x.Material).Distinct().Count());
 
-			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x =>
-				x.Material.Type == MaterialType.DiffuseLight));
+			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
 
-			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0,
-				importanceSamplingIndex = 0, materialIndex = 0;
+			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0, importanceSamplingIndex = 0, materialIndex = 0;
 
 			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform, EntityType entityType)
 			{
@@ -1214,28 +1215,42 @@ namespace Unity
 						break;
 
 					case EntityType.Mesh:
-						var mesh = e.MeshData.Mesh;
-						mesh.GetVertices(meshVertexList);
-						mesh.GetNormals(meshNormalList);
-						for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
+						using (Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(e.MeshData.Mesh))
 						{
-							mesh.GetIndices(meshIndexList, subMesh);
-							for (int i = 0; i < meshIndexList.Count; i += 3)
+							for (int meshIndex = 0; meshIndex < meshDataArray.Length; meshIndex++)
 							{
-								int3 indices = int3(meshIndexList[i], meshIndexList[i + 1], meshIndexList[i + 2]);
+								Mesh.MeshData meshData = meshDataArray[meshIndex];
 
-								if (e.MeshData.FaceNormals)
-									triangleBuffer[triangleIndex] = new Triangle(
-										meshVertexList[indices[0]], meshVertexList[indices[1]], meshVertexList[indices[2]]);
-								else
-									triangleBuffer[triangleIndex] = new Triangle(
-										meshVertexList[indices[0]], meshVertexList[indices[1]], meshVertexList[indices[2]],
-										meshNormalList[indices[0]], meshNormalList[indices[1]], meshNormalList[indices[2]]);
+								using var vertices = new NativeArray<Vector3>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+								meshData.GetVertices(vertices);
 
-								AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr, rigidTransform, EntityType.Triangle);
+								NativeArray<Vector3> normals = default;
+								if (!e.MeshData.FaceNormals)
+								{
+									normals = new NativeArray<Vector3>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+									meshData.GetNormals(normals);
+								}
+
+								NativeArray<ushort> indices = meshData.GetIndexData<ushort>();
+								for (int i = 0; i < indices.Length; i += 3)
+								{
+									int3 triangleIndices = int3(indices[i], indices[i + 1], indices[i + 2]);
+
+									if (e.MeshData.FaceNormals)
+										triangleBuffer[triangleIndex] = new Triangle(
+											vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]]);
+									else
+										triangleBuffer[triangleIndex] = new Triangle(
+											vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]],
+											normals[triangleIndices[0]], normals[triangleIndices[1]], normals[triangleIndices[2]]);
+
+									AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr, rigidTransform, EntityType.Triangle);
+								}
+
+								if (!e.MeshData.FaceNormals)
+									normals.Dispose();
 							}
 						}
-
 						break;
 				}
 			}

@@ -10,11 +10,11 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.collections": {
-      "version": "1.0.0-pre.3",
+      "version": "1.0.0-pre.5",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.unity.burst": "1.5.3",
+        "com.unity.burst": "1.5.4",
         "com.unity.test-framework": "1.1.22"
       },
       "url": "https://packages.unity.com"

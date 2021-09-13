@@ -6,6 +6,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine.Assertions;
 using Util;
 using static Unity.Mathematics.math;
@@ -54,6 +55,10 @@ namespace Unity
 
 	unsafe class BvhNodeData
 	{
+		static readonly ProfilerMarker encloseEntireBoundsMarker = new ProfilerMarker("Enclose entire bounds");
+		static readonly ProfilerMarker sortEntitiesMarker = new ProfilerMarker("Sort entities");
+		static readonly ProfilerMarker determinePartitionSizeMarker = new ProfilerMarker("Determine partition size");
+
 		public static int MaxDepth = 16;
 
 		public readonly AxisAlignedBoundingBox Bounds;
@@ -68,7 +73,7 @@ namespace Unity
 			Depth = depth;
 
 			var entireBounds = new AxisAlignedBoundingBox(float.MaxValue, float.MinValue);
-			using (new CumulativeStopwatch("Enclose entire bounds"))
+			using (encloseEntireBoundsMarker.Auto())
 			{
 				foreach (Entity entity in entities)
 					entireBounds = AxisAlignedBoundingBox.Enclose(entireBounds, entity.Bounds);
@@ -88,7 +93,7 @@ namespace Unity
 			}
 
 			if (sortAxis != biggestPartition)
-				using (new CumulativeStopwatch("Sort entities"))
+				using (sortEntitiesMarker.Auto())
 				{
 					// Use a job for sorting, if we are above a certain threshold where it becomes faster to do so
 					if (entities.Length > 64)
@@ -124,7 +129,7 @@ namespace Unity
 				float partitionStart = entities[0].Bounds.Min[biggestAxis];
 
 				// decide the size of the partition according to the size of the entities
-				using (new CumulativeStopwatch("Determine partition size"))
+				using (determinePartitionSizeMarker.Auto())
 				{
 					foreach (Entity entity in entities)
 					{

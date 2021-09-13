@@ -60,16 +60,27 @@ namespace Runtime
 				default: throw new InvalidOperationException($"Unknown entity type : {Type}");
 			}
 
-			float3[] corners = Bounds.Corners;
-
 			float3 destinationPosition = OriginTransform.pos + DestinationOffset;
 			var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
 			var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
 
 			var minimum = new float3(float.PositiveInfinity);
 			var maximum = new float3(float.NegativeInfinity);
-			foreach (float3 c in corners)
+
+			float3* corners = stackalloc float3[8]
 			{
+				float3(Bounds.Min.x, Bounds.Min.y, Bounds.Min.z),
+				float3(Bounds.Min.x, Bounds.Min.y, Bounds.Max.z),
+				float3(Bounds.Min.x, Bounds.Max.y, Bounds.Min.z),
+				float3(Bounds.Max.x, Bounds.Min.y, Bounds.Min.z),
+				float3(Bounds.Min.x, Bounds.Max.y, Bounds.Max.z),
+				float3(Bounds.Max.x, Bounds.Max.y, Bounds.Min.z),
+				float3(Bounds.Max.x, Bounds.Min.y, Bounds.Max.z),
+				float3(Bounds.Max.x, Bounds.Max.y, Bounds.Max.z)
+			};
+			for (var i = 0; i < 8; i++)
+			{
+				float3 c = corners[i];
 				minimum = min(minimum, transform(minTransform, c));
 				maximum = max(maximum, transform(maxTransform, c));
 			}

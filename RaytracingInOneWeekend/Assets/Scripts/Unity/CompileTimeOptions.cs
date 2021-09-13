@@ -21,7 +21,7 @@ namespace Unity
 		}
 
 		[SerializeField] [DisableInPlayMode] HitTestingMode hitTestingMode = HitTestingMode.Basic;
-		[SerializeField] [DisableInPlayMode] bool fullDiagnostics = false, pathDebugging = false, enableNvidiaOptix = false, profiling = false;
+		[SerializeField] [DisableInPlayMode] bool fullDiagnostics = false, pathDebugging = false, enableNvidiaOptix = false;
 
 #if UNITY_EDITOR
 		void OnValidate()
@@ -45,7 +45,6 @@ namespace Unity
 			newDefinitions.Remove("FULL_DIAGNOSTICS");
 			newDefinitions.Remove("PATH_DEBUGGING");
 			newDefinitions.Remove("ENABLE_OPTIX");
-			newDefinitions.Remove("PROFILING");
 
 			switch (hitTestingMode)
 			{
@@ -73,7 +72,6 @@ namespace Unity
 			if (fullDiagnostics) newDefinitions.Add("FULL_DIAGNOSTICS");
 			if (pathDebugging) newDefinitions.Add("PATH_DEBUGGING");
 			if (enableNvidiaOptix) newDefinitions.Add("ENABLE_OPTIX");
-			if (profiling) newDefinitions.Add("PROFILING");
 
 			if (!newDefinitions.SetEquals(originalDefinitions))
 			{
