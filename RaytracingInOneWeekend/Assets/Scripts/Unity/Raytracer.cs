@@ -1269,7 +1269,18 @@ namespace Unity
 			int nodeCount = 0;
 			using (new ScopedStopwatch("BVH Creation"))
 			{
-				bvhRootData = new BvhNodeData(entityBuffer, bvhEntities);
+				using (var bvhBuildingEntityBuffer = new NativeArray<BvhBuildingEntity>(entityBuffer.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory))
+				{
+					var initJob = new CreateBvhBuildingEntitiesJob
+					{
+						Entities = entityBuffer,
+						BvhBuildingEntities = bvhBuildingEntityBuffer
+					};
+					initJob.Schedule(entityBuffer.Length, 128).Complete();
+
+					bvhRootData = new BvhNodeData(bvhBuildingEntityBuffer, bvhEntities);
+				}
+
 				nodeCount = bvhRootData.ChildCount;
 			}
 #if PROFILING

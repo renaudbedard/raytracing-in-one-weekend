@@ -26,18 +26,14 @@ namespace Runtime
 		public readonly float3 DestinationOffset;
 		public readonly float2 TimeRange;
 		public readonly Material* Material;
-#if BVH
-		// TODO: this is only used in the BVH generation step, and not at runtime
-		public readonly AxisAlignedBoundingBox Bounds;
-#endif
 
-		[NativeDisableUnsafePtrRestriction] readonly void* content;
+		[NativeDisableUnsafePtrRestriction] public readonly void* Content;
 
 		public Entity(EntityType type, void* contentPointer, RigidTransform originTransform, Material* material,
 			bool moving = false, float3 destinationOffset = default, float2 timeRange = default) : this()
 		{
 			Type = type;
-			content = contentPointer;
+			Content = contentPointer;
 			Moving = moving;
 			TimeRange = timeRange;
 			OriginTransform = originTransform;
@@ -49,44 +45,6 @@ namespace Runtime
 				InverseTransform = inverse(OriginTransform);
 			else
 				Assert.AreNotEqual(timeRange.x, timeRange.y, "Time range cannot be empty for moving entities.");
-
-#if BVH
-			switch (Type)
-			{
-				case EntityType.Sphere: Bounds = ((Sphere*) content)->Bounds; break;
-				case EntityType.Rect: Bounds = ((Rect*) content)->Bounds; break;
-				case EntityType.Box: Bounds = ((Box*) content)->Bounds; break;
-				case EntityType.Triangle: Bounds = ((Triangle*) content)->Bounds; break;
-				default: throw new InvalidOperationException($"Unknown entity type : {Type}");
-			}
-
-			float3 destinationPosition = OriginTransform.pos + DestinationOffset;
-			var minTransform = new RigidTransform(OriginTransform.rot, min(OriginTransform.pos, destinationPosition));
-			var maxTransform = new RigidTransform(OriginTransform.rot, max(OriginTransform.pos, destinationPosition));
-
-			var minimum = new float3(float.PositiveInfinity);
-			var maximum = new float3(float.NegativeInfinity);
-
-			float3* corners = stackalloc float3[8]
-			{
-				float3(Bounds.Min.x, Bounds.Min.y, Bounds.Min.z),
-				float3(Bounds.Min.x, Bounds.Min.y, Bounds.Max.z),
-				float3(Bounds.Min.x, Bounds.Max.y, Bounds.Min.z),
-				float3(Bounds.Max.x, Bounds.Min.y, Bounds.Min.z),
-				float3(Bounds.Min.x, Bounds.Max.y, Bounds.Max.z),
-				float3(Bounds.Max.x, Bounds.Max.y, Bounds.Min.z),
-				float3(Bounds.Max.x, Bounds.Min.y, Bounds.Max.z),
-				float3(Bounds.Max.x, Bounds.Max.y, Bounds.Max.z)
-			};
-			for (var i = 0; i < 8; i++)
-			{
-				float3 c = corners[i];
-				minimum = min(minimum, transform(minTransform, c));
-				maximum = max(maximum, transform(maxTransform, c));
-			}
-
-			Bounds = new AxisAlignedBoundingBox(minimum, maximum);
-#endif
 		}
 
 		[Pure]
@@ -156,10 +114,10 @@ namespace Runtime
 		{
 			switch (Type)
 			{
-				case EntityType.Sphere: return ((Sphere*) content)->Hit(r, tMin, tMax, out distance, out normal);
-				case EntityType.Rect: return ((Rect*) content)->Hit(r, tMin, tMax, out distance, out normal);
-				case EntityType.Box: return ((Box*) content)->Hit(r, tMin, tMax, out distance, out normal);
-				case EntityType.Triangle: return ((Triangle*) content)->Hit(r, tMin, tMax, out distance, out normal);
+				case EntityType.Sphere: return ((Sphere*) Content)->Hit(r, tMin, tMax, out distance, out normal);
+				case EntityType.Rect: return ((Rect*) Content)->Hit(r, tMin, tMax, out distance, out normal);
+				case EntityType.Box: return ((Box*) Content)->Hit(r, tMin, tMax, out distance, out normal);
+				case EntityType.Triangle: return ((Triangle*) Content)->Hit(r, tMin, tMax, out distance, out normal);
 
 				default:
 					distance = 0;
@@ -176,10 +134,10 @@ namespace Runtime
 				switch (Type)
 				{
 					case EntityType.Rect:
-						return ((Rect*) content)->Pdf(entitySpaceRay.Direction, distance, entitySpaceNormal);
+						return ((Rect*) Content)->Pdf(entitySpaceRay.Direction, distance, entitySpaceNormal);
 
 					case EntityType.Sphere:
-						return ((Sphere*) content)->Pdf(entitySpaceRay.Origin);
+						return ((Sphere*) Content)->Pdf(entitySpaceRay.Origin);
 
 					default: throw new NotImplementedException();
 				}
@@ -193,8 +151,8 @@ namespace Runtime
 			float3 localPoint;
 			switch (Type)
 			{
-				case EntityType.Rect: localPoint = ((Rect*) content)->RandomPoint(ref rng); break;
-				case EntityType.Sphere: localPoint = ((Sphere*) content)->RandomPoint(ref rng); break;
+				case EntityType.Rect: localPoint = ((Rect*) Content)->RandomPoint(ref rng); break;
+				case EntityType.Sphere: localPoint = ((Sphere*) Content)->RandomPoint(ref rng); break;
 				default: throw new NotImplementedException();
 			}
 
