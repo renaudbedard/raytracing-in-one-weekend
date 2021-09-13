@@ -1,0 +1,145 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
+  m_Name: Four Bunnies
+  m_EditorClassIdentifier: 
+  cameraPosition: {x: 0.41, y: 2.36, z: 1.06}
+  cameraTarget: {x: 0.17933117, y: 1.7465734, z: 0.30468547}
+  cameraAperture: 0
+  cameraFieldOfView: 50.1
+  entities:
+  - name: 
+    type: 1
+    enabled: 0
+    position: {x: 0, y: -100.5, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 100
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 0, z: 0}
+      b: {x: 0, y: 0, z: 0}
+      c: {x: 0, y: 0, z: 0}
+    meshData:
+      mesh: {fileID: -2432090755550338912, guid: a3dfa5406c40018488bf9916821fd620,
+        type: 3}
+      faceNormals: 0
+    material: {fileID: 11400000, guid: 5b8051685a10b45f4a5fa3922b6d2fd8, type: 2}
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: 0.5, y: -0.35, z: -2}
+    rotation: {x: 0, y: 226.9, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 0, z: 0}
+      b: {x: 0, y: 0, z: 0}
+      c: {x: 0, y: 0, z: 0}
+    meshData:
+      mesh: {fileID: -2432090755550338912, guid: a3dfa5406c40018488bf9916821fd620,
+        type: 3}
+      faceNormals: 0
+    material: {fileID: 11400000, guid: 815d0a0a8ec26ab41be8487d1adb30f6, type: 2}
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: 0.5, y: -0.35, z: -0.5}
+    rotation: {x: 0, y: 159.2, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 0, z: 0}
+      b: {x: 0, y: 0, z: 0}
+      c: {x: 0, y: 0, z: 0}
+    meshData:
+      mesh: {fileID: -2432090755550338912, guid: a3dfa5406c40018488bf9916821fd620,
+        type: 3}
+      faceNormals: 1
+    material: {fileID: 11400000, guid: 67ca2b630403548e990e54f0dda310a6, type: 2}
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: -1.5, y: -0.35, z: -2}
+    rotation: {x: 0, y: 1.3, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 0, z: 0}
+      b: {x: 0, y: 0, z: 0}
+      c: {x: 0, y: 0, z: 0}
+    meshData:
+      mesh: {fileID: -2432090755550338912, guid: a3dfa5406c40018488bf9916821fd620,
+        type: 3}
+      faceNormals: 0
+    material: {fileID: 11400000, guid: 2b589fea2cde947bb9dd0396429df3b6, type: 2}
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: -1, y: -0.35, z: -0.5}
+    rotation: {x: 0, y: 82.67, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0.5
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 0, y: 0, z: 0}
+    triangleData:
+      a: {x: 0, y: 0, z: 0}
+      b: {x: 0, y: 0, z: 0}
+      c: {x: 0, y: 0, z: 0}
+    meshData:
+      mesh: {fileID: -2432090755550338912, guid: a3dfa5406c40018488bf9916821fd620,
+        type: 3}
+      faceNormals: 0
+    material: {fileID: 11400000, guid: 22fcb6a52f2954c11ab960f7d3fa3821, type: 2}
+  randomSeed: 10000
+  randomEntityGroups: []
+  skyType: 1
+  skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
+  skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
+  skyCubemap: {fileID: 8900000, guid: 597c0052c00828740a2e88c7d6d3cb91, type: 3}
