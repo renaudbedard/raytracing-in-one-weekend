@@ -13,44 +13,12 @@ using static Unity.Mathematics.math;
 
 namespace Unity
 {
-	[Flags]
 	enum PartitionAxis
 	{
-		None = 0,
-		X = 1,
-		Y = 2,
-		Z = 4,
-		All = X | Y | Z
-	}
-
-	static class PartitionAxisExtensions
-	{
-		public static int GetAxisId(this PartitionAxis axis)
-		{
-			switch (axis)
-			{
-				case PartitionAxis.X: return 0;
-				case PartitionAxis.Y: return 1;
-				case PartitionAxis.Z: return 2;
-			}
-
-			Assert.IsTrue(false, "Multivalued or unset axis");
-			return -1;
-		}
-
-		static readonly PartitionAxis[][] Permutations =
-		{
-			new PartitionAxis[0],
-			new [] { PartitionAxis.X },
-			new [] { PartitionAxis.Y },
-			new [] { PartitionAxis.X, PartitionAxis.Y },
-			new [] { PartitionAxis.Z },
-			new [] { PartitionAxis.X, PartitionAxis.Z },
-			new [] { PartitionAxis.Y, PartitionAxis.Z },
-			new [] { PartitionAxis.X, PartitionAxis.Y, PartitionAxis.Z },
-		};
-
-		public static PartitionAxis[] Enumerate(this PartitionAxis axis) => Permutations[(int) axis];
+		None = -1,
+		X = 0,
+		Y = 1,
+		Z = 2
 	}
 
 	readonly unsafe struct BvhBuildingEntity
@@ -124,22 +92,36 @@ namespace Unity
 		}
 	}
 
-	unsafe class BvhNodeData
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
+	struct BuildBvhJob : IJob
+	{
+		public int MaxDepth;
+		public NativeArray<BvhBuildingEntity> Entities;
+		public NativeList<Entity> BvhEntities;
+		public NativeList<BvhNodeData> BvhNodes;
+
+		public unsafe void Execute()
+		{
+			BvhNodes.AddNoResize(default);
+			((BvhNodeData*) BvhNodes.GetUnsafePtr())[0] = new BvhNodeData(Entities, BvhEntities, BvhNodes, MaxDepth);
+		}
+	}
+
+	readonly unsafe struct BvhNodeData
 	{
 		static readonly ProfilerMarker encloseEntireBoundsMarker = new ProfilerMarker("Enclose entire bounds");
-		static readonly ProfilerMarker sortEntitiesMarker = new ProfilerMarker("Sort entities");
+		static readonly ProfilerMarker sortEntitiesMarker = new ProfilerMarker("Sort entitiess");
 		static readonly ProfilerMarker determinePartitionSizeMarker = new ProfilerMarker("Determine partition size");
-
-		public static int MaxDepth = 16;
 
 		public readonly AxisAlignedBoundingBox Bounds;
 		public readonly Entity* EntitiesStart;
 		public readonly int EntityCount, Depth;
-		public readonly BvhNodeData Left, Right;
+		public readonly BvhNodeData* Left, Right;
 
 		public bool IsLeaf => EntitiesStart != null;
 
-		public BvhNodeData(NativeSlice<BvhBuildingEntity> entities, NativeList<Entity> bvhEntities, int depth = 0, PartitionAxis sortAxis = PartitionAxis.None)
+		public BvhNodeData(NativeSlice<BvhBuildingEntity> entities, NativeList<Entity> bvhEntities, NativeList<BvhNodeData> bvhNodes,
+			int maxDepth, int depth = 0, PartitionAxis sortAxis = PartitionAxis.None)
 		{
 			Depth = depth;
 
@@ -153,12 +135,12 @@ namespace Unity
 			var biggestPartition = PartitionAxis.None;
 			var biggestPartitionSize = float.MinValue;
 			float3 entireSize = entireBounds.Size;
-			foreach (PartitionAxis partition in PartitionAxis.All.Enumerate())
+			for (int i = 0; i < 3; i++)
 			{
-				float size = entireSize[partition.GetAxisId()];
+				float size = entireSize[i];
 				if (size > biggestPartitionSize)
 				{
-					biggestPartition = partition;
+					biggestPartition = (PartitionAxis) i;
 					biggestPartitionSize = size;
 				}
 			}
@@ -166,20 +148,12 @@ namespace Unity
 			if (sortAxis != biggestPartition)
 				using (sortEntitiesMarker.Auto())
 				{
-					// Use a job for sorting, if we are above a certain threshold where it becomes faster to do so
-					if (entities.Length > 64)
-					{
-						SortJob<BvhBuildingEntity, BvhBuildingEntityBoundsComparer> sortJob = entities.SortJob(new BvhBuildingEntityBoundsComparer(biggestPartition));
-						JobHandle sortJobHandle = sortJob.Schedule();
-						sortJobHandle.Complete();
-					}
-					else
-						entities.Sort(new BvhBuildingEntityBoundsComparer(biggestPartition));
+					entities.Sort(new BvhBuildingEntityBoundsComparer(biggestPartition));
 				}
 
-			int biggestAxis = biggestPartition.GetAxisId();
+			int biggestAxis = (int) biggestPartition;
 
-			if (depth == MaxDepth || entities.Length == 1)
+			if (depth == maxDepth || entities.Length == 1)
 			{
 				EntitiesStart = (Entity*) bvhEntities.GetUnsafePtr() + bvhEntities.Length;
 				// TODO: Sorting desc by entity size would make sense here
@@ -191,6 +165,7 @@ namespace Unity
 					Bounds = AxisAlignedBoundingBox.Enclose(Bounds, entities[i].Bounds);
 
 				EntityCount = entities.Length;
+				Left = Right = null;
 			}
 			else
 			{
@@ -219,10 +194,17 @@ namespace Unity
 				if (partitionLength == entities.Length)
 					partitionLength--;
 
-				Left = new BvhNodeData(new NativeSlice<BvhBuildingEntity>(entities, 0, partitionLength), bvhEntities, depth + 1, biggestPartition);
-				Right = new BvhNodeData(new NativeSlice<BvhBuildingEntity>(entities, partitionLength), bvhEntities, depth + 1, biggestPartition);
+				int tailIndex = bvhNodes.Length;
+				bvhNodes.AddNoResize(default);
+				Left = (BvhNodeData*) bvhNodes.GetUnsafePtr() + tailIndex;
+				*Left = new BvhNodeData(new NativeSlice<BvhBuildingEntity>(entities, 0, partitionLength), bvhEntities, bvhNodes, maxDepth, depth + 1, biggestPartition);
 
-				Bounds = AxisAlignedBoundingBox.Enclose(Left.Bounds, Right.Bounds);
+				tailIndex = bvhNodes.Length;
+				bvhNodes.AddNoResize(default);
+				Right = (BvhNodeData*) bvhNodes.GetUnsafePtr() + tailIndex;
+				*Right = new BvhNodeData(new NativeSlice<BvhBuildingEntity>(entities, partitionLength), bvhEntities, bvhNodes, maxDepth, depth + 1, biggestPartition);
+
+				Bounds = AxisAlignedBoundingBox.Enclose(Left->Bounds, Right->Bounds);
 			}
 		}
 
@@ -230,10 +212,8 @@ namespace Unity
 		{
 			get
 			{
-				if (IsLeaf)
-					return 1;
-
-				return Left.ChildCount + Right.ChildCount + 1;
+				if (IsLeaf) return 1;
+				return Left->ChildCount + Right->ChildCount + 1;
 			}
 		}
 
@@ -244,8 +224,8 @@ namespace Unity
 
 			if (!IsLeaf)
 			{
-				Left.GetAllSubBounds(workingList);
-				Right.GetAllSubBounds(workingList);
+				Left->GetAllSubBounds(workingList);
+				Right->GetAllSubBounds(workingList);
 			}
 
 			return workingList;
@@ -256,7 +236,7 @@ namespace Unity
 	{
 		readonly int axisId;
 
-		public BvhBuildingEntityBoundsComparer(PartitionAxis axis) => axisId = axis.GetAxisId();
+		public BvhBuildingEntityBoundsComparer(PartitionAxis axis) => axisId = (int) axis;
 
 		public int Compare(BvhBuildingEntity lhs, BvhBuildingEntity rhs)
 		{

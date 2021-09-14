@@ -164,7 +164,7 @@ namespace Unity
 			if (previewBvh)
 			{
 				if (!entityBuffer.IsCreated) RebuildEntityBuffers();
-				if (bvhRootData == null) RebuildBvh(true);
+				if (!bvhNodeDataBuffer.IsCreated) RebuildBvh(true);
 			}
 			else
 			{
@@ -363,10 +363,10 @@ namespace Unity
 			}
 
 #if BVH
-			if (previewBvh && bvhRootData != null)
+			if (previewBvh && bvhRootData.HasValue)
 			{
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
-				(AxisAlignedBoundingBox _, int Depth)[] subBounds = bvhRootData.GetAllSubBounds().ToArray();
+				(AxisAlignedBoundingBox _, int Depth)[] subBounds = bvhRootData.Value.GetAllSubBounds().ToArray();
 				int maxDepth = subBounds.Max(x => x.Depth);
 				int shownLayer = DateTime.Now.Second % (maxDepth + 1);
 				int i = -1;

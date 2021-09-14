@@ -128,7 +128,8 @@ namespace Unity
 #endif
 
 #if BVH
-		BvhNodeData bvhRootData;
+		BvhNodeData? bvhRootData => bvhNodeDataBuffer.IsCreated ? (BvhNodeData?) bvhNodeDataBuffer[0] : null;
+		NativeList<BvhNodeData> bvhNodeDataBuffer;
 		NativeArray<BvhNode> bvhNodeBuffer;
 		NativeList<Entity> bvhEntities;
 
@@ -400,7 +401,7 @@ namespace Unity
 			boolBuffers?.Dispose();
 
 #if BVH
-			bvhRootData = null;
+			bvhNodeDataBuffer.SafeDispose();
 			bvhEntities.SafeDispose();
 			bvhNodeBuffer.SafeDispose();
 #endif
@@ -1261,10 +1262,11 @@ namespace Unity
 #if BVH
 		unsafe void RebuildBvh(bool editorOnly = false)
 		{
-			BvhNodeData.MaxDepth = maxBvhDepth;
-
 			bvhEntities.EnsureCapacity(entityBuffer.Length);
 			bvhEntities.Clear();
+
+			bvhNodeDataBuffer.EnsureCapacity(entityBuffer.Length * 2);
+			bvhNodeDataBuffer.Clear();
 
 			int nodeCount = 0;
 			using (new ScopedStopwatch("BVH Creation"))
@@ -1276,18 +1278,28 @@ namespace Unity
 						Entities = entityBuffer,
 						BvhBuildingEntities = bvhBuildingEntityBuffer
 					};
-					initJob.Schedule(entityBuffer.Length, 128).Complete();
+					JobHandle initJobHandle = initJob.Schedule(entityBuffer.Length, 128);
 
-					bvhRootData = new BvhNodeData(bvhBuildingEntityBuffer, bvhEntities);
+					var buildJob = new BuildBvhJob
+					{
+						MaxDepth = maxBvhDepth,
+						Entities = bvhBuildingEntityBuffer,
+						BvhEntities = bvhEntities,
+						BvhNodes = bvhNodeDataBuffer
+					};
+					JobHandle buildJobHandle = buildJob.Schedule(initJobHandle);
+
+					initJobHandle.Complete();
+					buildJobHandle.Complete();
 				}
 
-				nodeCount = bvhRootData.ChildCount;
+				nodeCount = bvhRootData.Value.ChildCount;
 			}
 #if PROFILING
 			CumulativeStopwatch.Log();
 #endif
 
-			Debug.Log($"Rebuilt BVH ({bvhRootData.ChildCount} nodes for {entityBuffer.Length} entities)");
+			Debug.Log($"Rebuilt BVH ({bvhRootData.Value.ChildCount} nodes for {entityBuffer.Length} entities)");
 
 			if (editorOnly)
 				return;
@@ -1296,20 +1308,21 @@ namespace Unity
 			int nodeIndex = nodeCount - 1;
 
 			// Runtime BVH is inserted BACKWARDS while traversing postorder, which means the first node will be the root
-			BvhNode* WalkBvh(BvhNodeData nodeData)
+			BvhNode* WalkBvh(BvhNodeData* nodeData)
 			{
 				BvhNode* leftNode = null, rightNode = null;
 
-				if (!nodeData.IsLeaf)
+				if (!nodeData->IsLeaf)
 				{
-					leftNode = WalkBvh(nodeData.Left);
-					rightNode = WalkBvh(nodeData.Right);
+					leftNode = WalkBvh(nodeData->Left);
+					rightNode = WalkBvh(nodeData->Right);
 				}
 
-				bvhNodeBuffer[nodeIndex] = new BvhNode(nodeData.Bounds, nodeData.EntitiesStart, nodeData.EntityCount, leftNode, rightNode);
+				bvhNodeBuffer[nodeIndex] = new BvhNode(nodeData->Bounds, nodeData->EntitiesStart, nodeData->EntityCount,
+					leftNode, rightNode);
 				return (BvhNode*) bvhNodeBuffer.GetUnsafePtr() + nodeIndex--;
 			}
-			WalkBvh(bvhRootData);
+			WalkBvh((BvhNodeData*) bvhNodeDataBuffer.GetUnsafePtr());
 		}
 
 		public bool HitWorld(Ray r, out HitRecord hitRec)
