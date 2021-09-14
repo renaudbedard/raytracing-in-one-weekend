@@ -194,7 +194,7 @@ namespace Unity
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledFinalizeJobs = new Queue<ScheduledJobData<PassOutputData>>();
 
 		bool commandBufferHooked, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
-		float focusDistance;
+		float focusDistance = 1;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
 		bool queuedAccumulate;
