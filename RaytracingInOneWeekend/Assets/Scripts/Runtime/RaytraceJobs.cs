@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using OpenImageDenoise;
+using Unity;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
@@ -38,6 +39,39 @@ namespace Runtime
 		public float3 From, To;
 	}
 #endif
+
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
+	struct BuildRuntimeBvhJob : IJob
+	{
+		[ReadOnly] public NativeList<BvhNodeData> BvhNodeDataBuffer;
+		[WriteOnly] public NativeArray<BvhNode> BvhNodeBuffer;
+		public int NodeCount;
+
+		private int nodeIndex;
+
+		// Runtime BVH is inserted BACKWARDS while traversing postorder, which means the first node will be the root
+
+		unsafe BvhNode* WalkBvh(BvhNodeData* nodeData)
+		{
+			BvhNode* leftNode = null, rightNode = null;
+
+			if (!nodeData->IsLeaf)
+			{
+				leftNode = WalkBvh(nodeData->Left);
+				rightNode = WalkBvh(nodeData->Right);
+			}
+
+			BvhNodeBuffer[nodeIndex] = new BvhNode(nodeData->Bounds, nodeData->EntitiesStart, nodeData->EntityCount,
+				leftNode, rightNode);
+			return (BvhNode*) BvhNodeBuffer.GetUnsafePtr() + nodeIndex--;
+		}
+
+		public unsafe void Execute()
+		{
+			nodeIndex = NodeCount - 1;
+			WalkBvh((BvhNodeData*) BvhNodeDataBuffer.GetUnsafeReadOnlyPtr());
+		}
+	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	unsafe struct AccumulateJob : IJobParallelFor

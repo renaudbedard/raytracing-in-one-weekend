@@ -1260,7 +1260,7 @@ namespace Unity
 		}
 
 #if BVH
-		unsafe void RebuildBvh(bool editorOnly = false)
+		void RebuildBvh(bool editorOnly = false)
 		{
 			bvhEntities.EnsureCapacity(entityBuffer.Length);
 			bvhEntities.Clear();
@@ -1305,24 +1305,14 @@ namespace Unity
 				return;
 
 			bvhNodeBuffer.EnsureCapacity(nodeCount);
-			int nodeIndex = nodeCount - 1;
 
-			// Runtime BVH is inserted BACKWARDS while traversing postorder, which means the first node will be the root
-			BvhNode* WalkBvh(BvhNodeData* nodeData)
+			var buildRuntimeBvhJob = new BuildRuntimeBvhJob
 			{
-				BvhNode* leftNode = null, rightNode = null;
-
-				if (!nodeData->IsLeaf)
-				{
-					leftNode = WalkBvh(nodeData->Left);
-					rightNode = WalkBvh(nodeData->Right);
-				}
-
-				bvhNodeBuffer[nodeIndex] = new BvhNode(nodeData->Bounds, nodeData->EntitiesStart, nodeData->EntityCount,
-					leftNode, rightNode);
-				return (BvhNode*) bvhNodeBuffer.GetUnsafePtr() + nodeIndex--;
-			}
-			WalkBvh((BvhNodeData*) bvhNodeDataBuffer.GetUnsafePtr());
+				BvhNodeBuffer = bvhNodeBuffer,
+				BvhNodeDataBuffer = bvhNodeDataBuffer,
+				NodeCount = nodeCount
+			};
+			buildRuntimeBvhJob.Schedule().Complete();
 		}
 
 		public bool HitWorld(Ray r, out HitRecord hitRec)
