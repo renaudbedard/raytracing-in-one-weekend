@@ -762,7 +762,7 @@ namespace Runtime
 	struct ReduceRayCountJob : IJob
 	{
 		[ReadOnly] public NativeArray<Diagnostics> Diagnostics;
-		[WriteOnly] public NativeArray<int> TotalRayCount;
+		[WriteOnly] public NativeReference<int> TotalRayCount;
 
 		public void Execute()
 		{
@@ -771,7 +771,7 @@ namespace Runtime
 			for (int i = 0; i < Diagnostics.Length; i++)
 				totalRayCount += Diagnostics[i].RayCount;
 
-			TotalRayCount[0] = (int) totalRayCount;
+			TotalRayCount.Value = (int) totalRayCount;
 		}
 	}
 

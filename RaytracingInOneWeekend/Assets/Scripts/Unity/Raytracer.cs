@@ -96,7 +96,7 @@ namespace Unity
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
-		Pool<NativeArray<int>> intBuffers;
+		Pool<NativeReference<int>> intReferences;
 		Pool<NativeArray<long>> longBuffers;
 		Pool<NativeArray<bool>> boolBuffers;
 
@@ -128,11 +128,11 @@ namespace Unity
 #endif
 
 #if BVH
-		BvhNodeData? bvhRootData => bvhNodeDataBuffer.IsCreated ? (BvhNodeData?) bvhNodeDataBuffer[0] : null;
 		NativeList<BvhNodeData> bvhNodeDataBuffer;
 		NativeArray<BvhNode> bvhNodeBuffer;
 		NativeList<Entity> bvhEntities;
 
+		BvhNodeData? BvhRootData => bvhNodeDataBuffer.IsCreated ? (BvhNodeData?) bvhNodeDataBuffer[0] : null;
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 #endif
 		[UsedImplicitly] bool BvhEnabled =>
@@ -179,7 +179,7 @@ namespace Unity
 		{
 			public NativeArray<float4> Color;
 			public NativeArray<float3> Normal, Albedo;
-			public NativeArray<int> ReducedRayCount;
+			public NativeReference<int> ReducedRayCount;
 			public JobHandle ReduceRayCountJobHandle;
 			public NativeArray<long> Timing;
 		}
@@ -255,8 +255,8 @@ namespace Unity
 			float4Buffers = new Pool<NativeArray<float4>>(() => new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<float4>") { Capacity = 16 };
 
-			intBuffers = new Pool<NativeArray<int>>(() => new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
-				itemNameOverride: "NativeArray<int>") { Capacity = 4 };
+			intReferences = new Pool<NativeReference<int>>(() => new NativeReference<int>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
+				itemNameOverride: "NativeReference<int>") { Capacity = 4 };
 
 			longBuffers = new Pool<NativeArray<long>>(() => new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<long>") { Capacity = 4 };
@@ -396,7 +396,7 @@ namespace Unity
 
 			float3Buffers?.Dispose();
 			float4Buffers?.Dispose();
-			intBuffers?.Dispose();
+			intReferences?.Dispose();
 			longBuffers?.Dispose();
 			boolBuffers?.Dispose();
 
@@ -503,8 +503,8 @@ namespace Unity
 				longBuffers.Return(completedJob.OutputData.Timing);
 
 				completedJob.OutputData.ReduceRayCountJobHandle.Complete();
-				int totalRayCount = completedJob.OutputData.ReducedRayCount[0];
-				intBuffers.Return(completedJob.OutputData.ReducedRayCount);
+				int totalRayCount = completedJob.OutputData.ReducedRayCount.Value;
+				intReferences.Return(completedJob.OutputData.ReducedRayCount);
 
 				LastBatchRayCount = totalRayCount;
 				AccumulatedSamples += (float) samplesPerBatch / interlacing;
@@ -711,9 +711,8 @@ namespace Unity
 
 			accumulateJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 1 }.Schedule(accumulateJobHandle);
 
-			NativeArray<int> reducedRayCountBuffer = intBuffers.Take();
-			JobHandle reduceRayCountJobHandle = new ReduceRayCountJob
-					{ Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountBuffer }
+			NativeReference<int> reducedRayCountReference = intReferences.Take();
+			JobHandle reduceRayCountJobHandle = new ReduceRayCountJob { Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountReference }
 				.Schedule(accumulateJobHandle);
 
 			var outputData = new AccumulateOutputData
@@ -722,7 +721,7 @@ namespace Unity
 				Normal = float3Buffers.Take(),
 				Albedo = float3Buffers.Take(),
 				ReduceRayCountJobHandle = reduceRayCountJobHandle,
-				ReducedRayCount = reducedRayCountBuffer,
+				ReducedRayCount = reducedRayCountReference,
 				Timing = timingBuffer
 			};
 
@@ -1114,8 +1113,8 @@ namespace Unity
 		}
 #endif
 
-		private static readonly ProfilerMarker rebuildEntityBuffersMarker = new ProfilerMarker("Rebuild Entity Buffers");
-		private static readonly ProfilerMarker rebuildBvhMarker = new ProfilerMarker("Rebuild BVH");
+		static readonly ProfilerMarker rebuildEntityBuffersMarker = new ProfilerMarker("Rebuild Entity Buffers");
+		static readonly ProfilerMarker rebuildBvhMarker = new ProfilerMarker("Rebuild BVH");
 
 		void RebuildWorld()
 		{
@@ -1283,9 +1282,9 @@ namespace Unity
 				buildJobHandle.Complete();
 			}
 
-			nodeCount = bvhRootData.Value.ChildCount;
+			nodeCount = BvhRootData.Value.ChildCount;
 
-			Debug.Log($"Rebuilt BVH ({bvhRootData.Value.ChildCount} nodes for {entityBuffer.Length} entities)");
+			Debug.Log($"Rebuilt BVH ({BvhRootData.Value.ChildCount} nodes for {entityBuffer.Length} entities)");
 
 			if (editorOnly)
 				return;
