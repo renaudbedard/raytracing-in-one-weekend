@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using OpenImageDenoise;
+using Runtime.EntityTypes;
 using Unity;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
@@ -267,7 +268,7 @@ namespace Runtime
 
 			int depth = 0;
 			Entity* explicitSamplingTarget = null;
-
+			Material* probablisticWalkEntryMaterial = null;
 			bool firstNonSpecularHit = false;
 			sampleNormal = sampleAlbedo = default;
 
@@ -342,12 +343,12 @@ namespace Runtime
 					}
 				}
 
-				// iterative candidate tests
+				// Iterative candidate tests
 				bool hit = false;
 				while (hitCandidateBuffer.Length > 0)
 				{
 					var hitCandidate = hitCandidateBuffer.Pop();
-					bool thisHit = hitCandidate->Hit(ray, 0, float.PositiveInfinity, ref rng, out HitRecord thisRec);
+					bool thisHit = hitCandidate->Hit(ray, 0, float.PositiveInfinity, probablisticWalkEntryMaterial, ref rng, out HitRecord thisRec);
 					if (thisHit && (!hit || thisRec.Distance < rec.Distance))
 					{
 						hit = true;
@@ -376,15 +377,36 @@ namespace Runtime
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
-					// we explicitly sampled an entity and could not hit it -- early out of this sample
+					// We explicitly sampled an entity and could not hit it -- early out of this sample
 					if (explicitSamplingTarget != null && explicitSamplingTarget != rec.EntityPtr)
 						break;
 
 					Material* material = rec.EntityPtr->Material;
+					bool didScatter;
+					float3 albedo;
+					Ray scatteredRay;
+
+					if (material->Type == MaterialType.ProbabilisticVolume && probablisticWalkEntryMaterial == null)
+					{
+						// Hijack the scatter direction for entry hits on probabilistic volumes
+						scatteredRay = new Ray(rec.Point, ray.Direction, ray.Time);
+						didScatter = true;
+						probablisticWalkEntryMaterial = material;
+						albedo = 1;
+					}
+					else
+					{
+						if (material->Type != MaterialType.ProbabilisticVolume)
+							probablisticWalkEntryMaterial = null;
+
+						if (probablisticWalkEntryMaterial != null)
+							material = probablisticWalkEntryMaterial;
+
+						didScatter = material->Scatter(ray, rec, ref rng, PerlinNoise, out albedo, out scatteredRay);
+					}
+
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
-
-					bool didScatter = material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
 					if (depth == 0)
 						sampleNormal = rec.Normal;
@@ -393,7 +415,7 @@ namespace Runtime
 					{
 						if (material->IsPerfectSpecular)
 						{
-							// TODO: fresnel mix for dielectric, first diffuse bounce for metallic
+							// TODO: Fresnel mix for dielectric, first diffuse bounce for metallic
 						}
 						else
 						{

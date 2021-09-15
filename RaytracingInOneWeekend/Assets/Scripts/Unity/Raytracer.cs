@@ -6,6 +6,7 @@ using AOT;
 using JetBrains.Annotations;
 using OpenImageDenoise;
 using Runtime;
+using Runtime.EntityTypes;
 using Sirenix.OdinInspector;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -24,7 +25,7 @@ using Material = Runtime.Material;
 using quaternion = Unity.Mathematics.quaternion;
 using Random = Unity.Mathematics.Random;
 using Ray = Runtime.Ray;
-using Rect = Runtime.Rect;
+using Rect = Runtime.EntityTypes.Rect;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 
 #if ENABLE_OPTIX
@@ -1309,14 +1310,14 @@ namespace Unity
 			{
 #if FULL_DIAGNOSTICS
 				Diagnostics _ = default;
-				return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, ref _, out hitRec);
+				return BvhRoot->Hit(r, 0, float.PositiveInfinity, null, ref rng, ref _, out hitRec);
 #else
-				return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
+				return BvhRoot->Hit(r, 0, float.PositiveInfinity, null, ref rng, out hitRec);
 #endif // FULL_DIAGNOSTICS
 			}
 		}
 #else
-		public bool HitWorld(Ray r, out HitRecord hitRec) => World.Hit(r, 0, float.PositiveInfinity, ref rng, out hitRec);
+		public bool HitWorld(Ray r, out HitRecord hitRec) => World.Hit(r, 0, float.PositiveInfinity, false, ref rng, out hitRec);
 #endif // BVH
 
 		void CollectActiveEntities()

@@ -142,4 +142,4 @@ MonoBehaviour:
   skyType: 1
   skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
   skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
-  skyCubemap: {fileID: 8900000, guid: 597c0052c00828740a2e88c7d6d3cb91, type: 3}
+  skyCubemap: {fileID: 8900000, guid: 5fc77e8d5c2c9fc4db2cde2b4b034433, type: 3}

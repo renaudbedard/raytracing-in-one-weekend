@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 using Runtime;
+using Runtime.EntityTypes;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
-using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
 
 namespace Unity

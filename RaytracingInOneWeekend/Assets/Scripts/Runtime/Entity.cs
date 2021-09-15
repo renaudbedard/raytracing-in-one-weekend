@@ -1,5 +1,6 @@
 using System;
 using JetBrains.Annotations;
+using Runtime.EntityTypes;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
@@ -48,10 +49,10 @@ namespace Runtime
 		}
 
 		[Pure]
-		public bool Hit(Ray ray, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)
+		public bool Hit(Ray ray, float tMin, float tMax, Material* randomWalkEntryDensity, ref RandomSource rng, out HitRecord rec)
 		{
-			if (HitInternal(ray, tMin, tMax, ref rng, out float distance, out float3 entityLocalNormal,
-				out RigidTransform transformAtTime, out _))
+			if (HitInternal(ray, tMin, tMax, randomWalkEntryDensity, ref rng,
+				out float distance, out float3 entityLocalNormal, out RigidTransform transformAtTime, out _))
 			{
 				// TODO: normal is disregarded for isotropic materials
 				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)));
@@ -62,7 +63,7 @@ namespace Runtime
 			return false;
 		}
 
-		bool HitInternal(Ray ray, float tMin, float tMax, ref RandomSource rng,
+		bool HitInternal(Ray ray, float tMin, float tMax, Material* randomWalkEntryMaterial, ref RandomSource rng,
 			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay)
 		{
 			RigidTransform inverseTransform;
@@ -85,26 +86,17 @@ namespace Runtime
 			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
 				return false;
 
-			if (Material->Type == MaterialType.ProbabilisticVolume)
+			if (randomWalkEntryMaterial != null)
 			{
-				float entryDistance = distance;
-				if (!HitContent(entitySpaceRay, entryDistance + 0.001f, tMax, out float exitDistance, out _))
+				float volumeHitDistance = -(1 / randomWalkEntryMaterial->Density) * log(rng.NextFloat());
+
+				if (volumeHitDistance < distance)
+					distance = volumeHitDistance;
+				else
 				{
-					// we're inside the boundary, and our first hit was an exit point
-					exitDistance = entryDistance;
-					entryDistance = 0;
+					// Accept the hit only if it's not a probablistic volume exit hit
+					return Material->Type != MaterialType.ProbabilisticVolume;
 				}
-
-				float distanceInsideBoundary = exitDistance - entryDistance;
-				float volumeHitDistance = -(1 / Material->Density) * log(rng.NextFloat());
-
-				if (volumeHitDistance < distanceInsideBoundary)
-				{
-					distance = entryDistance + volumeHitDistance;
-					return true;
-				}
-
-				return false;
 			}
 
 			return true;
@@ -128,8 +120,8 @@ namespace Runtime
 
 		public float Pdf(Ray r, ref RandomSource rng)
 		{
-			if (HitInternal(r, 0.001f, float.PositiveInfinity, ref rng, out float distance,
-				out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
+			if (HitInternal(r, 0.001f, float.PositiveInfinity, null, ref rng,
+				out float distance, out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
 			{
 				switch (Type)
 				{

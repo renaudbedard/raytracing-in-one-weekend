@@ -25,7 +25,7 @@ namespace Unity
 		[Range(1, 2.65f)] [SerializeField] float refractiveIndex = 1;
 
 		[ShowIf(nameof(Type), MaterialType.ProbabilisticVolume)]
-		[Range(0, 1)] [SerializeField] float density = 1;
+		[Range(0, 50)] [SerializeField] float density = 1;
 
 #if UNITY_EDITOR
 		[ShowIf(nameof(AlbedoSupported))]

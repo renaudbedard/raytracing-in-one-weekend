@@ -1,7 +1,7 @@
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
-namespace Runtime
+namespace Runtime.EntityTypes
 {
 	readonly struct Box
 	{

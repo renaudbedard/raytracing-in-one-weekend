@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4eba0b43da3476bb4ab147b5a2f80fa, type: 3}
+  m_Name: Probabilistic Test
+  m_EditorClassIdentifier: 
+  cameraPosition: {x: -0.6, y: 0, z: -2}
+  cameraTarget: {x: 0, y: 0, z: 0}
+  cameraAperture: 0
+  cameraFieldOfView: 47.7
+  entities:
+  - name: 
+    type: 5
+    enabled: 1
+    position: {x: -0.22164965, y: 0, z: 1.4184601}
+    rotation: {x: 25.03, y: 210.33, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 1, y: 1, z: 1}
+    triangleData:
+      a: {x: 0, y: 1, z: 0}
+      b: {x: -1, y: -1, z: 0}
+      c: {x: 1, y: -1, z: 0}
+    meshData:
+      mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+      faceNormals: 1
+    material: {fileID: 11400000, guid: 7ee5c47319f7f6a409abafdfd3b17143, type: 2}
+  - name: 
+    type: 3
+    enabled: 1
+    position: {x: 0.47897995, y: 0, z: 0.45168817}
+    rotation: {x: -35.6, y: 143.93, z: 0}
+    moving: 0
+    destinationOffset: {x: 0, y: 0, z: 0}
+    timeRange: {x: 0, y: 0}
+    sphereData:
+      radius: 0
+      excludeFromOverlapTest: 0
+    rectData:
+      size: {x: 1, y: 1}
+    boxData:
+      size: {x: 1, y: 1, z: 1}
+    triangleData:
+      a: {x: 0, y: 1, z: 0}
+      b: {x: -1, y: -1, z: 0}
+      c: {x: 1, y: -1, z: 0}
+    meshData:
+      mesh: {fileID: 0}
+      faceNormals: 0
+    material: {fileID: 11400000, guid: daa9f1f9567a2458f947f457da77da6a, type: 2}
+  randomSeed: 1
+  randomEntityGroups: []
+  skyType: 1
+  skyBottomColor: {r: 1, g: 1, b: 1, a: 1}
+  skyTopColor: {r: 0.5, g: 0.7, b: 1, a: 1}
+  skyCubemap: {fileID: 8900000, guid: 58504c8e226a95944ad302949069e850, type: 3}
