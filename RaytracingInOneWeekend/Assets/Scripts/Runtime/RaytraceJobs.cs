@@ -8,6 +8,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 using Util;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
@@ -41,13 +42,78 @@ namespace Runtime
 #endif
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
+	unsafe struct AddMeshRuntimeEntitiesJob : IJob
+	{
+		[ReadOnly] public Mesh.MeshDataArray MeshDataArray;
+		[ReadOnly] [NativeDisableUnsafePtrRestriction] public Material* Material;
+
+		[WriteOnly] public NativeArray<Triangle> Triangles;
+		[WriteOnly] public NativeArray<Entity> Entities;
+		[WriteOnly] public NativeArray<Entity> ImportanceSampledEntities;
+
+		public NativeReference<int> TriangleIndex, EntityIndex, ImportanceSampledEntityIndex;
+
+		public bool FaceNormals, Moving;
+		public RigidTransform RigidTransform;
+		public float3 DestinationOffset;
+		public float2 TimeRange;
+
+		public void Execute()
+		{
+			for (int meshIndex = 0; meshIndex < MeshDataArray.Length; meshIndex++)
+			{
+				Mesh.MeshData meshData = MeshDataArray[meshIndex];
+
+				using var vertices = new NativeArray<Vector3>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+				meshData.GetVertices(vertices);
+
+				NativeArray<Vector3> normals = default;
+				if (!FaceNormals)
+				{
+					normals = new NativeArray<Vector3>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+					meshData.GetNormals(normals);
+				}
+
+				NativeArray<ushort> indices = meshData.GetIndexData<ushort>();
+				for (int i = 0; i < indices.Length; i += 3)
+				{
+					int3 triangleIndices = int3(indices[i], indices[i + 1], indices[i + 2]);
+
+					if (FaceNormals)
+						Triangles[TriangleIndex.Value] = new Triangle(
+							vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]]);
+					else
+						Triangles[TriangleIndex.Value] = new Triangle(
+							vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]],
+							normals[triangleIndices[0]], normals[triangleIndices[1]], normals[triangleIndices[2]]);
+
+					var contentPointer = (Triangle*) Triangles.GetUnsafePtr() + TriangleIndex.Value++;
+
+					Entity entity = Moving
+						? new Entity(EntityType.Triangle, contentPointer, RigidTransform, Material, true, DestinationOffset, TimeRange)
+						: new Entity(EntityType.Triangle, contentPointer, RigidTransform, Material);
+
+					Entities[EntityIndex.Value++] = entity;
+
+					if (Material->Type == MaterialType.DiffuseLight)
+						ImportanceSampledEntities[ImportanceSampledEntityIndex.Value++] = entity;
+				}
+
+				if (!FaceNormals)
+					normals.Dispose();
+			}
+		}
+	}
+
+#if BVH
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct BuildRuntimeBvhJob : IJob
 	{
 		[ReadOnly] public NativeList<BvhNodeData> BvhNodeDataBuffer;
 		[WriteOnly] public NativeArray<BvhNode> BvhNodeBuffer;
 		public int NodeCount;
 
-		private int nodeIndex;
+		int nodeIndex;
 
 		// Runtime BVH is inserted BACKWARDS while traversing postorder, which means the first node will be the root
 
@@ -72,6 +138,7 @@ namespace Runtime
 			WalkBvh((BvhNodeData*) BvhNodeDataBuffer.GetUnsafeReadOnlyPtr());
 		}
 	}
+#endif
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	unsafe struct AccumulateJob : IJobParallelFor

@@ -1130,9 +1130,11 @@ namespace Unity
 					activeMaterials.Add(entity.Material);
 
 			using (rebuildEntityBuffersMarker.Auto())
+			using (new ScopedStopwatch("^"))
 				RebuildEntityBuffers();
 #if BVH
 			using (rebuildBvhMarker.Auto())
+			using (new ScopedStopwatch("^"))
 				RebuildBvh();
 #endif
 
@@ -1217,40 +1219,30 @@ namespace Unity
 
 					case EntityType.Mesh:
 						using (Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(e.MeshData.Mesh))
+						using (var triangleIndexRef = new NativeReference<int>(triangleIndex, AllocatorManager.TempJob))
+						using (var importanceSamplingIndexRef = new NativeReference<int>(importanceSamplingIndex, AllocatorManager.TempJob))
+						using (var entityIndexRef = new NativeReference<int>(entityIndex, AllocatorManager.TempJob))
 						{
-							for (int meshIndex = 0; meshIndex < meshDataArray.Length; meshIndex++)
+							var addMeshJob = new AddMeshRuntimeEntitiesJob
 							{
-								Mesh.MeshData meshData = meshDataArray[meshIndex];
+								Entities = entityBuffer,
+								Triangles = triangleBuffer,
+								ImportanceSampledEntities = importanceSamplingEntityBuffer,
 
-								using var vertices = new NativeArray<Vector3>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-								meshData.GetVertices(vertices);
+								TriangleIndex = triangleIndexRef,
+								EntityIndex = entityIndexRef,
+								ImportanceSampledEntityIndex = importanceSamplingIndexRef,
 
-								NativeArray<Vector3> normals = default;
-								if (!e.MeshData.FaceNormals)
-								{
-									normals = new NativeArray<Vector3>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-									meshData.GetNormals(normals);
-								}
+								FaceNormals = e.MeshData.FaceNormals,
+								Material = materialPtr,
+								MeshDataArray = meshDataArray,
+								RigidTransform = rigidTransform
+							};
+							addMeshJob.Schedule().Complete();
 
-								NativeArray<ushort> indices = meshData.GetIndexData<ushort>();
-								for (int i = 0; i < indices.Length; i += 3)
-								{
-									int3 triangleIndices = int3(indices[i], indices[i + 1], indices[i + 2]);
-
-									if (e.MeshData.FaceNormals)
-										triangleBuffer[triangleIndex] = new Triangle(
-											vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]]);
-									else
-										triangleBuffer[triangleIndex] = new Triangle(
-											vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]],
-											normals[triangleIndices[0]], normals[triangleIndices[1]], normals[triangleIndices[2]]);
-
-									AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr, rigidTransform, EntityType.Triangle);
-								}
-
-								if (!e.MeshData.FaceNormals)
-									normals.Dispose();
-							}
+							triangleIndex = triangleIndexRef.Value;
+							importanceSamplingIndex = importanceSamplingIndexRef.Value;
+							entityIndex = entityIndexRef.Value;
 						}
 						break;
 				}
@@ -1269,35 +1261,29 @@ namespace Unity
 			bvhNodeDataBuffer.Clear();
 
 			int nodeCount = 0;
-			using (new ScopedStopwatch("BVH Creation"))
+			using (var bvhBuildingEntityBuffer = new NativeArray<BvhBuildingEntity>(entityBuffer.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory))
 			{
-				using (var bvhBuildingEntityBuffer = new NativeArray<BvhBuildingEntity>(entityBuffer.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory))
+				var initJob = new CreateBvhBuildingEntitiesJob
 				{
-					var initJob = new CreateBvhBuildingEntitiesJob
-					{
-						Entities = entityBuffer,
-						BvhBuildingEntities = bvhBuildingEntityBuffer
-					};
-					JobHandle initJobHandle = initJob.Schedule(entityBuffer.Length, 128);
+					Entities = entityBuffer,
+					BvhBuildingEntities = bvhBuildingEntityBuffer
+				};
+				JobHandle initJobHandle = initJob.Schedule(entityBuffer.Length, 128);
 
-					var buildJob = new BuildBvhJob
-					{
-						MaxDepth = maxBvhDepth,
-						Entities = bvhBuildingEntityBuffer,
-						BvhEntities = bvhEntities,
-						BvhNodes = bvhNodeDataBuffer
-					};
-					JobHandle buildJobHandle = buildJob.Schedule(initJobHandle);
+				var buildJob = new BuildBvhJob
+				{
+					MaxDepth = maxBvhDepth,
+					Entities = bvhBuildingEntityBuffer,
+					BvhEntities = bvhEntities,
+					BvhNodes = bvhNodeDataBuffer
+				};
+				JobHandle buildJobHandle = buildJob.Schedule(initJobHandle);
 
-					initJobHandle.Complete();
-					buildJobHandle.Complete();
-				}
-
-				nodeCount = bvhRootData.Value.ChildCount;
+				initJobHandle.Complete();
+				buildJobHandle.Complete();
 			}
-#if PROFILING
-			CumulativeStopwatch.Log();
-#endif
+
+			nodeCount = bvhRootData.Value.ChildCount;
 
 			Debug.Log($"Rebuilt BVH ({bvhRootData.Value.ChildCount} nodes for {entityBuffer.Length} entities)");
 

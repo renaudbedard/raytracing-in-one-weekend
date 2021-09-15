@@ -110,7 +110,7 @@ namespace Unity
 	readonly unsafe struct BvhNodeData
 	{
 		static readonly ProfilerMarker encloseEntireBoundsMarker = new ProfilerMarker("Enclose entire bounds");
-		static readonly ProfilerMarker sortEntitiesMarker = new ProfilerMarker("Sort entitiess");
+		static readonly ProfilerMarker sortEntitiesMarker = new ProfilerMarker("Sort entities");
 		static readonly ProfilerMarker determinePartitionSizeMarker = new ProfilerMarker("Determine partition size");
 
 		public readonly AxisAlignedBoundingBox Bounds;
