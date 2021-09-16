@@ -49,13 +49,16 @@ namespace Runtime
 		}
 
 		[Pure]
-		public bool Hit(Ray ray, float tMin, float tMax, Material* randomWalkEntryDensity, ref RandomSource rng, out HitRecord rec)
+		public bool Hit(Ray ray, float tMin, float tMax, Material* probablisticVolumeEntryMaterial, ref RandomSource rng, out HitRecord rec)
 		{
-			if (HitInternal(ray, tMin, tMax, randomWalkEntryDensity, ref rng,
-				out float distance, out float3 entityLocalNormal, out RigidTransform transformAtTime, out _))
+			if (HitInternal(ray, tMin, tMax, probablisticVolumeEntryMaterial, ref rng,
+				out float distance, out float3 entityLocalNormal, out RigidTransform transformAtTime, out _,
+				out bool inProbabilisticVolume))
 			{
 				// TODO: normal is disregarded for isotropic materials
-				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)));
+				rec = new HitRecord(distance, ray.GetPoint(distance),
+					normalize(rotate(transformAtTime, entityLocalNormal)), inProbabilisticVolume);
+
 				return true;
 			}
 
@@ -63,9 +66,11 @@ namespace Runtime
 			return false;
 		}
 
-		bool HitInternal(Ray ray, float tMin, float tMax, Material* randomWalkEntryMaterial, ref RandomSource rng,
-			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay)
+		bool HitInternal(Ray ray, float tMin, float tMax, Material* probablisticVolumeEntryMaterial, ref RandomSource rng,
+			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay,
+			out bool inProbabilisticVolume)
 		{
+			inProbabilisticVolume = false;
 			RigidTransform inverseTransform;
 
 			if (!Moving)
@@ -86,12 +91,15 @@ namespace Runtime
 			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
 				return false;
 
-			if (randomWalkEntryMaterial != null)
+			if (probablisticVolumeEntryMaterial != null)
 			{
-				float volumeHitDistance = -(1 / randomWalkEntryMaterial->Density) * log(rng.NextFloat());
+				float volumeHitDistance = -(1 / probablisticVolumeEntryMaterial->Density) * log(rng.NextFloat());
 
 				if (volumeHitDistance < distance)
+				{
 					distance = volumeHitDistance;
+					inProbabilisticVolume = true;
+				}
 				else
 				{
 					// Accept the hit only if it's not a probablistic volume exit hit
@@ -121,7 +129,7 @@ namespace Runtime
 		public float Pdf(Ray r, ref RandomSource rng)
 		{
 			if (HitInternal(r, 0.001f, float.PositiveInfinity, null, ref rng,
-				out float distance, out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
+				out float distance, out float3 entitySpaceNormal, out _, out Ray entitySpaceRay, out _))
 			{
 				switch (Type)
 				{

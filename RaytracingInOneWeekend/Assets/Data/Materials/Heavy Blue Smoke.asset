@@ -22,7 +22,7 @@ MonoBehaviour:
     image: {fileID: 0}
     value: 0
   refractiveIndex: 1
-  density: 10
+  density: 1
   albedo:
     type: 1
     mainColor: {r: 0.2, g: 0.4, b: 0.9, a: 0}

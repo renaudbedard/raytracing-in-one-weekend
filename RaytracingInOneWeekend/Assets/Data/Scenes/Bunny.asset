@@ -39,7 +39,8 @@ MonoBehaviour:
     meshData:
       mesh: {fileID: -2432090755550338912, guid: a3dfa5406c40018488bf9916821fd620,
         type: 3}
-    material: {fileID: 11400000, guid: d5a643c2e998b418c9ca96504e5827ca, type: 2}
+      faceNormals: 0
+    material: {fileID: 11400000, guid: daa9f1f9567a2458f947f457da77da6a, type: 2}
   randomSeed: 1
   randomEntityGroups: []
   skyType: 1

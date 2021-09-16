@@ -268,7 +268,7 @@ namespace Runtime
 
 			int depth = 0;
 			Entity* explicitSamplingTarget = null;
-			Material* probablisticWalkEntryMaterial = null;
+			Material* probablisticVolumeEntryMaterial = null;
 			bool firstNonSpecularHit = false;
 			sampleNormal = sampleAlbedo = default;
 
@@ -344,17 +344,45 @@ namespace Runtime
 				}
 
 				// Iterative candidate tests
-				bool hit = false;
+				int hits = 0;
+				var hitBuffer = stackalloc HitRecord[hitCandidateBuffer.Length];
 				while (hitCandidateBuffer.Length > 0)
 				{
 					var hitCandidate = hitCandidateBuffer.Pop();
-					bool thisHit = hitCandidate->Hit(ray, 0, float.PositiveInfinity, probablisticWalkEntryMaterial, ref rng, out HitRecord thisRec);
-					if (thisHit && (!hit || thisRec.Distance < rec.Distance))
+					if (hitCandidate->Hit(ray, 0, float.PositiveInfinity, null, ref rng, out HitRecord thisRec))
 					{
-						hit = true;
-						rec = thisRec;
-						rec.EntityPtr = hitCandidate;
+						thisRec.EntityPtr = hitCandidate;
+						hitBuffer[hits++] = thisRec;
 					}
+				}
+
+				if (hits > 0)
+				{
+					NativeSortExtension.Sort(hitBuffer, hits);
+
+					if (probablisticVolumeEntryMaterial != null)
+					{
+						bool anyHit = false;
+						for (int i = 0; i < hits; i++)
+						{
+							if (hitBuffer[i].EntityPtr->Hit(ray, 0, float.PositiveInfinity,
+								probablisticVolumeEntryMaterial,
+								ref rng, out HitRecord thisRec))
+							{
+								thisRec.EntityPtr = hitBuffer[i].EntityPtr;
+								anyHit = true;
+								rec = thisRec;
+								break;
+							}
+
+							probablisticVolumeEntryMaterial = null;
+						}
+
+						if (!anyHit)
+							hits = 0;
+					}
+					else
+						rec = hitBuffer[0];
 				}
 #else
 #if BVH
@@ -371,7 +399,7 @@ namespace Runtime
 
 				diagnostics.RayCount++;
 
-				if (hit)
+				if (hits > 0)
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths)
@@ -386,21 +414,22 @@ namespace Runtime
 					float3 albedo;
 					Ray scatteredRay;
 
-					if (material->Type == MaterialType.ProbabilisticVolume && probablisticWalkEntryMaterial == null)
+					if (material->Type == MaterialType.ProbabilisticVolume && probablisticVolumeEntryMaterial == null)
 					{
 						// Hijack the scatter direction for entry hits on probabilistic volumes
 						scatteredRay = new Ray(rec.Point, ray.Direction, ray.Time);
 						didScatter = true;
-						probablisticWalkEntryMaterial = material;
+						probablisticVolumeEntryMaterial = material;
 						albedo = 1;
 					}
 					else
 					{
-						if (material->Type != MaterialType.ProbabilisticVolume)
-							probablisticWalkEntryMaterial = null;
+						if (!rec.InProbabilisticVolume)
+							probablisticVolumeEntryMaterial = null;
 
-						if (probablisticWalkEntryMaterial != null)
-							material = probablisticWalkEntryMaterial;
+						// Hijack the material if we're still in a probabilistic volume
+						if (probablisticVolumeEntryMaterial != null)
+							material = probablisticVolumeEntryMaterial;
 
 						didScatter = material->Scatter(ray, rec, ref rng, PerlinNoise, out albedo, out scatteredRay);
 					}
