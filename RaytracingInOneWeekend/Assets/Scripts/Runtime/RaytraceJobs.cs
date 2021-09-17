@@ -426,15 +426,19 @@ namespace Runtime
 						if (exitHitIndex < hitCount)
 						{
 							HitRecord exitHitRecord = hitBuffer[exitHitIndex];
-							float distance = exitHitRecord.Distance;
+							float distanceInProbabilisticVolume = exitHitRecord.Distance;
 
 							if (currentProbabilisticVolumeMaterial == null)
+							{
+								distanceInProbabilisticVolume -= rec.Distance; // From entry hit to exit hit
 								currentProbabilisticVolumeMaterial = material;
+							}
 
-							if (currentProbabilisticVolumeMaterial->ProbabilisticHit(ref distance, ref rng))
+							if (currentProbabilisticVolumeMaterial->ProbabilisticHit(ref distanceInProbabilisticVolume, ref rng))
 							{
 								// We hit inside the volume; hijack the current hit record's distance and material
-								rec = new HitRecord(distance, ray.GetPoint(distance), 0);
+								// TODO: Normal is sort of undefined here, but should still be set
+								rec = new HitRecord(distanceInProbabilisticVolume, ray.GetPoint(distanceInProbabilisticVolume), -ray.Direction);
 								material = currentProbabilisticVolumeMaterial;
 							}
 							else
