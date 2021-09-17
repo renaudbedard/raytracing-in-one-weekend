@@ -601,7 +601,7 @@ namespace Unity
 				interlacingOffsetIndex = 0;
 
 #if PATH_DEBUGGING
-				debugPaths.EnsureCapacity((int) traceDepth);
+				debugPaths.EnsureCapacity(traceDepth);
 #endif
 				mraysPerSecResults.Clear();
 				AccumulatedSamples = 0;
@@ -617,6 +617,8 @@ namespace Unity
 			NativeArray<float4> colorOutputBuffer = float4Buffers.Take();
 			NativeArray<float3> normalOutputBuffer = float3Buffers.Take();
 			NativeArray<float3> albedoOutputBuffer = float3Buffers.Take();
+
+			// TODO: This should be a NativeReference<bool>
 			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
 
 			if (interlacingOffsets == null || interlacing != interlacingOffsets.Length)

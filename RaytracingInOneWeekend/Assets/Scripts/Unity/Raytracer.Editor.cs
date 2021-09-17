@@ -11,6 +11,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Util;
 using static Unity.Mathematics.math;
+using Random = UnityEngine.Random;
 
 #if ODIN_INSPECTOR
 
@@ -384,12 +385,15 @@ namespace Unity
 #if PATH_DEBUGGING
 			if (debugPaths.IsCreated)
 			{
+				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
 				float alpha = 1;
+				uint i = frameSeed;
 				foreach (DebugPath path in debugPaths)
 				{
-					Debug.DrawLine(path.From, path.To,
-						fadeDebugPaths ? Color.white.GetAlphaReplaced(alpha) : Color.white, debugPathDuration);
+					var color = Color.HSVToRGB(frac(i * silverRatio), 1, 1);
+					Debug.DrawLine(path.From, path.To, fadeDebugPaths ? color.GetAlphaReplaced(alpha) : color, debugPathDuration);
 					alpha *= 0.5f;
+					i++;
 				}
 			}
 #endif
