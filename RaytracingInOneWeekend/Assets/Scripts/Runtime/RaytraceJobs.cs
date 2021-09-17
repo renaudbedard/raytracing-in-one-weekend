@@ -426,7 +426,7 @@ namespace Runtime
 
 							if (currentProbabilisticVolumeMaterial == null)
 							{
-								Debug.Log($"#{depth} : Entry hit");
+								Trace($"#{depth} : Entry hit");
 
 								// Factor in entry distance
 								probabilisticVolumeEntryDistance = rec.Distance;
@@ -436,14 +436,14 @@ namespace Runtime
 							}
 							else
 							{
-								Debug.Log($"#{depth} : Ray origin is inside a volume");
+								Trace($"#{depth} : Ray origin is inside a volume");
 							}
 
 							if (currentProbabilisticVolumeMaterial->ProbabilisticHit(ref distanceInProbabilisticVolume, ref rng))
 							{
 								// We hit inside the volume; hijack the current hit record's distance and material
 								// TODO: Normal is sort of undefined here, but should still be set
-								Debug.Log($"#{depth} : We hit inside the volume");
+								Trace($"#{depth} : We hit inside the volume");
 								float totalDistance = probabilisticVolumeEntryDistance + distanceInProbabilisticVolume;
 								rec = new HitRecord(totalDistance, ray.GetPoint(totalDistance), -ray.Direction);
 								material = currentProbabilisticVolumeMaterial;
@@ -451,26 +451,27 @@ namespace Runtime
 							else
 							{
 								// No hit inside the volume, exit it
-								Debug.Log($"#{depth} : No hit inside volume, passing through");
+								Trace($"#{depth} : No hit inside volume, passing through");
 
 								if (exitHitRecord.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume &&
 								    dot(exitHitRecord.Normal, ray.Direction) > 0)
 								{
 									// Volume exit, move to next hit
-									Debug.Log($"#{depth} : Volume exit, advance to next hit");
+									Trace($"#{depth} : Volume exit, advance to next hit");
 									hitIndex = exitHitIndex + 1;
 									continue;
 								}
 
 								// Obstacle, continue
-								Debug.Log($"#{depth} : Obstacle, scattering on exit hit");
+								Trace($"#{depth} : Obstacle, scattering on exit hit");
 								rec = exitHitRecord;
+								material = rec.EntityPtr->Material;
 							}
 						}
 						else
 						{
 							// No more surfaces to hit (probabilistic volume has holes)
-							Debug.Log($"#{depth} : No more surfaces to hit, breaking");
+							Trace($"#{depth} : No more surfaces to hit, breaking");
 							hitCount = 0;
 							break;
 						}
@@ -480,8 +481,6 @@ namespace Runtime
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
 					material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
-
-					Debug.Log($"#{depth} : mat={(rec.EntityPtr == null ? "InVolume" : rec.EntityPtr->Material->Type.ToString())} d={rec.Distance} scatter={(dot(scatteredRay.Direction, ray.Direction) > 0 ? "towards" : "against")}");
 
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
@@ -531,7 +530,7 @@ namespace Runtime
 				// No hit?
 				if (hitIndex >= hitCount)
 				{
-					Debug.Log($"#{depth} : No more hits, hitting sky");
+					Trace($"#{depth} : No more hits, hitting sky");
 #if PATH_DEBUGGING
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
@@ -578,6 +577,9 @@ namespace Runtime
 
 			return true;
 		}
+
+		[BurstDiscard]
+		private void Trace(string text) => Debug.Log(text);
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
