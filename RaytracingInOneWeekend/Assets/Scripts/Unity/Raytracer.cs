@@ -1303,16 +1303,13 @@ namespace Unity
 
 		public bool HitWorld(Ray r, out HitRecord hitRec)
 		{
-			var rng = new RandomSource(noiseColor, new Random(frameSeed),
-				blueNoise.GetRuntimeData(frameSeed).GetPerPixelData((uint2) bufferSize / 2));
-
 			unsafe
 			{
 #if FULL_DIAGNOSTICS
 				Diagnostics _ = default;
-				return BvhRoot->Hit(r, 0, float.PositiveInfinity, null, ref rng, ref _, out hitRec);
+				return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref _, out hitRec);
 #else
-				return BvhRoot->Hit(r, 0, float.PositiveInfinity, null, ref rng, out hitRec);
+				return BvhRoot->Hit(r, 0, float.PositiveInfinity, out hitRec);
 #endif // FULL_DIAGNOSTICS
 			}
 		}

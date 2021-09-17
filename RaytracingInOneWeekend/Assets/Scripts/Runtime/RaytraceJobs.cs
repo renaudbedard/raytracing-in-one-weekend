@@ -183,6 +183,7 @@ namespace Runtime
 		[NativeDisableUnsafePtrRestriction] public DebugPath* DebugPaths;
 #endif
 
+		[SkipLocalsInit]
 		public void Execute(int index)
 		{
 			if (CancellationToken[0])
@@ -268,9 +269,8 @@ namespace Runtime
 
 			int depth = 0;
 			Entity* explicitSamplingTarget = null;
-			Material* probablisticVolumeEntryMaterial = null;
 			bool firstNonSpecularHit = false;
-			sampleNormal = sampleAlbedo = default;
+			sampleColor = sampleNormal = sampleAlbedo = default;
 
 			Ray ray = eyeRay;
 
@@ -287,7 +287,6 @@ namespace Runtime
 			for (; depth < TraceDepth; depth++)
 			{
 #if BVH_ITERATIVE
-				HitRecord rec = default;
 				float3 rayInvDirection = rcp(ray.Direction);
 
 				// Convert NaN to INFINITY, since Burst thinks that divisions by 0 = NaN
@@ -298,6 +297,7 @@ namespace Runtime
 
 				nodeTraversalBuffer.Push(BvhRoot);
 
+				// Traverse the BVH and record candidate leaf nodes
 				while (nodeTraversalBuffer.Length > 0)
 				{
 					BvhNode* nodePtr = nodeTraversalBuffer.Pop();
@@ -344,95 +344,124 @@ namespace Runtime
 				}
 
 				// Iterative candidate tests
-				int hits = 0;
-				var hitBuffer = stackalloc HitRecord[hitCandidateBuffer.Length];
+				int hitCount = 0;
+				var hitBuffer = stackalloc HitRecord[hitCandidateBuffer.Length * 2];
 				while (hitCandidateBuffer.Length > 0)
 				{
 					var hitCandidate = hitCandidateBuffer.Pop();
-					if (hitCandidate->Hit(ray, 0, float.PositiveInfinity, null, ref rng, out HitRecord thisRec))
+					if (hitCandidate->Hit(ray, 0, float.PositiveInfinity, out HitRecord thisRec))
 					{
 						thisRec.EntityPtr = hitCandidate;
-						hitBuffer[hits++] = thisRec;
-					}
-				}
+						hitBuffer[hitCount++] = thisRec;
 
-				if (hits > 0)
-				{
-					NativeSortExtension.Sort(hitBuffer, hits);
-
-					if (probablisticVolumeEntryMaterial != null)
-					{
-						bool anyHit = false;
-						for (int i = 0; i < hits; i++)
+						// Inject exit hits for probabilistic convex hulls
+						if (hitCandidate->Material->Type == MaterialType.ProbabilisticVolume &&
+						    hitCandidate->Type.IsConvexHull() &&
+							hitCandidate->Hit(ray, thisRec.Distance + 0.001f, float.PositiveInfinity, out HitRecord exitRec))
 						{
-							if (hitBuffer[i].EntityPtr->Hit(ray, 0, float.PositiveInfinity,
-								probablisticVolumeEntryMaterial,
-								ref rng, out HitRecord thisRec))
-							{
-								thisRec.EntityPtr = hitBuffer[i].EntityPtr;
-								anyHit = true;
-								rec = thisRec;
-								break;
-							}
-
-							probablisticVolumeEntryMaterial = null;
+							exitRec.EntityPtr = hitCandidate;
+							hitBuffer[hitCount++] = exitRec;
 						}
-
-						if (!anyHit)
-							hits = 0;
 					}
-					else
-						rec = hitBuffer[0];
 				}
+
+				// Sort hit records by distance
+				int hitIndex = 0;
+				if (hitCount > 0)
+					NativeSortExtension.Sort(hitBuffer, hitCount);
 #else
+				// TODO: This will need to be updated if I care about supporting recursive BVH
 #if BVH
-				bool hit = BvhRoot->Hit(
+				//bool hit = BvhRoot->Hit(
 #else
-				bool hit = Entities.Hit(
+				//bool hit = Entities.Hit(
 #endif
-					ray, 0, float.PositiveInfinity, ref rng,
+				//	ray, 0, float.PositiveInfinity, ref rng,
 #if FULL_DIAGNOSTICS && BVH
-					ref diagnostics,
+				//	ref diagnostics,
 #endif
-					out HitRecord rec);
+				//	out HitRecord rec);
 #endif
 
 				diagnostics.RayCount++;
 
-				if (hits > 0)
+				while (hitIndex < hitCount)
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
-					// We explicitly sampled an entity and could not hit it -- early out of this sample
+					// Look for a probablistic volume exit hit before an entry hit
+					Material* currentProbabilisticVolumeMaterial = null;
+					for (int i = hitIndex; i < hitCount; i++)
+					{
+						var hit = hitBuffer[i];
+						if (hit.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume)
+						{
+							// Entry hit, early out
+							if (dot(hit.Normal, ray.Direction) < 0)
+								break;
+
+							// Exit hit before an entry hit, we are inside this volume
+							currentProbabilisticVolumeMaterial = hit.EntityPtr->Material;
+							break;
+						}
+					}
+
+					HitRecord rec = hitBuffer[hitIndex];
+
+					// We explicitly sampled an entity and could not hit it, fail this sample
 					if (explicitSamplingTarget != null && explicitSamplingTarget != rec.EntityPtr)
-						break;
+						return false;
 
 					Material* material = rec.EntityPtr->Material;
-					bool didScatter;
-					float3 albedo;
-					Ray scatteredRay;
 
-					if (material->Type == MaterialType.ProbabilisticVolume && probablisticVolumeEntryMaterial == null)
+					if (currentProbabilisticVolumeMaterial != null || // Inside a volume
+					    material->Type == MaterialType.ProbabilisticVolume) // Entering a volume
 					{
-						// Hijack the scatter direction for entry hits on probabilistic volumes
-						scatteredRay = new Ray(rec.Point, ray.Direction, ray.Time);
-						didScatter = true;
-						probablisticVolumeEntryMaterial = material;
-						albedo = 1;
-					}
-					else
-					{
-						if (!rec.InProbabilisticVolume)
-							probablisticVolumeEntryMaterial = null;
+						int exitHitIndex = currentProbabilisticVolumeMaterial == null ?
+							hitIndex + 1 : // Hit is an entry, look for an exit
+							hitIndex; // Hit is an exit or an obstacle
 
-						// Hijack the material if we're still in a probabilistic volume
-						if (probablisticVolumeEntryMaterial != null)
-							material = probablisticVolumeEntryMaterial;
+						if (exitHitIndex < hitCount)
+						{
+							HitRecord exitHitRecord = hitBuffer[exitHitIndex];
+							float distance = exitHitRecord.Distance;
 
-						didScatter = material->Scatter(ray, rec, ref rng, PerlinNoise, out albedo, out scatteredRay);
+							if (currentProbabilisticVolumeMaterial == null)
+								currentProbabilisticVolumeMaterial = material;
+
+							if (currentProbabilisticVolumeMaterial->ProbabilisticHit(ref distance, ref rng))
+							{
+								// We hit inside the volume; hijack the current hit record's distance and material
+								rec = new HitRecord(distance, ray.GetPoint(distance), 0);
+								material = currentProbabilisticVolumeMaterial;
+							}
+							else
+							{
+								// No hit inside the volume, exit it
+
+								if (exitHitRecord.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume &&
+								    dot(exitHitRecord.Normal, ray.Direction) > 0)
+								{
+									// Volume exit, move to next hit
+									hitIndex = exitHitIndex + 1;
+									continue;
+								}
+
+								// Obstacle, continue
+								rec = exitHitRecord;
+							}
+						}
+						else
+						{
+							// No more surfaces to hit (probabilistic volume has holes)
+							hitCount = 0;
+							break;
+						}
 					}
+
+					material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
@@ -454,12 +483,6 @@ namespace Runtime
 						}
 					}
 
-					if (!didScatter)
-					{
-						attenuationCursor++;
-						break;
-					}
-
 					if (ImportanceSampler.Mode == ImportanceSamplingMode.None || material->IsPerfectSpecular)
 					{
 						*attenuationCursor++ = albedo;
@@ -473,25 +496,26 @@ namespace Runtime
 						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);
 
-						// scatter ray is likely parallel to the surface, and division would cause a NaN
+						// Scatter ray is likely parallel to the surface, and division would cause a NaN
+						// TODO: Is failing the entire sample too drastic?
 						if (pdfValue.AlmostEquals(0))
-						{
-							attenuationCursor++;
-							break;
-						}
+							return false;
 
 						*attenuationCursor++ = albedo * scatterPdfValue / pdfValue;
 					}
 
 					ray = ray.OffsetTowards(dot(scatteredRay.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
+					break;
 				}
-				else
+
+				// No hit?
+				if (hitIndex >= hitCount)
 				{
 #if PATH_DEBUGGING
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = ray.Direction * 99999 };
 #endif
-					// sample the sky color
+					// Sample the sky color
 					float3 hitSkyColor = default;
 					switch (Environment.SkyType)
 					{
@@ -512,17 +536,19 @@ namespace Runtime
 						sampleAlbedo = hitSkyColor;
 						sampleNormal = -ray.Direction;
 					}
+
+					// Stop tracing
 					break;
 				}
 			}
 
 			sampleColor = 0;
 
-			// safety : if we don't hit an emissive surface within the trace depth limit, fail this sample
+			// Safety : if we don't hit an emissive surface within the trace depth limit, fail this sample
 			if (depth == TraceDepth)
 				return false;
 
-			// attenuate colors from the tail of the hit stack to the head
+			// Attenuate colors from the tail of the hit stack to the head
 			while (emissionCursor != emissionStack)
 			{
 				sampleColor *= *--attenuationCursor;

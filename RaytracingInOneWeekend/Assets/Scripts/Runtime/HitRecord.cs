@@ -9,14 +9,12 @@ namespace Runtime
 		public readonly float3 Point;
 		public readonly float3 Normal;
 		public Entity* EntityPtr;
-		public readonly bool InProbabilisticVolume;
 
-		public HitRecord(float distance, float3 point, float3 normal, bool inProbabilisticVolume) : this()
+		public HitRecord(float distance, float3 point, float3 normal) : this()
 		{
 			Distance = distance;
 			Point = point;
 			Normal = normal;
-			InProbabilisticVolume = inProbabilisticVolume;
 		}
 
 		public int CompareTo(HitRecord other)

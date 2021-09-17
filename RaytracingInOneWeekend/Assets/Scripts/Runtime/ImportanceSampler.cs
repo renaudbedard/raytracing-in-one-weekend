@@ -42,7 +42,7 @@ namespace Runtime
 
 			var basePointer = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr();
 			for (int i = 0; i < TargetEntities.Length; i++)
-				pdfValue += (basePointer + i)->Pdf(scatterRay, ref rng);
+				pdfValue += (basePointer + i)->Pdf(scatterRay);
 			pdfValue /= totalOptions;
 		}
 	}

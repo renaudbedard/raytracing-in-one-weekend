@@ -18,6 +18,11 @@ namespace Runtime
 		Mesh
 	}
 
+	static class EntityTypeExtensions
+	{
+		public static bool IsConvexHull(this EntityType type) => type == EntityType.Box || type == EntityType.Sphere;
+	}
+
 	readonly unsafe struct Entity
 	{
 		public readonly EntityType Type;
@@ -49,15 +54,13 @@ namespace Runtime
 		}
 
 		[Pure]
-		public bool Hit(Ray ray, float tMin, float tMax, Material* probablisticVolumeEntryMaterial, ref RandomSource rng, out HitRecord rec)
+		public bool Hit(Ray ray, float tMin, float tMax, out HitRecord rec)
 		{
-			if (HitInternal(ray, tMin, tMax, probablisticVolumeEntryMaterial, ref rng,
-				out float distance, out float3 entityLocalNormal, out RigidTransform transformAtTime, out _,
-				out bool inProbabilisticVolume))
+			if (HitInternal(ray, tMin, tMax,
+				out float distance, out float3 entityLocalNormal, out RigidTransform transformAtTime, out _))
 			{
 				// TODO: normal is disregarded for isotropic materials
-				rec = new HitRecord(distance, ray.GetPoint(distance),
-					normalize(rotate(transformAtTime, entityLocalNormal)), inProbabilisticVolume);
+				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)));
 
 				return true;
 			}
@@ -66,11 +69,9 @@ namespace Runtime
 			return false;
 		}
 
-		bool HitInternal(Ray ray, float tMin, float tMax, Material* probablisticVolumeEntryMaterial, ref RandomSource rng,
-			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay,
-			out bool inProbabilisticVolume)
+		bool HitInternal(Ray ray, float tMin, float tMax,
+			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay)
 		{
-			inProbabilisticVolume = false;
 			RigidTransform inverseTransform;
 
 			if (!Moving)
@@ -91,22 +92,6 @@ namespace Runtime
 			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
 				return false;
 
-			if (probablisticVolumeEntryMaterial != null)
-			{
-				float volumeHitDistance = -(1 / probablisticVolumeEntryMaterial->Density) * log(rng.NextFloat());
-
-				if (volumeHitDistance < distance)
-				{
-					distance = volumeHitDistance;
-					inProbabilisticVolume = true;
-				}
-				else
-				{
-					// Accept the hit only if it's not a probablistic volume exit hit
-					return Material->Type != MaterialType.ProbabilisticVolume;
-				}
-			}
-
 			return true;
 		}
 
@@ -126,10 +111,10 @@ namespace Runtime
 			}
 		}
 
-		public float Pdf(Ray r, ref RandomSource rng)
+		public float Pdf(Ray r)
 		{
-			if (HitInternal(r, 0.001f, float.PositiveInfinity, null, ref rng,
-				out float distance, out float3 entitySpaceNormal, out _, out Ray entitySpaceRay, out _))
+			if (HitInternal(r, 0.001f, float.PositiveInfinity,
+				out float distance, out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
 			{
 				switch (Type)
 				{

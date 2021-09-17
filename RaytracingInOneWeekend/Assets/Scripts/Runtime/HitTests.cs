@@ -170,8 +170,7 @@ namespace Runtime
 		}
 
 #else
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, Material* randomWalkEntryMaterial,
-			ref RandomSource rng,
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
 #if FULL_DIAGNOSTICS
 			ref Diagnostics diagnostics,
 #endif
@@ -195,7 +194,7 @@ namespace Runtime
 				bool anyHit = false;
 				for (int i = 0; i < n.EntityCount; i++)
 				{
-					bool thisHit = (n.EntitiesStart + i)->Hit(r, tMin, tMax, randomWalkEntryMaterial, ref rng, out HitRecord thisRec);
+					bool thisHit = (n.EntitiesStart + i)->Hit(r, tMin, tMax, out HitRecord thisRec);
 					if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
 					{
 						anyHit = true;
@@ -207,11 +206,11 @@ namespace Runtime
 			}
 
 #if FULL_DIAGNOSTICS
-			bool hitLeft = n.Left->Hit(r, tMin, tMax, randomWalkEntryMaterial, ref rng, ref diagnostics, out HitRecord leftRecord);
-			bool hitRight = n.Right->Hit(r, tMin, tMax, randomWalkEntryMaterial, ref rng, ref diagnostics, out HitRecord rightRecord);
+			bool hitLeft = n.Left->Hit(r, tMin, tMax, ref diagnostics, out HitRecord leftRecord);
+			bool hitRight = n.Right->Hit(r, tMin, tMax, ref diagnostics, out HitRecord rightRecord);
 #else
-			bool hitLeft = n.Left->Hit(r, tMin, tMax, randomWalkEntryMaterial, ref rng, out HitRecord leftRecord);
-			bool hitRight = n.Right->Hit(r, tMin, tMax, randomWalkEntryMaterial, ref rng, out HitRecord rightRecord);
+			bool hitLeft = n.Left->Hit(r, tMin, tMax, out HitRecord leftRecord);
+			bool hitRight = n.Right->Hit(r, tMin, tMax, out HitRecord rightRecord);
 #endif
 
 			if (!hitLeft && !hitRight)

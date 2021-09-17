@@ -43,7 +43,24 @@ namespace Runtime
 		}
 
 		[Pure]
-		public bool Scatter(Ray ray, HitRecord rec, ref RandomSource rng, PerlinNoise perlinNoise,
+		public bool ProbabilisticHit(ref float hitDistance, ref RandomSource rng)
+		{
+			if (Type != MaterialType.ProbabilisticVolume)
+				return false;
+
+			float volumeHitDistance = -(1 / Density) * log(rng.NextFloat());
+
+			if (volumeHitDistance < hitDistance)
+			{
+				hitDistance = volumeHitDistance;
+				return true;
+			}
+
+			return false;
+		}
+
+		[Pure]
+		public void Scatter(Ray ray, HitRecord rec, ref RandomSource rng, PerlinNoise perlinNoise,
 			out float3 reflectance, out Ray scattered)
 		{
 			switch (Type)
@@ -54,7 +71,7 @@ namespace Runtime
 					//float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
 					float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, ray.Time);
-					return true;
+					break;
 				}
 
 				case MaterialType.Metal:
@@ -76,7 +93,7 @@ namespace Runtime
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
 					float roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise).x;
 					scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
-					return true;
+					break;
 				}
 
 				case MaterialType.Dielectric:
@@ -111,18 +128,18 @@ namespace Runtime
 						scatterDirection = reflect(ray.Direction, roughNormal);
 
 					scattered = new Ray(rec.Point, scatterDirection, ray.Time);
-					return true;
+					break;
 				}
 
 				case MaterialType.ProbabilisticVolume:
 					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
 					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
-					return true;
+					break;
 
 				default:
 					reflectance = default;
 					scattered = default;
-					return false;
+					break;
 			}
 		}
 
