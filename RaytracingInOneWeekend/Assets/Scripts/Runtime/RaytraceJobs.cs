@@ -213,8 +213,7 @@ namespace Runtime
 			var rng = new RandomSource(NoiseColor, whiteNoise, blueNoise);
 
 #if PATH_DEBUGGING
-			int2 intCoordinates = (int2) coordinates;
-			bool doDebugPaths = all(intCoordinates == DebugCoordinates);
+			bool doDebugPaths = all(coordinates == DebugCoordinates);
 			if (doDebugPaths)
 				for (int i = 0; i < TraceDepth; i++) DebugPaths[i] = default;
 #endif
@@ -423,11 +422,16 @@ namespace Runtime
 						{
 							HitRecord exitHitRecord = hitBuffer[exitHitIndex];
 							float distanceInProbabilisticVolume = exitHitRecord.Distance;
+							float probabilisticVolumeEntryDistance = 0;
 
 							if (currentProbabilisticVolumeMaterial == null)
 							{
 								Debug.Log($"#{depth} : Entry hit");
-								distanceInProbabilisticVolume -= rec.Distance; // From entry hit to exit hit
+
+								// Factor in entry distance
+								probabilisticVolumeEntryDistance = rec.Distance;
+								distanceInProbabilisticVolume -= rec.Distance;
+
 								currentProbabilisticVolumeMaterial = material;
 							}
 							else
@@ -440,7 +444,8 @@ namespace Runtime
 								// We hit inside the volume; hijack the current hit record's distance and material
 								// TODO: Normal is sort of undefined here, but should still be set
 								Debug.Log($"#{depth} : We hit inside the volume");
-								rec = new HitRecord(distanceInProbabilisticVolume, ray.GetPoint(distanceInProbabilisticVolume), -ray.Direction);
+								float totalDistance = probabilisticVolumeEntryDistance + distanceInProbabilisticVolume;
+								rec = new HitRecord(totalDistance, ray.GetPoint(totalDistance), -ray.Direction);
 								material = currentProbabilisticVolumeMaterial;
 							}
 							else
@@ -474,9 +479,9 @@ namespace Runtime
 					if (doDebugPaths)
 						DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
 #endif
-					Debug.Log($"#{depth} : dir={ray.Direction}, mat={(rec.EntityPtr == null ? "InVolume" : rec.EntityPtr->Material->Type.ToString())} d={rec.Distance} n={rec.Normal}");
-
 					material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
+
+					Debug.Log($"#{depth} : mat={(rec.EntityPtr == null ? "InVolume" : rec.EntityPtr->Material->Type.ToString())} d={rec.Distance} scatter={(dot(scatteredRay.Direction, ray.Direction) > 0 ? "towards" : "against")}");
 
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
 					*emissionCursor++ = emission;
