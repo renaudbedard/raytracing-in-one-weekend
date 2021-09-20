@@ -1,9 +1,9 @@
-using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 
 namespace Runtime
 {
-	unsafe struct HitRecord : IComparable<HitRecord>
+	unsafe struct HitRecord
 	{
 		public readonly float Distance;
 		public readonly float3 Point;
@@ -17,9 +17,9 @@ namespace Runtime
 			Normal = normal;
 		}
 
-		public int CompareTo(HitRecord other)
+		public readonly struct DistanceComparer : IComparer<HitRecord>
 		{
-			return Distance.CompareTo(other.Distance);
+			public int Compare(HitRecord x, HitRecord y) => x.Distance.CompareTo(y.Distance);
 		}
 	}
 }

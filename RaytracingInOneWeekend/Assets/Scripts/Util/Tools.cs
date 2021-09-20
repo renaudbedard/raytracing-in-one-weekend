@@ -122,5 +122,12 @@ namespace Util
 				seen.Add(current);
 			} while (seen.Count < length);
 		}
+
+		public static unsafe T* Pop<T>(this ref UnsafePtrList<T> list) where T : unmanaged
+		{
+			T* element = list[list.Length - 1];
+			list.Resize(list.Length - 1);
+			return element;
+		}
 	}
 }

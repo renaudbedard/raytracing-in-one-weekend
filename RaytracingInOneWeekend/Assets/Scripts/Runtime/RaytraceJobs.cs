@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using OpenImageDenoise;
@@ -143,8 +144,7 @@ namespace Runtime
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
-		const int FirstBlockBvhNodeCount = 16;
-		const int FirstBlockHitCandidateCount = 16;
+		const int InitialWorkingListSize = 0;
 
 		[ReadOnly] public NativeArray<bool> CancellationToken;
 
@@ -216,6 +216,10 @@ namespace Runtime
 			float3* emissionStack = stackalloc float3[TraceDepth];
 			float3* attenuationStack = stackalloc float3[TraceDepth];
 
+			var nodeTraversalBuffer = new UnsafePtrList<BvhNode>(InitialWorkingListSize, AllocatorManager.Temp);
+			var hitCandidateBuffer = new UnsafePtrList<Entity>(InitialWorkingListSize, AllocatorManager.Temp);
+			var hitRecordBuffer = new UnsafeList<HitRecord>(InitialWorkingListSize, AllocatorManager.Temp);
+
 			float3 fallbackAlbedo = default, fallbackNormal = default;
 			Diagnostics diagnostics = default;
 
@@ -224,7 +228,7 @@ namespace Runtime
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? blueNoise.NextFloat2() : 0.5f)) / Size;
 				Ray eyeRay = View.GetRay(normalizedCoordinates, ref rng);
 
-				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack,
+				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack, ref nodeTraversalBuffer, ref hitCandidateBuffer, ref hitRecordBuffer,
 #if PATH_DEBUGGING
 					doDebugPaths && s == 0,
 #endif
@@ -249,10 +253,14 @@ namespace Runtime
 			OutputAlbedo[index] = sampleCount == 0 ? fallbackAlbedo : albedoAcc;
 
 			OutputDiagnostics[index] = diagnostics;
+
+			nodeTraversalBuffer.Dispose();
+			hitCandidateBuffer.Dispose();
+			hitRecordBuffer.Dispose();
 		}
 
-		[SkipLocalsInit]
 		bool Sample(Ray eyeRay, ref RandomSource rng, float3* emissionStack, float3* attenuationStack,
+			ref UnsafePtrList<BvhNode> nodeTraversalBuffer, ref UnsafePtrList<Entity> hitCandidateBuffer, ref UnsafeList<HitRecord> hitRecordBuffer,
 #if PATH_DEBUGGING
 			bool doDebugPaths,
 #endif
@@ -261,53 +269,33 @@ namespace Runtime
 			float3* emissionCursor = emissionStack;
 			float3* attenuationCursor = attenuationStack;
 
+			nodeTraversalBuffer.Clear();
+			hitCandidateBuffer.Clear();
+			hitRecordBuffer.Clear();
+
 			int depth = 0;
 			Entity* explicitSamplingTarget = null;
 			bool firstNonSpecularHit = false;
 			sampleColor = sampleNormal = sampleAlbedo = default;
+			Material* currentProbabilisticVolumeMaterial = null;
 
 			Ray ray = eyeRay;
 
-			var np = stackalloc BvhNode*[FirstBlockBvhNodeCount];
-			var npb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(np, FirstBlockBvhNodeCount) };
-			var nodeTraversalBuffer = new PointerBlockChain<BvhNode>(npb);
-
-			var ep = stackalloc Entity*[FirstBlockHitCandidateCount];
-			var epb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(ep, FirstBlockHitCandidateCount) };
-			var hitCandidateBuffer = new PointerBlockChain<Entity>(epb);
-
 			for (; depth < TraceDepth; depth++)
 			{
-				FindHitCandidates(ray, nodeTraversalBuffer, hitCandidateBuffer, ref diagnostics);
+				FindHitCandidates(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, ref diagnostics);
+				FindHits(ray, ref hitCandidateBuffer, ref hitRecordBuffer);
 
-				if (hitCandidateBuffer.Length == 0)
-					break;
-
-				var hitBuffer = stackalloc HitRecord[hitCandidateBuffer.Length * 2];
-				FindHits(ray, hitCandidateBuffer, hitBuffer, out int hitIndex, out int hitCount);
+				// At trace depth 0, we have no context on whether the ray started within a volume
+				if (depth == 0)
+					DetermineVolumeContainment(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, hitRecordBuffer, ref diagnostics, out currentProbabilisticVolumeMaterial);
 
 				diagnostics.RayCount++;
 
-				while (hitIndex < hitCount)
+				int hitIndex = 0;
+				while (hitIndex < hitRecordBuffer.Length)
 				{
-					// Look for a probablistic volume exit hit before an entry hit
-					Material* currentProbabilisticVolumeMaterial = null;
-					for (int i = hitIndex; i < hitCount; i++)
-					{
-						var hit = hitBuffer[i];
-						if (hit.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume)
-						{
-							// Entry hit, early out
-							if (dot(hit.Normal, ray.Direction) < 0)
-								break;
-
-							// Exit hit before an entry hit, we are likely inside this volume
-							currentProbabilisticVolumeMaterial = hit.EntityPtr->Material;
-							break;
-						}
-					}
-
-					HitRecord rec = hitBuffer[hitIndex];
+					HitRecord rec = hitRecordBuffer[hitIndex];
 
 					// We explicitly sampled an entity and could not hit it, fail this sample
 					if (explicitSamplingTarget != null && explicitSamplingTarget != rec.EntityPtr)
@@ -315,6 +303,7 @@ namespace Runtime
 
 					Material* material = rec.EntityPtr->Material;
 
+					// TODO: This is messy
 					if (currentProbabilisticVolumeMaterial != null || // Inside a volume
 					    material->Type == MaterialType.ProbabilisticVolume) // Entering a volume
 					{
@@ -326,9 +315,9 @@ namespace Runtime
 						int exitHitIndex = hitIndex;
 						int lastExitIndex = -1;
 						int sameMaterialEntries = 0;
-						while (exitHitIndex < hitCount)
+						while (exitHitIndex < hitRecordBuffer.Length)
 						{
-							HitRecord hit = hitBuffer[exitHitIndex];
+							HitRecord hit = hitRecordBuffer[exitHitIndex];
 							if (hit.EntityPtr->Material == currentProbabilisticVolumeMaterial)
 							{
 								if (dot(hit.Normal, ray.Direction) < 0)
@@ -350,9 +339,9 @@ namespace Runtime
 						if (sameMaterialEntries > 0 && lastExitIndex != -1)
 							exitHitIndex = lastExitIndex;
 
-						if (exitHitIndex < hitCount)
+						if (exitHitIndex < hitRecordBuffer.Length)
 						{
-							HitRecord exitHitRecord = hitBuffer[exitHitIndex];
+							HitRecord exitHitRecord = hitRecordBuffer[exitHitIndex];
 							float distanceInProbabilisticVolume = exitHitRecord.Distance;
 							float probabilisticVolumeEntryDistance = 0;
 
@@ -382,6 +371,7 @@ namespace Runtime
 							{
 								// No hit inside the volume, exit it
 								Trace($"#{depth} : No hit inside volume, passing through");
+								currentProbabilisticVolumeMaterial = null;
 
 								if (exitHitRecord.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume &&
 								    dot(exitHitRecord.Normal, ray.Direction) > 0)
@@ -402,7 +392,7 @@ namespace Runtime
 						{
 							// No more surfaces to hit (probabilistic volume has holes)
 							Trace($"#{depth} : No more surfaces to hit, breaking");
-							hitCount = 0;
+							hitRecordBuffer.Clear();
 							break;
 						}
 					}
@@ -458,7 +448,7 @@ namespace Runtime
 				}
 
 				// No hit?
-				if (hitIndex >= hitCount)
+				if (hitIndex >= hitRecordBuffer.Length)
 				{
 					Trace($"#{depth} : No more hits, hitting sky");
 #if PATH_DEBUGGING
@@ -508,8 +498,7 @@ namespace Runtime
 			return true;
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)] // Inlining is required for stackallocs to persist in the caller scope
-		void FindHitCandidates(Ray ray, PointerBlockChain<BvhNode> nodeTraversalBuffer, PointerBlockChain<Entity> hitCandidateBuffer, ref Diagnostics diagnostics)
+		void FindHitCandidates(Ray ray, BvhNode* bvhRoot, ref UnsafePtrList<BvhNode> nodeTraversalBuffer, ref UnsafePtrList<Entity> hitCandidateBuffer, ref Diagnostics diagnostics)
 		{
 			float3 rayInvDirection = rcp(ray.Direction);
 
@@ -519,7 +508,7 @@ namespace Runtime
 			nodeTraversalBuffer.Clear();
 			hitCandidateBuffer.Clear();
 
-			nodeTraversalBuffer.Push(BvhRoot);
+			nodeTraversalBuffer.Add(bvhRoot);
 
 			// Traverse the BVH and record candidate leaf nodes
 			while (nodeTraversalBuffer.Length > 0)
@@ -536,17 +525,9 @@ namespace Runtime
 				if (nodePtr->IsLeaf)
 				{
 					int entityCount = nodePtr->EntityCount;
-					int toAllocate = hitCandidateBuffer.GetRequiredAllocationSize(entityCount, out var parentBlock);
-					if (toAllocate > 0)
-					{
-						var p = stackalloc Entity*[toAllocate];
-						var pb = stackalloc PointerBlock<Entity>[1] { new PointerBlock<Entity>(p, toAllocate, parentBlock) };
-						parentBlock->NextBlock = pb;
-					}
-
 					Entity* entityPtr = nodePtr->EntitiesStart;
 					for (int i = 0; i < entityCount; i++, ++entityPtr)
-						hitCandidateBuffer.Push(entityPtr);
+						hitCandidateBuffer.Add(entityPtr);
 
 #if FULL_DIAGNOSTICS
 					diagnostics.CandidateCount += entityCount;
@@ -554,31 +535,24 @@ namespace Runtime
 				}
 				else
 				{
-					int toAllocate = nodeTraversalBuffer.GetRequiredAllocationSize(2, out var parentBlock);
-					if (toAllocate > 0)
-					{
-						var p = stackalloc BvhNode*[toAllocate];
-						var pb = stackalloc PointerBlock<BvhNode>[1] { new PointerBlock<BvhNode>(p, toAllocate, parentBlock) };
-						parentBlock->NextBlock = pb;
-					}
-
-					nodeTraversalBuffer.Push(nodePtr->Left);
-					nodeTraversalBuffer.Push(nodePtr->Right);
+					nodeTraversalBuffer.Add(nodePtr->Left);
+					nodeTraversalBuffer.Add(nodePtr->Right);
 				}
 			}
 		}
 
-		void FindHits(Ray ray, PointerBlockChain<Entity> hitCandidateBuffer, HitRecord* hitBuffer, out int hitIndex, out int hitCount)
+		static void FindHits(Ray ray, ref UnsafePtrList<Entity> hitCandidateBuffer, ref UnsafeList<HitRecord> hitBuffer)
 		{
-			// Iterative candidate tests
-			hitCount = 0;
+			hitBuffer.Clear();
+
 			while (hitCandidateBuffer.Length > 0)
 			{
-				var hitCandidate = hitCandidateBuffer.Pop();
+				Entity* hitCandidate = hitCandidateBuffer.Pop();
+
 				if (hitCandidate->Hit(ray, 0, float.PositiveInfinity, out HitRecord thisRec))
 				{
 					thisRec.EntityPtr = hitCandidate;
-					hitBuffer[hitCount++] = thisRec;
+					hitBuffer.Add(thisRec);
 
 					// Inject exit hits for probabilistic convex hulls
 					if (hitCandidate->Material->Type == MaterialType.ProbabilisticVolume &&
@@ -586,15 +560,53 @@ namespace Runtime
 					    hitCandidate->Hit(ray, thisRec.Distance + 0.001f, float.PositiveInfinity, out HitRecord exitRec))
 					{
 						exitRec.EntityPtr = hitCandidate;
-						hitBuffer[hitCount++] = exitRec;
+						hitBuffer.Add(exitRec);
 					}
 				}
 			}
 
-			// Sort hit records by distance
-			hitIndex = 0;
-			if (hitCount > 0)
-				NativeSortExtension.Sort(hitBuffer, hitCount);
+			hitBuffer.Sort(new HitRecord.DistanceComparer());
+		}
+
+		bool DetermineVolumeContainment(Ray ray, BvhNode* bvhRoot, ref UnsafePtrList<BvhNode> nodeTraversalBuffer, ref UnsafePtrList<Entity> hitCandidateBuffer, UnsafeList<HitRecord> hitBuffer, ref Diagnostics localDiagnostics, out Material* volumeMaterial)
+		{
+			for (int i = 0; i < hitBuffer.Length; i++)
+			{
+				HitRecord hit = hitBuffer[i];
+				if (hit.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume)
+				{
+					// Entry hit, early out
+					if (dot(hit.Normal, ray.Direction) < 0)
+						break;
+
+					// Exit hit before an entry hit, we are likely inside this volume; throw a ray backwards to make sure
+					var backwardsRay = new Ray(ray.Origin, -ray.Direction, ray.Time);
+					FindHitCandidates(backwardsRay, bvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, ref localDiagnostics);
+					if (AnyBackwardsVolumeEntryHit(backwardsRay, ref hitCandidateBuffer))
+					{
+						volumeMaterial = hit.EntityPtr->Material;
+						return true;
+					}
+				}
+			}
+			volumeMaterial = null;
+			return false;
+		}
+
+		static bool AnyBackwardsVolumeEntryHit(Ray backwardsRay, ref UnsafePtrList<Entity> hitCandidateBuffer)
+		{
+			for (int i = 0; i < hitCandidateBuffer.Length; i++)
+			{
+				Entity* hitCandidate = hitCandidateBuffer[i];
+				if (hitCandidate->Material->Type == MaterialType.ProbabilisticVolume &&
+				    hitCandidate->Hit(backwardsRay, 0, float.PositiveInfinity, out HitRecord hitRecord) &&
+				    dot(hitRecord.Normal, backwardsRay.Direction) > 0)
+				{
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		[BurstDiscard]
