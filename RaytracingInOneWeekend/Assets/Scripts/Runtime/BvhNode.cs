@@ -1,4 +1,3 @@
-#if BVH
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Runtime
@@ -22,4 +21,3 @@ namespace Runtime
 		public bool IsLeaf => EntitiesStart != null;
 	}
 }
-#endif

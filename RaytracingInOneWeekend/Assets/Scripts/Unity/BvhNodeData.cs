@@ -1,4 +1,3 @@
-#if BVH
 using System;
 using System.Collections.Generic;
 using Runtime;
@@ -244,4 +243,3 @@ namespace Unity
 		}
 	}
 }
-#endif

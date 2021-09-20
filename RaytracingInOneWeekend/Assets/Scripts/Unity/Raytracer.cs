@@ -121,27 +121,18 @@ namespace Unity
 		NativeArray<Triangle> triangleBuffer;
 		NativeArray<Entity> entityBuffer, importanceSamplingEntityBuffer;
 		NativeArray<Material> materialBuffer;
-#if !BVH
-		NativeArray<Entity> World => entityBuffer;
-#endif
 #if PATH_DEBUGGING
 		NativeArray<DebugPath> debugPaths;
 #endif
 
-#if BVH
 		NativeList<BvhNodeData> bvhNodeDataBuffer;
 		NativeArray<BvhNode> bvhNodeBuffer;
 		NativeList<Entity> bvhEntities;
 
 		BvhNodeData? BvhRootData => bvhNodeDataBuffer.IsCreated ? (BvhNodeData?) bvhNodeDataBuffer[0] : null;
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
-#endif
-		[UsedImplicitly] bool BvhEnabled =>
-#if BVH
-			true;
-#else
-			false;
-#endif
+
+		[UsedImplicitly] bool BvhEnabled => true;
 
 		readonly PerlinNoiseData perlinNoise = new PerlinNoiseData();
 
@@ -401,11 +392,10 @@ namespace Unity
 			longBuffers?.Dispose();
 			boolBuffers?.Dispose();
 
-#if BVH
 			bvhNodeDataBuffer.SafeDispose();
 			bvhEntities.SafeDispose();
 			bvhNodeBuffer.SafeDispose();
-#endif
+
 			perlinNoise.Dispose();
 #if PATH_DEBUGGING
 			debugPaths.SafeDispose();
@@ -665,11 +655,7 @@ namespace Unity
 					SampleCount = min(samplesPerPixel, samplesPerBatch),
 					TraceDepth = traceDepth,
 					SubPixelJitter = subPixelJitter,
-#if BVH
 					BvhRoot = BvhRoot,
-#else
-					Entities = entityBuffer,
-#endif
 					PerlinNoise = perlinNoise.GetRuntimeData(),
 					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
 					NoiseColor = noiseColor,
@@ -1134,11 +1120,10 @@ namespace Unity
 			using (rebuildEntityBuffersMarker.Auto())
 			using (new ScopedStopwatch("^"))
 				RebuildEntityBuffers();
-#if BVH
+
 			using (rebuildBvhMarker.Auto())
 			using (new ScopedStopwatch("^"))
 				RebuildBvh();
-#endif
 
 			perlinNoise.Generate(scene.RandomSeed);
 
@@ -1253,7 +1238,6 @@ namespace Unity
 			Debug.Log($"Rebuilt entity buffer of {entityBuffer.Length} entities");
 		}
 
-#if BVH
 		void RebuildBvh(bool editorOnly = false)
 		{
 			bvhEntities.EnsureCapacity(entityBuffer.Length);
@@ -1315,9 +1299,6 @@ namespace Unity
 #endif // FULL_DIAGNOSTICS
 			}
 		}
-#else
-		public bool HitWorld(Ray r, out HitRecord hitRec) => World.Hit(r, 0, float.PositiveInfinity, false, ref rng, out hitRec);
-#endif // BVH
 
 		void CollectActiveEntities()
 		{

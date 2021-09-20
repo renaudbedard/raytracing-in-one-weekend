@@ -55,11 +55,10 @@ namespace Unity
 		[UsedImplicitly]
 		void AbortTrace() => traceAborted = true;
 
-#if BVH
 		[SerializeField]
 		[DisableInPlayMode]
 		bool previewBvh = false;
-#endif
+
 		[SerializeField] [DisableInEditorMode] BufferView bufferView = BufferView.Front;
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;
@@ -130,13 +129,11 @@ namespace Unity
 				WatchForWorldChanges();
 			}
 
-#if BVH
 			if (bvhNodeBuffer.IsCreated && !EditorApplication.isPlaying &&
 			    UnityEditorInternal.InternalEditorUtility.isApplicationActive)
 			{
 				EditorWindow.GetWindow<SceneView>().Repaint();
 			}
-#endif
 		}
 
 		void EnsurePreviewObjectExists(PrimitiveType type, ref MeshFilter previewObject)
@@ -161,7 +158,7 @@ namespace Unity
 		void UpdatePreview()
 		{
 			if (!this) return;
-#if BVH
+
 			if (previewBvh)
 			{
 				if (!entityBuffer.IsCreated) RebuildEntityBuffers();
@@ -172,7 +169,6 @@ namespace Unity
 				OnDestroy();
 				ActiveEntities.Clear();
 			}
-#endif // BVH
 
 			if (scene)
 			{
@@ -310,9 +306,6 @@ namespace Unity
 			EditorUtility.SetDirty(this);
 		}
 
-#if BVH
-		unsafe
-#endif
 		void OnDrawGizmos()
 		{
 			var sceneCameraTransform = SceneView.GetAllSceneCameras()[0].transform;
@@ -363,7 +356,6 @@ namespace Unity
 				}
 			}
 
-#if BVH
 			if (previewBvh && BvhRootData.HasValue)
 			{
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
@@ -380,7 +372,6 @@ namespace Unity
 					Gizmos.DrawCube(bounds.Center, bounds.Size);
 				}
 			}
-#endif
 
 #if PATH_DEBUGGING
 			if (debugPaths.IsCreated)
