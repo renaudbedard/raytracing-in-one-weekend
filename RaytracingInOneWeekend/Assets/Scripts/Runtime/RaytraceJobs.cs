@@ -144,7 +144,9 @@ namespace Runtime
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	unsafe struct AccumulateJob : IJobParallelFor
 	{
-		const int InitialWorkingListSize = 0;
+		const int BvhNodeStackAllocSize = 128;
+		const int EntityStackAllocSize = 64;
+		const int HitRecordStackAllocSize = 32;
 
 		[ReadOnly] public NativeArray<bool> CancellationToken;
 
@@ -216,9 +218,14 @@ namespace Runtime
 			float3* emissionStack = stackalloc float3[TraceDepth];
 			float3* attenuationStack = stackalloc float3[TraceDepth];
 
-			var nodeTraversalBuffer = new UnsafePtrList<BvhNode>(InitialWorkingListSize, AllocatorManager.Temp);
-			var hitCandidateBuffer = new UnsafePtrList<Entity>(InitialWorkingListSize, AllocatorManager.Temp);
-			var hitRecordBuffer = new UnsafeList<HitRecord>(InitialWorkingListSize, AllocatorManager.Temp);
+			BvhNode** bvhNodeBuffer = stackalloc BvhNode*[BvhNodeStackAllocSize];
+			var nodeTraversalStack = new HybridPtrStack<BvhNode>(bvhNodeBuffer, BvhNodeStackAllocSize);
+
+			Entity** entityBuffer = stackalloc Entity*[EntityStackAllocSize];
+			var hitCandidateStack = new HybridPtrStack<Entity>(entityBuffer, EntityStackAllocSize);
+
+			HitRecord* hitRecordBuffer = stackalloc HitRecord[HitRecordStackAllocSize];
+			var hitRecordList = new HybridList<HitRecord>(hitRecordBuffer, HitRecordStackAllocSize);
 
 			float3 fallbackAlbedo = default, fallbackNormal = default;
 			Diagnostics diagnostics = default;
@@ -228,7 +235,7 @@ namespace Runtime
 				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? blueNoise.NextFloat2() : 0.5f)) / Size;
 				Ray eyeRay = View.GetRay(normalizedCoordinates, ref rng);
 
-				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack, ref nodeTraversalBuffer, ref hitCandidateBuffer, ref hitRecordBuffer,
+				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack, ref nodeTraversalStack, ref hitCandidateStack, ref hitRecordList,
 #if PATH_DEBUGGING
 					doDebugPaths && s == 0,
 #endif
@@ -253,14 +260,10 @@ namespace Runtime
 			OutputAlbedo[index] = sampleCount == 0 ? fallbackAlbedo : albedoAcc;
 
 			OutputDiagnostics[index] = diagnostics;
-
-			nodeTraversalBuffer.Dispose();
-			hitCandidateBuffer.Dispose();
-			hitRecordBuffer.Dispose();
 		}
 
 		bool Sample(Ray eyeRay, ref RandomSource rng, float3* emissionStack, float3* attenuationStack,
-			ref UnsafePtrList<BvhNode> nodeTraversalBuffer, ref UnsafePtrList<Entity> hitCandidateBuffer, ref UnsafeList<HitRecord> hitRecordBuffer,
+			ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer, ref HybridList<HitRecord> hitRecordBuffer,
 #if PATH_DEBUGGING
 			bool doDebugPaths,
 #endif
@@ -498,7 +501,7 @@ namespace Runtime
 			return true;
 		}
 
-		void FindHitCandidates(Ray ray, BvhNode* bvhRoot, ref UnsafePtrList<BvhNode> nodeTraversalBuffer, ref UnsafePtrList<Entity> hitCandidateBuffer, ref Diagnostics diagnostics)
+		void FindHitCandidates(Ray ray, BvhNode* bvhRoot, ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer, ref Diagnostics diagnostics)
 		{
 			float3 rayInvDirection = rcp(ray.Direction);
 
@@ -508,7 +511,7 @@ namespace Runtime
 			nodeTraversalBuffer.Clear();
 			hitCandidateBuffer.Clear();
 
-			nodeTraversalBuffer.Add(bvhRoot);
+			nodeTraversalBuffer.Push(bvhRoot);
 
 			// Traverse the BVH and record candidate leaf nodes
 			while (nodeTraversalBuffer.Length > 0)
@@ -527,7 +530,7 @@ namespace Runtime
 					int entityCount = nodePtr->EntityCount;
 					Entity* entityPtr = nodePtr->EntitiesStart;
 					for (int i = 0; i < entityCount; i++, ++entityPtr)
-						hitCandidateBuffer.Add(entityPtr);
+						hitCandidateBuffer.Push(entityPtr);
 
 #if FULL_DIAGNOSTICS
 					diagnostics.CandidateCount += entityCount;
@@ -535,20 +538,19 @@ namespace Runtime
 				}
 				else
 				{
-					nodeTraversalBuffer.Add(nodePtr->Left);
-					nodeTraversalBuffer.Add(nodePtr->Right);
+					nodeTraversalBuffer.Push(nodePtr->Left);
+					nodeTraversalBuffer.Push(nodePtr->Right);
 				}
 			}
 		}
 
-		static void FindHits(Ray ray, ref UnsafePtrList<Entity> hitCandidateBuffer, ref UnsafeList<HitRecord> hitBuffer)
+		static void FindHits(Ray ray, ref HybridPtrStack<Entity> hitCandidateBuffer, ref HybridList<HitRecord> hitBuffer)
 		{
 			hitBuffer.Clear();
 
 			while (hitCandidateBuffer.Length > 0)
 			{
 				Entity* hitCandidate = hitCandidateBuffer.Pop();
-
 				if (hitCandidate->Hit(ray, 0, float.PositiveInfinity, out HitRecord thisRec))
 				{
 					thisRec.EntityPtr = hitCandidate;
@@ -565,10 +567,11 @@ namespace Runtime
 				}
 			}
 
-			hitBuffer.Sort(new HitRecord.DistanceComparer());
+			if (hitBuffer.Length > 0)
+				hitBuffer.Sort(new HitRecord.DistanceComparer());
 		}
 
-		bool DetermineVolumeContainment(Ray ray, BvhNode* bvhRoot, ref UnsafePtrList<BvhNode> nodeTraversalBuffer, ref UnsafePtrList<Entity> hitCandidateBuffer, UnsafeList<HitRecord> hitBuffer, ref Diagnostics localDiagnostics, out Material* volumeMaterial)
+		bool DetermineVolumeContainment(Ray ray, BvhNode* bvhRoot, ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer, HybridList<HitRecord> hitBuffer, ref Diagnostics localDiagnostics, out Material* volumeMaterial)
 		{
 			for (int i = 0; i < hitBuffer.Length; i++)
 			{
@@ -593,7 +596,7 @@ namespace Runtime
 			return false;
 		}
 
-		static bool AnyBackwardsVolumeEntryHit(Ray backwardsRay, ref UnsafePtrList<Entity> hitCandidateBuffer)
+		static bool AnyBackwardsVolumeEntryHit(Ray backwardsRay, ref HybridPtrStack<Entity> hitCandidateBuffer)
 		{
 			for (int i = 0; i < hitCandidateBuffer.Length; i++)
 			{
