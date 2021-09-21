@@ -1,5 +1,6 @@
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
+using int3 = Unity.Mathematics.int3;
 
 namespace Runtime.EntityTypes
 {
@@ -21,6 +22,14 @@ namespace Runtime.EntityTypes
 		{
 			Data = float3x3(v3 - v1, v2 - v1, v1);
 			Normals = float3x3(normalize(n1), normalize(n2), normalize(n3));
+		}
+
+		public float3 RandomPoint(ref RandomSource rng)
+		{
+			float2 u = rng.NextFloat2(0, 1);
+			if (u.x + u.y > 1)
+				u = 1 - u;
+			return u.x * Data[0] + u.y * Data[1] + Data[3];
 		}
 
 		public AxisAlignedBoundingBox Bounds

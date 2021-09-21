@@ -1287,18 +1287,7 @@ namespace Unity
 			buildRuntimeBvhJob.Schedule().Complete();
 		}
 
-		public bool HitWorld(Ray r, out HitRecord hitRec)
-		{
-			unsafe
-			{
-#if FULL_DIAGNOSTICS
-				Diagnostics _ = default;
-				return BvhRoot->Hit(r, 0, float.PositiveInfinity, ref _, out hitRec);
-#else
-				return BvhRoot->Hit(r, 0, float.PositiveInfinity, out hitRec);
-#endif // FULL_DIAGNOSTICS
-			}
-		}
+		unsafe bool HitWorld(Ray r, out HitRecord hitRec) => BvhRoot->Hit(r, 0, float.PositiveInfinity, out hitRec);
 
 		void CollectActiveEntities()
 		{

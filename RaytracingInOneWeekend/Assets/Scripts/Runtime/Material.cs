@@ -159,6 +159,9 @@ namespace Runtime
 					// Disabled because it currently does not work right
 					//return GgxMicrofacet.Pdf(incomingLightDirection, outgoingLightDirection, geometricNormal, Roughness);
 
+				case MaterialType.DiffuseLight:
+					return 0; // Doesn't matter, because there is no scattering or albedo
+
 				default: throw new NotImplementedException();
 			}
 		}

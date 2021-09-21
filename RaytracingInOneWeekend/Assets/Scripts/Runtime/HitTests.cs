@@ -2,10 +2,6 @@ using Runtime.EntityTypes;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 
-#if BASIC
-using Unity.Collections;
-#endif
-
 namespace Runtime
 {
 	static class HitTests
@@ -111,6 +107,7 @@ namespace Runtime
 
 			if (distance > tMax) return false;
 
+			// TODO: Normal is wrong when ray origin is inside the box
 			normal = sgn;
 			return true;
 		}
@@ -149,32 +146,7 @@ namespace Runtime
 			return true;
 		}
 
-#if BASIC
-		// iterative entity array hit test
-		public static unsafe bool Hit(this NativeArray<Entity> entities, Ray r, float tMin, float tMax, ref RandomSource rng, out HitRecord rec)
-		{
-			bool anyHit = false;
-			rec = new HitRecord(tMax, 0, 0);
-
-			for (var i = 0; i < entities.Length; i++)
-			{
-				var thisHit = entities[i].Hit(r, tMin, rec.Distance, ref rng, out HitRecord thisRec);
-				if (thisHit && (!anyHit || thisRec.Distance < rec.Distance))
-				{
-					anyHit = true;
-					rec = thisRec;
-					rec.EntityPtr = (Entity*) entities.GetUnsafeReadOnlyPtr() + i;
-				}
-			}
-			return anyHit;
-		}
-
-#else
-		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax,
-#if FULL_DIAGNOSTICS
-			ref Diagnostics diagnostics,
-#endif
-			out HitRecord rec)
+		public static unsafe bool Hit(this BvhNode n, Ray r, float tMin, float tMax, out HitRecord rec)
 		{
 			rec = default;
 			float3 rayInvDirection = rcp(r.Direction);
@@ -182,15 +154,8 @@ namespace Runtime
 			if (!n.Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
 				return false;
 
-#if FULL_DIAGNOSTICS
-			diagnostics.BoundsHitCount++;
-#endif
-
 			if (n.IsLeaf)
 			{
-#if FULL_DIAGNOSTICS
-				diagnostics.CandidateCount += n.EntityCount;
-#endif
 				bool anyHit = false;
 				for (int i = 0; i < n.EntityCount; i++)
 				{
@@ -205,13 +170,8 @@ namespace Runtime
 				return anyHit;
 			}
 
-#if FULL_DIAGNOSTICS
-			bool hitLeft = n.Left->Hit(r, tMin, tMax, ref diagnostics, out HitRecord leftRecord);
-			bool hitRight = n.Right->Hit(r, tMin, tMax, ref diagnostics, out HitRecord rightRecord);
-#else
 			bool hitLeft = n.Left->Hit(r, tMin, tMax, out HitRecord leftRecord);
 			bool hitRight = n.Right->Hit(r, tMin, tMax, out HitRecord rightRecord);
-#endif
 
 			if (!hitLeft && !hitRight)
 				return false;
@@ -231,6 +191,5 @@ namespace Runtime
 			rec = rightRecord;
 			return true;
 		}
-#endif
 	}
 }

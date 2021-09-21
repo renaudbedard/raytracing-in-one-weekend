@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using OpenImageDenoise;
 using Runtime.EntityTypes;
 using Unity;
@@ -185,13 +183,11 @@ namespace Runtime
 			if (CancellationToken[0])
 				return;
 
-			// ReSharper disable once PossibleLossOfFraction
 			int2 coordinates = int2(
 				index % (int) Size.x, // column
-				index / (int) Size.x // row
+				index / (int) Size.x  // row
 			);
 
-			// early out
 			if (coordinates.y % SliceDivider != SliceOffset)
 				return;
 
@@ -272,10 +268,6 @@ namespace Runtime
 			float3* emissionCursor = emissionStack;
 			float3* attenuationCursor = attenuationStack;
 
-			nodeTraversalBuffer.Clear();
-			hitCandidateBuffer.Clear();
-			hitRecordBuffer.Clear();
-
 			int depth = 0;
 			Entity* explicitSamplingTarget = null;
 			bool firstNonSpecularHit = false;
@@ -286,12 +278,22 @@ namespace Runtime
 
 			for (; depth < TraceDepth; depth++)
 			{
-				FindHitCandidates(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, ref diagnostics);
+				FindHitCandidates(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer
+#if FULL_DIAGNOSTICS
+					, ref diagnostics
+#endif
+					);
+
 				FindHits(ray, ref hitCandidateBuffer, ref hitRecordBuffer);
 
-				// At trace depth 0, we have no context on whether the ray started within a volume
-				if (depth == 0)
-					DetermineVolumeContainment(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, hitRecordBuffer, ref diagnostics, out currentProbabilisticVolumeMaterial);
+				if (currentProbabilisticVolumeMaterial == null)
+				{
+					DetermineVolumeContainment(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, hitRecordBuffer,
+#if FULL_DIAGNOSTICS
+						ref diagnostics,
+#endif
+						out currentProbabilisticVolumeMaterial);
+				}
 
 				diagnostics.RayCount++;
 
@@ -406,6 +408,7 @@ namespace Runtime
 					material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
+
 					*emissionCursor++ = emission;
 
 					if (depth == 0)
@@ -472,7 +475,7 @@ namespace Runtime
 					}
 
 					*emissionCursor++ = hitSkyColor;
-					attenuationCursor++;
+					*attenuationCursor++ = 1;
 
 					if (!firstNonSpecularHit)
 					{
@@ -501,7 +504,11 @@ namespace Runtime
 			return true;
 		}
 
-		void FindHitCandidates(Ray ray, BvhNode* bvhRoot, ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer, ref Diagnostics diagnostics)
+		static void FindHitCandidates(Ray ray, BvhNode* bvhRoot, ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer
+#if FULL_DIAGNOSTICS
+			, ref Diagnostics diagnostics
+#endif
+			)
 		{
 			float3 rayInvDirection = rcp(ray.Direction);
 
@@ -571,7 +578,11 @@ namespace Runtime
 				hitBuffer.Sort(new HitRecord.DistanceComparer());
 		}
 
-		bool DetermineVolumeContainment(Ray ray, BvhNode* bvhRoot, ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer, HybridList<HitRecord> hitBuffer, ref Diagnostics localDiagnostics, out Material* volumeMaterial)
+		static void DetermineVolumeContainment(Ray ray, BvhNode* bvhRoot, ref HybridPtrStack<BvhNode> nodeTraversalBuffer, ref HybridPtrStack<Entity> hitCandidateBuffer, HybridList<HitRecord> hitBuffer,
+#if FULL_DIAGNOSTICS
+			ref Diagnostics diagnostics,
+#endif
+			out Material* volumeMaterial)
 		{
 			for (int i = 0; i < hitBuffer.Length; i++)
 			{
@@ -584,16 +595,20 @@ namespace Runtime
 
 					// Exit hit before an entry hit, we are likely inside this volume; throw a ray backwards to make sure
 					var backwardsRay = new Ray(ray.Origin, -ray.Direction, ray.Time);
-					FindHitCandidates(backwardsRay, bvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, ref localDiagnostics);
+					FindHitCandidates(backwardsRay, bvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer
+#if FULL_DIAGNOSTICS
+						, ref diagnostics
+#endif
+					);
 					if (AnyBackwardsVolumeEntryHit(backwardsRay, ref hitCandidateBuffer))
 					{
 						volumeMaterial = hit.EntityPtr->Material;
-						return true;
+						return;
 					}
 				}
 			}
+
 			volumeMaterial = null;
-			return false;
 		}
 
 		static bool AnyBackwardsVolumeEntryHit(Ray backwardsRay, ref HybridPtrStack<Entity> hitCandidateBuffer)

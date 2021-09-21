@@ -138,6 +138,7 @@ namespace Runtime
 			{
 				case EntityType.Rect: localPoint = ((Rect*) Content)->RandomPoint(ref rng); break;
 				case EntityType.Sphere: localPoint = ((Sphere*) Content)->RandomPoint(ref rng); break;
+				case EntityType.Triangle: localPoint = ((Triangle*) Content)->RandomPoint(ref rng); break;
 				default: throw new NotImplementedException();
 			}
 

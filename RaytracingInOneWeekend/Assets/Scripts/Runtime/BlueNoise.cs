@@ -61,7 +61,7 @@ namespace Runtime
 
 		public float2 NextFloat2(float2 min, float2 max) => NextFloat2() * (max - min) + min;
 
-		public int NextInt(int min, int max) => (int) floor(NextFloat() * (max - min) + min);
+		public int NextInt(int min, int max) => (int) math.min(NextFloat() * (max - min) + min, max - 1);
 
 		void Advance()
 		{
