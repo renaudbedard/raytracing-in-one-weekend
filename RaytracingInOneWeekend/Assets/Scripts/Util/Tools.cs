@@ -71,6 +71,17 @@ namespace Util
 			if (list.Length < size) list.Capacity = size;
 		}
 
+		public static void EnsureCapacity<T>(this ref UnsafePtrList<T> list, int size) where T : unmanaged
+		{
+			if (!list.IsCreated)
+			{
+				list = new UnsafePtrList<T>(size, Allocator.Persistent);
+				return;
+			}
+
+			if (list.Length < size) list.Capacity = size;
+		}
+
 		public static void SafeDispose<T>(this ref NativeArray<T> array) where T : struct
 		{
 			if (array.IsCreated) array.Dispose();

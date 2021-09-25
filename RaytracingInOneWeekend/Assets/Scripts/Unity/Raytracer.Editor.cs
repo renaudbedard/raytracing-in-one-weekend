@@ -55,10 +55,8 @@ namespace Unity
 		[UsedImplicitly]
 		void AbortTrace() => traceAborted = true;
 
-		[SerializeField]
-		[DisableInPlayMode]
-		bool previewBvh = false;
-
+		[SerializeField] bool debugFailedSamples = false;
+		[SerializeField] [DisableInPlayMode] bool previewBvh = false;
 		[SerializeField] [DisableInEditorMode] BufferView bufferView = BufferView.Front;
 
 		CommandBuffer opaquePreviewCommandBuffer, transparentPreviewCommandBuffer;

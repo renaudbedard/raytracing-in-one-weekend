@@ -3,8 +3,10 @@ using JetBrains.Annotations;
 using Runtime.EntityTypes;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine;
 using UnityEngine.Assertions;
 using static Unity.Mathematics.math;
+using Rect = Runtime.EntityTypes.Rect;
 
 namespace Runtime
 {
@@ -118,16 +120,11 @@ namespace Runtime
 			{
 				switch (Type)
 				{
-					case EntityType.Rect:
-						return ((Rect*) Content)->Pdf(entitySpaceRay.Direction, distance, entitySpaceNormal);
-
-					case EntityType.Sphere:
-						return ((Sphere*) Content)->Pdf(entitySpaceRay.Origin);
-
+					case EntityType.Rect: return ((Rect*) Content)->Pdf(entitySpaceRay.Direction, distance, entitySpaceNormal);
+					case EntityType.Sphere: return ((Sphere*) Content)->Pdf(entitySpaceRay.Origin);
 					default: throw new NotImplementedException();
 				}
 			}
-
 			return 0;
 		}
 
@@ -141,8 +138,7 @@ namespace Runtime
 				case EntityType.Triangle: localPoint = ((Triangle*) Content)->RandomPoint(ref rng); break;
 				default: throw new NotImplementedException();
 			}
-
-			return transform(TransformAtTime(time), localPoint);
+			return transform(!Moving ? OriginTransform : TransformAtTime(time), localPoint);
 		}
 
 		public RigidTransform TransformAtTime(float t) =>

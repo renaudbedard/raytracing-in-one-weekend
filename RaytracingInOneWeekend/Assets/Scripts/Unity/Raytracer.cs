@@ -119,7 +119,8 @@ namespace Unity
 		NativeArray<Rect> rectBuffer;
 		NativeArray<Box> boxBuffer;
 		NativeArray<Triangle> triangleBuffer;
-		NativeArray<Entity> entityBuffer, importanceSamplingEntityBuffer;
+		NativeArray<Entity> entityBuffer;
+		UnsafePtrList<Entity> importanceSamplingEntityPointers;
 		NativeArray<Material> materialBuffer;
 #if PATH_DEBUGGING
 		NativeArray<DebugPath> debugPaths;
@@ -379,7 +380,7 @@ namespace Unity
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Handle.Complete();
 
 			entityBuffer.SafeDispose();
-			importanceSamplingEntityBuffer.SafeDispose();
+			importanceSamplingEntityPointers.Dispose();
 			sphereBuffer.SafeDispose();
 			rectBuffer.SafeDispose();
 			boxBuffer.SafeDispose();
@@ -662,8 +663,8 @@ namespace Unity
 					OutputDiagnostics = diagnosticsBuffer,
 					ImportanceSampler = new ImportanceSampler
 					{
-						TargetEntities = importanceSamplingEntityBuffer,
-						Mode = importanceSamplingEntityBuffer.Length == 0
+						TargetEntityPointers = importanceSamplingEntityPointers,
+						Mode = importanceSamplingEntityPointers.Length == 0
 							? ImportanceSamplingMode.None
 							: importanceSampling
 					},
@@ -764,7 +765,7 @@ namespace Unity
 			{
 				CancellationToken = cancellationBuffer,
 
-				DebugMode = denoiseMode == DenoiseMode.None,
+				DebugMode = debugFailedSamples,
 #if ENABLE_OPTIX
 				LdrAlbedo = denoiseMode == DenoiseMode.NvidiaOptix,
 #else
@@ -1147,7 +1148,8 @@ namespace Unity
 
 			materialBuffer.EnsureCapacity(ActiveEntities.Select(x => x.Material).Distinct().Count());
 
-			importanceSamplingEntityBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
+			importanceSamplingEntityPointers.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
+			importanceSamplingEntityPointers.Clear();
 
 			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0, importanceSamplingIndex = 0, materialIndex = 0;
 
@@ -1160,7 +1162,7 @@ namespace Unity
 				entityBuffer[entityIndex++] = entity;
 
 				if (e.Material.Type == MaterialType.DiffuseLight)
-					importanceSamplingEntityBuffer[importanceSamplingIndex++] = entity;
+					importanceSamplingEntityPointers.AddNoResize((Entity*) entityBuffer.GetUnsafePtr() + (entityIndex - 1));
 			}
 
 			foreach (EntityData e in ActiveEntities)
@@ -1207,18 +1209,16 @@ namespace Unity
 					case EntityType.Mesh:
 						using (Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(e.MeshData.Mesh))
 						using (var triangleIndexRef = new NativeReference<int>(triangleIndex, AllocatorManager.TempJob))
-						using (var importanceSamplingIndexRef = new NativeReference<int>(importanceSamplingIndex, AllocatorManager.TempJob))
 						using (var entityIndexRef = new NativeReference<int>(entityIndex, AllocatorManager.TempJob))
 						{
 							var addMeshJob = new AddMeshRuntimeEntitiesJob
 							{
 								Entities = entityBuffer,
 								Triangles = triangleBuffer,
-								ImportanceSampledEntities = importanceSamplingEntityBuffer,
+								ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
 
 								TriangleIndex = triangleIndexRef,
 								EntityIndex = entityIndexRef,
-								ImportanceSampledEntityIndex = importanceSamplingIndexRef,
 
 								FaceNormals = e.MeshData.FaceNormals,
 								Material = materialPtr,
@@ -1228,7 +1228,6 @@ namespace Unity
 							addMeshJob.Schedule().Complete();
 
 							triangleIndex = triangleIndexRef.Value;
-							importanceSamplingIndex = importanceSamplingIndexRef.Value;
 							entityIndex = entityIndexRef.Value;
 						}
 						break;

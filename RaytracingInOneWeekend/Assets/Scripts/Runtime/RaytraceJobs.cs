@@ -50,9 +50,9 @@ namespace Runtime
 
 		[WriteOnly] public NativeArray<Triangle> Triangles;
 		[WriteOnly] public NativeArray<Entity> Entities;
-		[WriteOnly] public NativeArray<Entity> ImportanceSampledEntities;
+		[WriteOnly] public UnsafePtrList<Entity> ImportanceSampledEntityPointers;
 
-		public NativeReference<int> TriangleIndex, EntityIndex, ImportanceSampledEntityIndex;
+		public NativeReference<int> TriangleIndex, EntityIndex;
 
 		public bool FaceNormals, Moving;
 		public RigidTransform RigidTransform;
@@ -97,7 +97,7 @@ namespace Runtime
 					Entities[EntityIndex.Value++] = entity;
 
 					if (Material->Type == MaterialType.DiffuseLight)
-						ImportanceSampledEntities[ImportanceSampledEntityIndex.Value++] = entity;
+						ImportanceSampledEntityPointers.AddNoResize((Entity*) Entities.GetUnsafePtr() + (EntityIndex.Value - 1));
 				}
 
 				if (!FaceNormals)
@@ -269,10 +269,11 @@ namespace Runtime
 			float3* attenuationCursor = attenuationStack;
 
 			int depth = 0;
-			Entity* explicitSamplingTarget = null;
+			void* explicitSamplingTarget = null;
 			bool firstNonSpecularHit = false;
 			sampleColor = sampleNormal = sampleAlbedo = default;
 			Material* currentProbabilisticVolumeMaterial = null;
+			bool stopTracing = false;
 
 			Ray ray = eyeRay;
 
@@ -286,7 +287,7 @@ namespace Runtime
 
 				FindHits(ray, ref hitCandidateBuffer, ref hitRecordBuffer);
 
-				if (currentProbabilisticVolumeMaterial == null)
+				if (currentProbabilisticVolumeMaterial == null && explicitSamplingTarget == null)
 				{
 					DetermineVolumeContainment(ray, BvhRoot, ref nodeTraversalBuffer, ref hitCandidateBuffer, hitRecordBuffer,
 #if FULL_DIAGNOSTICS
@@ -302,9 +303,26 @@ namespace Runtime
 				{
 					HitRecord rec = hitRecordBuffer[hitIndex];
 
-					// We explicitly sampled an entity and could not hit it, fail this sample
-					if (explicitSamplingTarget != null && explicitSamplingTarget != rec.EntityPtr)
-						return false;
+					if (explicitSamplingTarget != null)
+					{
+						// Skip hits inside of probabilistic volumes if we're explicitely sampling a light
+						if (rec.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume)
+						{
+							hitIndex++;
+							continue;
+						}
+
+						// We explicitly sampled an entity and could not hit it, fail this sample
+						if (explicitSamplingTarget != rec.EntityPtr->Content)
+						{
+#if PATH_DEBUGGING
+							if (doDebugPaths)
+								DebugPaths[depth] = new DebugPath { From = ray.Origin, To = rec.Point };
+#endif
+							stopTracing = true;
+							break;
+						}
+					}
 
 					Material* material = rec.EntityPtr->Material;
 
@@ -408,7 +426,6 @@ namespace Runtime
 					material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
 					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
-
 					*emissionCursor++ = emission;
 
 					if (depth == 0)
@@ -438,13 +455,25 @@ namespace Runtime
 						float3 outgoingLightDirection = -ray.Direction;
 						float scatterPdfValue = material->Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
 
+						// We reached our target, stop tracing
+						if (explicitSamplingTarget != null)
+							stopTracing = true;
+
 						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
 							out ray, out float pdfValue, out explicitSamplingTarget);
 
+						// We already hit the target, stop tracing
+						stopTracing |= explicitSamplingTarget != null && rec.EntityPtr != null && explicitSamplingTarget == rec.EntityPtr->Content;
+
+						// Ignore probabilistic volume containment when doing explicit light sampling
+						currentProbabilisticVolumeMaterial = null;
+
 						// Scatter ray is likely parallel to the surface, and division would cause a NaN
-						// TODO: Is failing the entire sample too drastic?
 						if (pdfValue.AlmostEquals(0))
-							return false;
+						{
+							*attenuationCursor++ = 1;
+							break;
+						}
 
 						*attenuationCursor++ = albedo * scatterPdfValue / pdfValue;
 					}
@@ -452,6 +481,10 @@ namespace Runtime
 					ray = ray.OffsetTowards(dot(scatteredRay.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
 					break;
 				}
+
+				// When explicit target sampling succeeded
+				if (stopTracing)
+					break;
 
 				// No hit?
 				if (hitIndex >= hitRecordBuffer.Length)
@@ -497,8 +530,16 @@ namespace Runtime
 			// Attenuate colors from the tail of the hit stack to the head
 			while (emissionCursor != emissionStack)
 			{
-				sampleColor *= *--attenuationCursor;
-				sampleColor += *--emissionCursor;
+				var a = *--attenuationCursor;
+				if (any(isnan(a)))
+					Debug.Log("nan attenuation (unstack)");
+
+				var e = *--emissionCursor;
+				if (any(isnan(e)))
+					Debug.Log("nan emmision (unstack)");
+
+				sampleColor *= a;
+				sampleColor += e;
 			}
 
 			return true;
@@ -666,12 +707,6 @@ namespace Runtime
 			float3 finalColor;
 			if (!DebugMode)
 			{
-				if (realSampleCount == 0) finalColor = 0;
-				else if (any(isnan(inputColor))) finalColor = 0;
-				else finalColor = inputColor.xyz / realSampleCount;
-			}
-			else
-			{
 				if (realSampleCount == 0)
 				{
 					int tentativeIndex = index;
@@ -684,6 +719,12 @@ namespace Runtime
 					}
 				}
 
+				if (realSampleCount == 0) finalColor = 0;
+				else if (any(isnan(inputColor))) finalColor = 0;
+				else finalColor = inputColor.xyz / realSampleCount;
+			}
+			else
+			{
 				if (realSampleCount == 0) finalColor = NoSamplesColor;
 				else if (any(isnan(inputColor))) finalColor = NaNColor;
 				else finalColor = inputColor.xyz / realSampleCount;

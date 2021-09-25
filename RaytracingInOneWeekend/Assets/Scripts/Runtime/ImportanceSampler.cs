@@ -12,37 +12,36 @@ namespace Runtime
 		Mixture
 	}
 
-	struct ImportanceSampler
+	unsafe struct ImportanceSampler
 	{
-		[ReadOnly] public NativeArray<Entity> TargetEntities;
+		[ReadOnly] public UnsafePtrList<Entity> TargetEntityPointers;
+
 		public ImportanceSamplingMode Mode;
 
-		public unsafe void Sample(Ray materialScatterRay, float3 outgoingLightDirection, HitRecord rec, Material* material, ref RandomSource rng,
-			out Ray scatterRay, out float pdfValue, out Entity* targetEntityId)
+		public void Sample(Ray materialScatterRay, float3 outgoingLightDirection, HitRecord rec, Material* material, ref RandomSource rng,
+			out Ray scatterRay, out float pdfValue, out void* targetEntityContent)
 		{
-			int totalOptions = TargetEntities.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
+			int totalOptions = TargetEntityPointers.Length + (Mode == ImportanceSamplingMode.Mixture ? 1 : 0);
 			int chosenOption = rng.NextInt(0, totalOptions);
-			if (chosenOption == TargetEntities.Length)
+			if (chosenOption == TargetEntityPointers.Length)
 			{
 				scatterRay = materialScatterRay;
-				targetEntityId = null;
+				targetEntityContent = null;
 			}
 			else
 			{
-				Entity* chosenEntity = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr() + chosenOption;
+				Entity* chosenEntity = TargetEntityPointers[chosenOption];
 				float3 pointOnEntity = chosenEntity->RandomPoint(materialScatterRay.Time, ref rng);
-				scatterRay = new Ray(materialScatterRay.Origin,
-					normalize(pointOnEntity - materialScatterRay.Origin));
-				targetEntityId = chosenEntity;
+				scatterRay = new Ray(materialScatterRay.Origin, normalize(pointOnEntity - materialScatterRay.Origin));
+				targetEntityContent = chosenEntity->Content;
 			}
 
 			pdfValue = 0;
 			if (Mode == ImportanceSamplingMode.Mixture)
 				pdfValue += material->Pdf(scatterRay.Direction, outgoingLightDirection, rec.Normal);
 
-			var basePointer = (Entity*) TargetEntities.GetUnsafeReadOnlyPtr();
-			for (int i = 0; i < TargetEntities.Length; i++)
-				pdfValue += (basePointer + i)->Pdf(scatterRay);
+			for (int i = 0; i < TargetEntityPointers.Length; ++i)
+				pdfValue += TargetEntityPointers[i]->Pdf(scatterRay);
 			pdfValue /= totalOptions;
 		}
 	}
