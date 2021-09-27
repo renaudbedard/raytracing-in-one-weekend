@@ -583,7 +583,7 @@ namespace Runtime
 			{
 				BvhNode* nodePtr = nodeTraversalBuffer.Pop();
 
-				if (!nodePtr->Bounds.Hit(ray.Origin, rayInvDirection, 0, float.PositiveInfinity))
+				if (!nodePtr->Bounds.Hit(ray.Origin, rayInvDirection))
 					continue;
 
 #if FULL_DIAGNOSTICS

@@ -6,7 +6,7 @@ namespace Runtime
 {
 	static class HitTests
 	{
-		public static bool Hit(this AxisAlignedBoundingBox aabb, float3 rayOrigin, float3 rayInvDirection, float tMin, float tMax)
+		public static bool Hit(this AxisAlignedBoundingBox aabb, float3 rayOrigin, float3 rayInvDirection)
 		{
 			// optimized algorithm from Roman Wiche
 			// https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
@@ -14,8 +14,8 @@ namespace Runtime
 			float3 t0 = (aabb.Min - rayOrigin) * rayInvDirection;
 			float3 t1 = (aabb.Max - rayOrigin) * rayInvDirection;
 
-			tMin = max(tMin, cmax(min(t0, t1)));
-			tMax = min(tMax, cmin(max(t0, t1)));
+			float tMin = max(0, cmax(min(t0, t1)));
+			float tMax = cmin(max(t0, t1));
 
 			return tMin < tMax;
 		}
@@ -151,7 +151,7 @@ namespace Runtime
 			rec = default;
 			float3 rayInvDirection = rcp(r.Direction);
 
-			if (!n.Bounds.Hit(r.Origin, rayInvDirection, tMin, tMax))
+			if (!n.Bounds.Hit(r.Origin, rayInvDirection))
 				return false;
 
 			if (n.IsLeaf)
