@@ -87,9 +87,13 @@ namespace Runtime
 				inverseTransform = inverse(transformAtTime);
 			}
 
-			entitySpaceRay = new Ray(
-				transform(inverseTransform, ray.Origin),
-				rotate(inverseTransform, ray.Direction));
+			// Triangles are always world-space
+			if (Type == EntityType.Triangle)
+				entitySpaceRay = ray;
+			else
+				entitySpaceRay = new Ray(
+					transform(inverseTransform, ray.Origin),
+					rotate(inverseTransform, ray.Direction));
 
 			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
 				return false;

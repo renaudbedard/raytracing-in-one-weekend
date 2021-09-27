@@ -292,7 +292,7 @@ namespace Unity
 					case EntityType.Mesh:
 						MeshData m = entity.MeshData;
 						previewCommandBuffer.DrawMesh(m.Mesh,
-							Matrix4x4.TRS(entity.Position, entity.Rotation, Vector3.one), material, 0,
+							Matrix4x4.TRS(entity.Position, entity.Rotation, Vector3.one * m.Scale), material, 0,
 							material.FindPass("FORWARD"));
 						break;
 				}
