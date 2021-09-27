@@ -87,7 +87,7 @@ namespace Runtime
 					for (int j = 0; j < 3; j++)
 					{
 						worldSpaceVertices[j] = transform(RigidTransform, vertices[triangleIndices[j]]) * Scale;
-						worldSpaceNormals[j] = mul(RigidTransform.rot, vertices[triangleIndices[j]]);
+						if (!FaceNormals) worldSpaceNormals[j] = mul(RigidTransform.rot, normals[triangleIndices[j]]);
 					}
 
 					if (FaceNormals)
