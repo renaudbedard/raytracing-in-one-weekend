@@ -1223,7 +1223,8 @@ namespace Unity
 								FaceNormals = e.MeshData.FaceNormals,
 								Material = materialPtr,
 								MeshDataArray = meshDataArray,
-								RigidTransform = rigidTransform
+								RigidTransform = rigidTransform,
+								Scale = e.MeshData.Scale
 							};
 							addMeshJob.Schedule().Complete();
 

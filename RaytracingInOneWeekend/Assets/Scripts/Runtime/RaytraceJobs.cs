@@ -58,6 +58,7 @@ namespace Runtime
 		public RigidTransform RigidTransform;
 		public float3 DestinationOffset;
 		public float2 TimeRange;
+		public float Scale;
 
 		public void Execute()
 		{
@@ -80,19 +81,27 @@ namespace Runtime
 				{
 					int3 triangleIndices = int3(indices[i], indices[i + 1], indices[i + 2]);
 
+					// Bake transform
+					float3* worldSpaceVertices = stackalloc float3[3];
+					float3* worldSpaceNormals = stackalloc float3[3];
+					for (int j = 0; j < 3; j++)
+					{
+						worldSpaceVertices[j] = transform(RigidTransform, vertices[triangleIndices[j]]) * Scale;
+						worldSpaceNormals[j] = mul(RigidTransform.rot, vertices[triangleIndices[j]]);
+					}
+
 					if (FaceNormals)
-						Triangles[TriangleIndex.Value] = new Triangle(
-							vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]]);
+						Triangles[TriangleIndex.Value] = new Triangle(worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2]);
 					else
 						Triangles[TriangleIndex.Value] = new Triangle(
-							vertices[triangleIndices[0]], vertices[triangleIndices[1]], vertices[triangleIndices[2]],
-							normals[triangleIndices[0]], normals[triangleIndices[1]], normals[triangleIndices[2]]);
+							worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2],
+							worldSpaceNormals[0], worldSpaceNormals[1], worldSpaceNormals[2]);
 
 					var contentPointer = (Triangle*) Triangles.GetUnsafePtr() + TriangleIndex.Value++;
 
 					Entity entity = Moving
-						? new Entity(EntityType.Triangle, contentPointer, RigidTransform, Material, true, DestinationOffset, TimeRange)
-						: new Entity(EntityType.Triangle, contentPointer, RigidTransform, Material);
+						? new Entity(EntityType.Triangle, contentPointer, default, Material, true, DestinationOffset, TimeRange)
+						: new Entity(EntityType.Triangle, contentPointer, default, Material);
 
 					Entities[EntityIndex.Value++] = entity;
 

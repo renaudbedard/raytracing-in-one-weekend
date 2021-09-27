@@ -8,6 +8,7 @@ namespace Unity
 	{
 		[SerializeField] Mesh mesh;
 		[SerializeField] bool faceNormals;
+		[SerializeField] float scale = 1;
 
 		public Mesh Mesh
 		{
@@ -19,6 +20,12 @@ namespace Unity
 		{
 			get => faceNormals;
 			set => faceNormals = value;
+		}
+
+		public float Scale
+		{
+			get => scale;
+			set => scale = value;
 		}
 	}
 }
