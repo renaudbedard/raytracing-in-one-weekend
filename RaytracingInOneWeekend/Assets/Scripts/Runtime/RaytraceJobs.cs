@@ -198,10 +198,18 @@ namespace Runtime
 
 			int sampleCount = (int) lastColor.w;
 
-			PerPixelBlueNoise blueNoise = BlueNoise.GetPerPixelData((uint2) coordinates);
-			// big primes stolen from Unity's random class
-			Random whiteNoise = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
-
+			PerPixelBlueNoise blueNoise = default;
+			Random whiteNoise = default;
+			switch (NoiseColor)
+			{
+				case NoiseColor.Blue:
+					blueNoise = BlueNoise.GetPerPixelData((uint2) coordinates);
+					break;
+				case NoiseColor.White:
+					// Big primes stolen from Unity's random class
+					whiteNoise = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
+					break;
+			}
 			var rng = new RandomSource(NoiseColor, whiteNoise, blueNoise);
 
 #if PATH_DEBUGGING
@@ -306,11 +314,11 @@ namespace Runtime
 					if (explicitSamplingTarget != null)
 					{
 						// Skip hits inside of probabilistic volumes if we're explicitely sampling a light
-						if (rec.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume)
-						{
-							hitIndex++;
-							continue;
-						}
+						// if (rec.EntityPtr->Material->Type == MaterialType.ProbabilisticVolume)
+						// {
+						// 	hitIndex++;
+						// 	continue;
+						// }
 
 						// We explicitly sampled an entity and could not hit it, fail this sample
 						if (explicitSamplingTarget != rec.EntityPtr->Content)
