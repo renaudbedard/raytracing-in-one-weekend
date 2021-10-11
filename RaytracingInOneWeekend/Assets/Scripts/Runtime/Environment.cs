@@ -4,6 +4,7 @@ namespace Runtime
 {
 	enum SkyType
 	{
+		None,
 		GradientSky,
 		CubeMap
 	}

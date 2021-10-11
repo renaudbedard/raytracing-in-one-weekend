@@ -52,10 +52,13 @@ namespace Unity
 
 	partial class Raytracer : MonoBehaviour
 	{
-		[Title("References")] [SerializeField] Camera targetCamera;
+		[Title("References")]
+		[SerializeField] Camera targetCamera;
 		[SerializeField] BlueNoiseData blueNoise;
+		[SerializeField] Shader gradientSkyShader;
 
-		[Title("Settings")] [SerializeField] [Range(1, 100)]
+		[Title("Settings")]
+		[SerializeField] [Range(1, 100)]
 		int interlacing = 2;
 
 		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [OnValueChanged("@scene.MarkDirty()")] [UsedImplicitly] int maxBvhDepth = 16;
@@ -73,9 +76,6 @@ namespace Unity
 		[SerializeField] bool fadeDebugPaths = false;
 		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
 #endif
-
-		[Title("World")] [InlineEditor(DrawHeader = false)] [SerializeField]
-		internal SceneData scene = null;
 
 		[Title("Debug")] [SerializeField] [DisableInPlayMode]
 		Shader viewRangeShader = null;
@@ -132,6 +132,13 @@ namespace Unity
 
 		BvhNodeData? BvhRootData => bvhNodeDataBuffer.IsCreated ? (BvhNodeData?) bvhNodeDataBuffer[0] : null;
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
+
+		private UnityEngine.Material SkyboxMaterial => RenderSettings.skybox ?? FindObjectOfType<Skybox>()?.material;
+
+		private SkyType SkyType =>
+			SkyboxMaterial?.mainTexture is UnityEngine.Cubemap ? SkyType.CubeMap :
+			SkyboxMaterial?.shader == gradientSkyShader ? SkyType.GradientSky :
+			SkyType.None;
 
 		[UsedImplicitly] bool BvhEnabled => true;
 
@@ -197,15 +204,13 @@ namespace Unity
 		readonly Stopwatch traceTimer = new Stopwatch();
 		readonly List<float> mraysPerSecResults = new List<float>();
 
-		internal readonly List<EntityData> ActiveEntities = new List<EntityData>();
-		readonly List<MaterialData> activeMaterials = new List<MaterialData>();
+		readonly List<UnityEngine.Material> activeMaterials = new List<UnityEngine.Material>();
 
 		float2 bufferSize;
 
 		int BufferLength => (int) (bufferSize.x * bufferSize.y);
 
-		bool TraceActive => scheduledAccumulateJobs.Count > 0 || scheduledCombineJobs.Count > 0 ||
-		                    scheduledDenoiseJobs.Count > 0 || scheduledFinalizeJobs.Count > 0;
+		bool TraceActive => scheduledAccumulateJobs.Count > 0 || scheduledCombineJobs.Count > 0 || scheduledDenoiseJobs.Count > 0 || scheduledFinalizeJobs.Count > 0;
 
 		enum BufferView
 		{
@@ -265,9 +270,7 @@ namespace Unity
 		void Start()
 		{
 			targetCamera.RemoveAllCommandBuffers();
-#if UNITY_EDITOR
-			scene = scene.DeepClone();
-#endif
+
 			RebuildWorld();
 			InitDenoisers();
 			EnsureBuffersBuilt();
@@ -432,11 +435,6 @@ namespace Unity
 			Check(CudaBuffer.Deallocate(optixAlbedoBuffer));
 			Check(CudaBuffer.Deallocate(optixOutputBuffer));
 #endif
-
-#if UNITY_EDITOR
-			if (scene.hideFlags == HideFlags.HideAndDontSave)
-				Destroy(scene);
-#endif
 		}
 
 		void Update()
@@ -574,8 +572,8 @@ namespace Unity
 			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
 
-			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, scene.CameraFieldOfView,
-				bufferSize.x / bufferSize.y, scene.CameraAperture, focusDistance);
+			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView,
+				bufferSize.x / bufferSize.y, targetCamera.GetComponent<CameraData>().ApertureSize, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -647,10 +645,10 @@ namespace Unity
 					View = raytracingCamera,
 					Environment = new Environment
 					{
-						SkyBottomColor = scene.SkyBottomColor.ToFloat3(),
-						SkyTopColor = scene.SkyTopColor.ToFloat3(),
-						SkyCubemap = scene.SkyCubemap ? new Cubemap(scene.SkyCubemap) : default,
-						SkyType = scene.SkyType,
+						SkyBottomColor = SkyboxMaterial == null ? default : SkyboxMaterial.GetColor("_Color1").ToFloat3(),
+						SkyTopColor = SkyboxMaterial == null ? default : SkyboxMaterial.GetColor("_Color2").ToFloat3(),
+						SkyCubemap = SkyboxMaterial != null && SkyboxMaterial.mainTexture is UnityEngine.Cubemap ? new Cubemap(SkyboxMaterial.mainTexture as UnityEngine.Cubemap) : default,
+						SkyType = SkyType,
 					},
 					Seed = frameSeed,
 					SampleCount = min(samplesPerPixel, samplesPerBatch),
@@ -932,7 +930,6 @@ namespace Unity
 		{
 #if UNITY_EDITOR
 			targetCamera.transform.hasChanged = false;
-			scene.UpdateFromGameView();
 #endif
 		}
 
@@ -1108,15 +1105,9 @@ namespace Unity
 
 		void RebuildWorld()
 		{
-#if UNITY_EDITOR
-			if (scene) scene.ClearDirty();
-#endif
 			CollectActiveEntities();
 
 			activeMaterials.Clear();
-			foreach (EntityData entity in ActiveEntities)
-				if (!activeMaterials.Contains(entity.Material))
-					activeMaterials.Add(entity.Material);
 
 			using (rebuildEntityBuffersMarker.Auto())
 			using (new ScopedStopwatch("^"))
@@ -1126,113 +1117,59 @@ namespace Unity
 			using (new ScopedStopwatch("^"))
 				RebuildBvh();
 
-			perlinNoise.Generate(scene.RandomSeed);
+			// TODO: Random seed as part of scene definition
+			perlinNoise.Generate(1); // scene.RandomSeed);
 
 			worldNeedsRebuild = false;
 		}
 
 		unsafe void RebuildEntityBuffers()
 		{
-			var addedMaterials = new Dictionary<MaterialData, int>();
+			// TODO: Non-mesh primitives
+			// TODO: Importance sampling
+			// TODO: Movement support
 
-			entityBuffer.EnsureCapacity(
-				ActiveEntities.Count(x => x.Type != EntityType.Mesh) +
-				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
+			// TODO: These should all be lists
+			int triangleIndex = 0, entityIndex = 0, materialIndex = 0;
 
-			sphereBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Sphere));
-			rectBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Rect));
-			boxBuffer.EnsureCapacity(ActiveEntities.Count(x => x.Type == EntityType.Box));
-			triangleBuffer.EnsureCapacity(
-				ActiveEntities.Count(x => x.Type == EntityType.Triangle) +
-				ActiveEntities.Where(x => x.Type == EntityType.Mesh).Sum(x => x.MeshData.Mesh.triangles.Length / 3));
-
-			materialBuffer.EnsureCapacity(ActiveEntities.Select(x => x.Material).Distinct().Count());
-
-			importanceSamplingEntityPointers.EnsureCapacity(ActiveEntities.Count(x => x.Material.Type == MaterialType.DiffuseLight));
-			importanceSamplingEntityPointers.Clear();
-
-			int entityIndex = 0, sphereIndex = 0, rectIndex = 0, boxIndex = 0, triangleIndex = 0, importanceSamplingIndex = 0, materialIndex = 0;
-
-			void AddEntity(EntityData e, void* contentPointer, Material* material, RigidTransform entityTransform, EntityType entityType)
+			// Collect mesh renderers
+			foreach (var meshRenderer in FindObjectsOfType<MeshRenderer>().Where(x => x.enabled))
 			{
-				Entity entity = e.Moving
-					? new Entity(entityType, contentPointer, entityTransform, material, true, e.DestinationOffset, e.TimeRange)
-					: new Entity(entityType, contentPointer, entityTransform, material);
+				// TODO: Only add new materials
+				// TODO: Material properties
+				var material = new Material();
+				materialBuffer[materialIndex++] = material;
 
-				entityBuffer[entityIndex++] = entity;
+				Transform meshTransform = meshRenderer.transform;
+				var rigidTransform = new RigidTransform(meshTransform.rotation, meshTransform.position);
 
-				if (e.Material.Type == MaterialType.DiffuseLight)
-					importanceSamplingEntityPointers.AddNoResize((Entity*) entityBuffer.GetUnsafePtr() + (entityIndex - 1));
-			}
+				var meshFilter = meshRenderer.gameObject.GetComponent<MeshFilter>();
 
-			foreach (EntityData e in ActiveEntities)
-			{
-				Material* materialPtr;
-				if (addedMaterials.TryGetValue(e.Material, out int mi))
-					materialPtr = (Material*) materialBuffer.GetUnsafePtr() + mi;
-				else
+				using Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(meshFilter.mesh);
+				using var triangleIndexRef = new NativeReference<int>(triangleIndex, AllocatorManager.TempJob);
+				using var entityIndexRef = new NativeReference<int>(entityIndex, AllocatorManager.TempJob);
+
+				var addMeshJob = new AddMeshRuntimeEntitiesJob
 				{
-					Material material = e.Material
-						? new Material(e.Material.Type, e.Material.TextureScale,
-							e.Material.Albedo.GetRuntimeData(), e.Material.Emission.GetRuntimeData(),
-							e.Material.Roughness.GetRuntimeData(), e.Material.RefractiveIndex, e.Material.Density)
-						: default;
+					Entities = entityBuffer,
+					Triangles = triangleBuffer,
+					ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
 
-					addedMaterials[e.Material] = materialIndex;
-					materialBuffer[materialIndex++] = material;
-					materialPtr = (Material*) materialBuffer.GetUnsafePtr() + (materialIndex - 1);
-				}
+					TriangleIndex = triangleIndexRef,
+					EntityIndex = entityIndexRef,
 
-				RigidTransform rigidTransform = new RigidTransform(e.Rotation, e.Position);
-				switch (e.Type)
-				{
-					case EntityType.Sphere:
-						sphereBuffer[sphereIndex] = new Sphere(e.SphereData.Radius);
-						AddEntity(e, (Sphere*) sphereBuffer.GetUnsafePtr() + sphereIndex++, materialPtr, rigidTransform, EntityType.Sphere);
-						break;
+					// TODO: Face normals support
+					//FaceNormals = e.MeshData.FaceNormals,
 
-					case EntityType.Rect:
-						rectBuffer[rectIndex] = new Rect(e.RectData.Size);
-						AddEntity(e, (Rect*) rectBuffer.GetUnsafePtr() + rectIndex++, materialPtr, rigidTransform, EntityType.Rect);
-						break;
+					Material = (Material*) materialBuffer.GetUnsafeReadOnlyPtr() + (materialIndex - 1),
+					MeshDataArray = meshDataArray,
+					RigidTransform = rigidTransform,
+					Scale = meshTransform.lossyScale.magnitude
+				};
+				addMeshJob.Schedule().Complete();
 
-					case EntityType.Box:
-						boxBuffer[boxIndex] = new Box(e.BoxData.Size);
-						AddEntity(e, (Box*) boxBuffer.GetUnsafePtr() + boxIndex++, materialPtr, rigidTransform, EntityType.Box);
-						break;
-
-					case EntityType.Triangle:
-						triangleBuffer[triangleIndex] = new Triangle(e.TriangleData.A, e.TriangleData.B, e.TriangleData.C);
-						AddEntity(e, (Triangle*) triangleBuffer.GetUnsafePtr() + triangleIndex++, materialPtr, rigidTransform, EntityType.Triangle);
-						break;
-
-					case EntityType.Mesh:
-						using (Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(e.MeshData.Mesh))
-						using (var triangleIndexRef = new NativeReference<int>(triangleIndex, AllocatorManager.TempJob))
-						using (var entityIndexRef = new NativeReference<int>(entityIndex, AllocatorManager.TempJob))
-						{
-							var addMeshJob = new AddMeshRuntimeEntitiesJob
-							{
-								Entities = entityBuffer,
-								Triangles = triangleBuffer,
-								ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
-
-								TriangleIndex = triangleIndexRef,
-								EntityIndex = entityIndexRef,
-
-								FaceNormals = e.MeshData.FaceNormals,
-								Material = materialPtr,
-								MeshDataArray = meshDataArray,
-								RigidTransform = rigidTransform,
-								Scale = e.MeshData.Scale
-							};
-							addMeshJob.Schedule().Complete();
-
-							triangleIndex = triangleIndexRef.Value;
-							entityIndex = entityIndexRef.Value;
-						}
-						break;
-				}
+				triangleIndex = triangleIndexRef.Value;
+				entityIndex = entityIndexRef.Value;
 			}
 
 			Debug.Log($"Rebuilt entity buffer of {entityBuffer.Length} entities");
@@ -1291,168 +1228,155 @@ namespace Unity
 
 		void CollectActiveEntities()
 		{
-			int lastEntityCount = ActiveEntities.Count;
-
-			ActiveEntities.Clear();
-
-			if (!scene) return;
-
-			if (scene.Entities != null)
-				foreach (EntityData entity in scene.Entities)
-					if (entity.Enabled)
-						ActiveEntities.Add(entity);
-
-			if (scene.RandomEntityGroups != null)
-			{
-				var rng = new Random(scene.RandomSeed);
-				foreach (RandomEntityGroup group in scene.RandomEntityGroups)
-				{
-					MaterialData GetMaterial()
-					{
-						(float lambertian, float metal, float dielectric, float light) probabilities = (
-							group.LambertChance,
-							group.MetalChance,
-							group.DieletricChance,
-							group.LightChance);
-
-						float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric + probabilities.light;
-						probabilities.metal += probabilities.lambertian;
-						probabilities.dielectric += probabilities.metal;
-						probabilities.light += probabilities.dielectric;
-						probabilities.lambertian /= sum;
-						probabilities.metal /= sum;
-						probabilities.dielectric /= sum;
-						probabilities.light /= sum;
-
-						MaterialData material = null;
-						float randomValue = rng.NextFloat();
-						if (randomValue < probabilities.lambertian)
-						{
-							Color from = group.DiffuseAlbedo.colorKeys[0].color;
-							Color to = group.DiffuseAlbedo.colorKeys[1].color;
-							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-							if (group.DoubleSampleDiffuseAlbedo)
-								color *= rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-							material = MaterialData.Lambertian(TextureData.Constant(color), 1);
-						}
-						else if (randomValue < probabilities.metal)
-						{
-							Color from = group.MetalAlbedo.colorKeys[0].color;
-							Color to = group.MetalAlbedo.colorKeys[1].color;
-							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-							float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
-							material = MaterialData.Metal(TextureData.Constant(color), 1, TextureData.Constant(fuzz));
-						}
-						else if (randomValue < probabilities.dielectric)
-						{
-							material = MaterialData.Dielectric(
-								rng.NextFloat(group.RefractiveIndex.x, group.RefractiveIndex.y),
-								TextureData.Constant(1), TextureData.Constant(0));
-						}
-						else if (randomValue < probabilities.light)
-						{
-							Color from = group.Emissive.colorKeys[0].color;
-							Color to = group.Emissive.colorKeys[1].color;
-							float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
-							material = MaterialData.DiffuseLight(TextureData.Constant(color));
-						}
-
-						return material;
-					}
-
-					// TODO: fix overlap test to account for all entity types
-					bool AnyOverlap(float3 center, float radius) => ActiveEntities
-						.Where(x => x.Type == EntityType.Sphere)
-						.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
-						          distance(x.Position, center) < x.SphereData.Radius + radius + group.MinDistance);
-
-					EntityData GetEntity(float3 center, float3 radius)
-					{
-						bool moving = rng.NextFloat() < group.MovementChance;
-						quaternion rotation = quaternion.Euler(group.Rotation);
-						var entityData = new EntityData
-						{
-							Type = group.Type,
-							Position = rotate(rotation, center - (float3) group.Offset) + (float3) group.Offset,
-							Rotation = rotation,
-							Material = GetMaterial()
-						};
-						switch (group.Type)
-						{
-							case EntityType.Sphere: entityData.SphereData = new SphereData(radius.x); break;
-							case EntityType.Box: entityData.BoxData = new BoxData(radius); break;
-							case EntityType.Rect: entityData.RectData = new RectData(radius.xy); break;
-							case EntityType.Triangle: break; // TODO
-						}
-
-						if (moving)
-						{
-							float3 offset = rng.NextFloat3(
-								float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
-								float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
-
-							entityData.TimeRange = new Vector2(0, 1);
-							entityData.Moving = true;
-							entityData.DestinationOffset = offset;
-						}
-
-						return entityData;
-					}
-
-					switch (group.Distribution)
-					{
-						case RandomDistribution.DartThrowing:
-							for (int i = 0; i < group.TentativeCount; i++)
-							{
-								float3 center = rng.NextFloat3(
-									float3(-group.SpreadX / 2, -group.SpreadY / 2, -group.SpreadZ / 2),
-									float3(group.SpreadX / 2, group.SpreadY / 2, group.SpreadZ / 2));
-
-								center += (float3) group.Offset;
-
-								float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
-
-								if (group.OffsetByRadius)
-									center += radius;
-
-								if (!group.SkipOverlapTest && AnyOverlap(center, radius))
-									continue;
-
-								ActiveEntities.Add(GetEntity(center, radius));
-							}
-							break;
-
-						case RandomDistribution.JitteredGrid:
-							float3 ranges = float3(group.SpreadX, group.SpreadY, group.SpreadZ);
-							float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
-
-							// correct the range so that it produces the same result as the book
-							float3 correctedRangeEnd = (float3) group.Offset + ranges / 2;
-							float3 period = max(float3(group.PeriodX, group.PeriodY, group.PeriodZ), 1);
-							correctedRangeEnd += (1 - abs(sign(ranges))) * period / 2;
-
-							for (float i = group.Offset.x - ranges.x / 2; i < correctedRangeEnd.x; i += period.x)
-							for (float j = group.Offset.y - ranges.y / 2; j < correctedRangeEnd.y; j += period.y)
-							for (float k = group.Offset.z - ranges.z / 2; k < correctedRangeEnd.z; k += period.z)
-							{
-								float3 center = float3(i, j, k) + rng.NextFloat3(group.PositionVariation * cellSize);
-								float3 radius = rng.NextFloat(group.Radius.x, group.Radius.y) *
-								                float3(rng.NextFloat(group.ScaleVariationX.x, group.ScaleVariationX.y),
-									                rng.NextFloat(group.ScaleVariationY.x, group.ScaleVariationY.y),
-									                rng.NextFloat(group.ScaleVariationZ.x, group.ScaleVariationZ.y));
-
-								if (!group.SkipOverlapTest && AnyOverlap(center, radius.x))
-									continue;
-
-								ActiveEntities.Add(GetEntity(center, radius));
-							}
-							break;
-					}
-				}
-			}
-
-			if (lastEntityCount != ActiveEntities.Count)
-				Debug.Log($"Collected {ActiveEntities.Count} active entities");
+			// TODO: Random entity groups
+			// if (scene.RandomEntityGroups != null)
+			// {
+			// 	var rng = new Random(scene.RandomSeed);
+			// 	foreach (RandomEntityGroup group in scene.RandomEntityGroups)
+			// 	{
+			// 		MaterialData GetMaterial()
+			// 		{
+			// 			(float lambertian, float metal, float dielectric, float light) probabilities = (
+			// 				group.LambertChance,
+			// 				group.MetalChance,
+			// 				group.DieletricChance,
+			// 				group.LightChance);
+			//
+			// 			float sum = probabilities.lambertian + probabilities.metal + probabilities.dielectric + probabilities.light;
+			// 			probabilities.metal += probabilities.lambertian;
+			// 			probabilities.dielectric += probabilities.metal;
+			// 			probabilities.light += probabilities.dielectric;
+			// 			probabilities.lambertian /= sum;
+			// 			probabilities.metal /= sum;
+			// 			probabilities.dielectric /= sum;
+			// 			probabilities.light /= sum;
+			//
+			// 			MaterialData material = null;
+			// 			float randomValue = rng.NextFloat();
+			// 			if (randomValue < probabilities.lambertian)
+			// 			{
+			// 				Color from = group.DiffuseAlbedo.colorKeys[0].color;
+			// 				Color to = group.DiffuseAlbedo.colorKeys[1].color;
+			// 				float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+			// 				if (group.DoubleSampleDiffuseAlbedo)
+			// 					color *= rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+			// 				material = MaterialData.Lambertian(TextureData.Constant(color), 1);
+			// 			}
+			// 			else if (randomValue < probabilities.metal)
+			// 			{
+			// 				Color from = group.MetalAlbedo.colorKeys[0].color;
+			// 				Color to = group.MetalAlbedo.colorKeys[1].color;
+			// 				float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+			// 				float fuzz = rng.NextFloat(group.Fuzz.x, group.Fuzz.y);
+			// 				material = MaterialData.Metal(TextureData.Constant(color), 1, TextureData.Constant(fuzz));
+			// 			}
+			// 			else if (randomValue < probabilities.dielectric)
+			// 			{
+			// 				material = MaterialData.Dielectric(
+			// 					rng.NextFloat(group.RefractiveIndex.x, group.RefractiveIndex.y),
+			// 					TextureData.Constant(1), TextureData.Constant(0));
+			// 			}
+			// 			else if (randomValue < probabilities.light)
+			// 			{
+			// 				Color from = group.Emissive.colorKeys[0].color;
+			// 				Color to = group.Emissive.colorKeys[1].color;
+			// 				float3 color = rng.NextFloat3(from.ToFloat3(), to.ToFloat3());
+			// 				material = MaterialData.DiffuseLight(TextureData.Constant(color));
+			// 			}
+			//
+			// 			return material;
+			// 		}
+			//
+			// 		// TODO: fix overlap test to account for all entity types
+			// 		bool AnyOverlap(float3 center, float radius) => ActiveEntities
+			// 			.Where(x => x.Type == EntityType.Sphere)
+			// 			.Any(x => !x.SphereData.ExcludeFromOverlapTest &&
+			// 			          distance(x.Position, center) < x.SphereData.Radius + radius + group.MinDistance);
+			//
+			// 		EntityData GetEntity(float3 center, float3 radius)
+			// 		{
+			// 			bool moving = rng.NextFloat() < group.MovementChance;
+			// 			quaternion rotation = quaternion.Euler(group.Rotation);
+			// 			var entityData = new EntityData
+			// 			{
+			// 				Type = group.Type,
+			// 				Position = rotate(rotation, center - (float3) group.Offset) + (float3) group.Offset,
+			// 				Rotation = rotation,
+			// 				Material = GetMaterial()
+			// 			};
+			// 			switch (group.Type)
+			// 			{
+			// 				case EntityType.Sphere: entityData.SphereData = new SphereData(radius.x); break;
+			// 				case EntityType.Box: entityData.BoxData = new BoxData(radius); break;
+			// 				case EntityType.Rect: entityData.RectData = new RectData(radius.xy); break;
+			// 				case EntityType.Triangle: break; // TODO
+			// 			}
+			//
+			// 			if (moving)
+			// 			{
+			// 				float3 offset = rng.NextFloat3(
+			// 					float3(group.MovementXOffset.x, group.MovementYOffset.x, group.MovementZOffset.x),
+			// 					float3(group.MovementXOffset.y, group.MovementYOffset.y, group.MovementZOffset.y));
+			//
+			// 				entityData.TimeRange = new Vector2(0, 1);
+			// 				entityData.Moving = true;
+			// 				entityData.DestinationOffset = offset;
+			// 			}
+			//
+			// 			return entityData;
+			// 		}
+			//
+			// 		switch (group.Distribution)
+			// 		{
+			// 			case RandomDistribution.DartThrowing:
+			// 				for (int i = 0; i < group.TentativeCount; i++)
+			// 				{
+			// 					float3 center = rng.NextFloat3(
+			// 						float3(-group.SpreadX / 2, -group.SpreadY / 2, -group.SpreadZ / 2),
+			// 						float3(group.SpreadX / 2, group.SpreadY / 2, group.SpreadZ / 2));
+			//
+			// 					center += (float3) group.Offset;
+			//
+			// 					float radius = rng.NextFloat(group.Radius.x, group.Radius.y);
+			//
+			// 					if (group.OffsetByRadius)
+			// 						center += radius;
+			//
+			// 					if (!group.SkipOverlapTest && AnyOverlap(center, radius))
+			// 						continue;
+			//
+			// 					ActiveEntities.Add(GetEntity(center, radius));
+			// 				}
+			// 				break;
+			//
+			// 			case RandomDistribution.JitteredGrid:
+			// 				float3 ranges = float3(group.SpreadX, group.SpreadY, group.SpreadZ);
+			// 				float3 cellSize = float3(group.PeriodX, group.PeriodY, group.PeriodZ) * sign(ranges);
+			//
+			// 				// correct the range so that it produces the same result as the book
+			// 				float3 correctedRangeEnd = (float3) group.Offset + ranges / 2;
+			// 				float3 period = max(float3(group.PeriodX, group.PeriodY, group.PeriodZ), 1);
+			// 				correctedRangeEnd += (1 - abs(sign(ranges))) * period / 2;
+			//
+			// 				for (float i = group.Offset.x - ranges.x / 2; i < correctedRangeEnd.x; i += period.x)
+			// 				for (float j = group.Offset.y - ranges.y / 2; j < correctedRangeEnd.y; j += period.y)
+			// 				for (float k = group.Offset.z - ranges.z / 2; k < correctedRangeEnd.z; k += period.z)
+			// 				{
+			// 					float3 center = float3(i, j, k) + rng.NextFloat3(group.PositionVariation * cellSize);
+			// 					float3 radius = rng.NextFloat(group.Radius.x, group.Radius.y) *
+			// 					                float3(rng.NextFloat(group.ScaleVariationX.x, group.ScaleVariationX.y),
+			// 						                rng.NextFloat(group.ScaleVariationY.x, group.ScaleVariationY.y),
+			// 						                rng.NextFloat(group.ScaleVariationZ.x, group.ScaleVariationZ.y));
+			//
+			// 					if (!group.SkipOverlapTest && AnyOverlap(center, radius.x))
+			// 						continue;
+			//
+			// 					ActiveEntities.Add(GetEntity(center, radius));
+			// 				}
+			// 				break;
+			// 		}
+			// 	}
+			// }
 		}
 	}
 }

@@ -17,7 +17,7 @@ namespace Util
 		public static void GetOrthonormalBasis(float3 normal, out float3 tangent, out float3 bitangent)
 		{
 			// Corrected Frisvad method
-			// from listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+			// From listing 3 in : https://graphics.pixar.com/library/OrthonormalB/paper.pdf
 			float s = normal.z >= 0 ? 1.0f : -1.0f;
 			float a = -1 / (s + normal.z);
 			float b = normal.x * normal.y * a;
@@ -95,12 +95,6 @@ namespace Util
 		public static void SafeDispose<T>(this ref NativeList<T> list) where T : unmanaged
 		{
 			if (list.IsCreated) list.Dispose();
-		}
-
-		public static unsafe void AddNoResize<T>(this NativeList<T> list, T element) where T : unmanaged
-		{
-			((UnsafeList*) NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref list))->AddRangeNoResize<T>(
-				&element, 1);
 		}
 
 		public static T PeekOrDefault<T>(this Queue<T> queue)
