@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2236193653819141411
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7080320701072629987}
+  - component: {fileID: 4640589406651769888}
+  m_Layer: 0
+  m_Name: Raytracer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7080320701072629987
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2236193653819141411}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4640589406651769888
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2236193653819141411}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d6c0cee0ccad644786b59e2bb9c00a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetCamera: {fileID: 0}
+  blueNoise:
+    NoiseTextures:
+    - {fileID: 2800000, guid: 988f9d5b639439b4cbe6e83118df1bd3, type: 3}
+    - {fileID: 2800000, guid: 6395de0f2fdc63243bcef65ce7b270ed, type: 3}
+    - {fileID: 2800000, guid: 9b352422dc11bac4c90ec15e802b777c, type: 3}
+    - {fileID: 2800000, guid: 8f0868f378c369d47996156bd58f4836, type: 3}
+    - {fileID: 2800000, guid: 1239dc9e51c64f04c86e84a1690084c5, type: 3}
+    - {fileID: 2800000, guid: 260ca2b61a6dbaa4f88332ec008c2897, type: 3}
+    - {fileID: 2800000, guid: 0b7589618c08aa74d881b177cfaae3aa, type: 3}
+    - {fileID: 2800000, guid: 6c9f7b3ed06d98a4f9837e65e97aa804, type: 3}
+  interlacing: 2
+  maxBvhDepth: 16
+  resolutionScaling: 0.5
+  samplesPerPixel: 1000
+  samplesPerBatch: 10
+  traceDepth: 35
+  importanceSampling: 0
+  denoiseMode: 0
+  noiseColor: 0
+  subPixelJitter: 1
+  previewAfterBatch: 1
+  stopWhenCompleted: 1
+  scene: {fileID: 0}
+  viewRangeShader: {fileID: 4800000, guid: ca41bab96b2791e4a8cefb20b49bae59, type: 3}
+  AccumulatedSamples: 0
+  MillionRaysPerSecond: 0
+  AvgMRaysPerSecond: 0
+  LastBatchDuration: 0
+  LastBatchRayCount: 0
+  LastTraceDuration: 0
+  BufferMinValue: 0
+  BufferMaxValue: 0
+  debugFailedSamples: 0
+  previewBvh: 0
+  bufferView: 0
+  previewMaterials: []
