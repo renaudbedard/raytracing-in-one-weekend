@@ -1,11 +1,11 @@
 {
   "dependencies": {
-    "com.unity.burst": "1.6.0-pre.4",
+    "com.unity.burst": "1.6.0",
     "com.unity.collections": "1.0.0-pre.6",
     "com.unity.ide.rider": "3.0.7",
-    "com.unity.inputsystem": "1.0.2",
+    "com.unity.inputsystem": "1.1.1",
     "com.unity.mathematics": "1.2.4",
-    "com.unity.recorder": "2.5.5",
+    "com.unity.recorder": "3.0.1",
     "com.unity.test-framework": "1.1.29",
     "com.unity.ugui": "1.0.0",
     "com.unity.modules.ai": "1.0.0",

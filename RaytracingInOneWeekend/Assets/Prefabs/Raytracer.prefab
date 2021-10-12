@@ -27,6 +27,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1279825510624294608}
   m_Father: {fileID: 0}
@@ -55,6 +56,7 @@ MonoBehaviour:
     - {fileID: 2800000, guid: 260ca2b61a6dbaa4f88332ec008c2897, type: 3}
     - {fileID: 2800000, guid: 0b7589618c08aa74d881b177cfaae3aa, type: 3}
     - {fileID: 2800000, guid: 6c9f7b3ed06d98a4f9837e65e97aa804, type: 3}
+  gradientSkyShader: {fileID: 4800000, guid: 1b1032babd6d64921a50506aa07cf3b2, type: 3}
   interlacing: 2
   maxBvhDepth: 16
   resolutionScaling: 0.5
@@ -67,7 +69,6 @@ MonoBehaviour:
   subPixelJitter: 1
   previewAfterBatch: 1
   stopWhenCompleted: 1
-  scene: {fileID: 0}
   viewRangeShader: {fileID: 4800000, guid: ca41bab96b2791e4a8cefb20b49bae59, type: 3}
   AccumulatedSamples: 0
   MillionRaysPerSecond: 0
@@ -80,7 +81,6 @@ MonoBehaviour:
   debugFailedSamples: 0
   previewBvh: 0
   bufferView: 0
-  previewMaterials: []
 --- !u!1 &7156214339460175477
 GameObject:
   m_ObjectHideFlags: 0
@@ -109,6 +109,7 @@ Transform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7080320701072629987}
   m_RootOrder: 0

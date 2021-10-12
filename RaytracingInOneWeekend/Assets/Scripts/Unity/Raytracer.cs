@@ -22,8 +22,6 @@ using Debug = UnityEngine.Debug;
 using Environment = Runtime.Environment;
 using float3 = Unity.Mathematics.float3;
 using Material = Runtime.Material;
-using quaternion = Unity.Mathematics.quaternion;
-using Random = Unity.Mathematics.Random;
 using Ray = Runtime.Ray;
 using Rect = Runtime.EntityTypes.Rect;
 using RigidTransform = Unity.Mathematics.RigidTransform;
@@ -58,10 +56,9 @@ namespace Unity
 		[SerializeField] Shader gradientSkyShader;
 
 		[Title("Settings")]
-		[SerializeField] [Range(1, 100)]
-		int interlacing = 2;
+		[SerializeField] [Range(1, 100)] int interlacing = 2;
 
-		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [OnValueChanged("@scene.MarkDirty()")] [UsedImplicitly] int maxBvhDepth = 16;
+		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [UsedImplicitly] int maxBvhDepth = 16;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
@@ -77,7 +74,8 @@ namespace Unity
 		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
 #endif
 
-		[Title("Debug")] [SerializeField] [DisableInPlayMode]
+		[Title("Debug")]
+		[SerializeField] [DisableInPlayMode]
 		Shader viewRangeShader = null;
 
 		[OdinReadOnly] public float AccumulatedSamples;
@@ -439,9 +437,6 @@ namespace Unity
 
 		void Update()
 		{
-#if UNITY_EDITOR
-			WatchForWorldChanges();
-#endif
 			uint2 currentSize = uint2(
 				(uint) ceil(targetCamera.pixelWidth * resolutionScaling),
 				(uint) ceil(targetCamera.pixelHeight * resolutionScaling));
@@ -1053,7 +1048,7 @@ namespace Unity
 
 				void PrepareTexture<T>(Texture2D texture, out NativeArray<T> buffer) where T : struct
 				{
-					texture.Resize(width, height);
+					texture.Reinitialize(width, height);
 					texture.filterMode = resolutionScaling > 1 ? FilterMode.Bilinear : FilterMode.Point;
 					buffer = texture.GetRawTextureData<T>();
 				}
