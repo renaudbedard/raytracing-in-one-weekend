@@ -51,7 +51,6 @@ namespace Unity
 	partial class Raytracer : MonoBehaviour
 	{
 		[Title("References")]
-		[SerializeField] Camera targetCamera;
 		[SerializeField] BlueNoiseData blueNoise;
 		[SerializeField] Shader gradientSkyShader;
 
@@ -92,6 +91,8 @@ namespace Unity
 		[UsedImplicitly] [ShowInInspector] public float CombineJobs => scheduledCombineJobs.Count;
 		[UsedImplicitly] [ShowInInspector] public float DenoiseJobs => scheduledDenoiseJobs.Count;
 		[UsedImplicitly] [ShowInInspector] public float FinalizeJobs => scheduledFinalizeJobs.Count;
+
+		Camera TargetCamera => Camera.main;
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
@@ -267,7 +268,7 @@ namespace Unity
 
 		void Start()
 		{
-			targetCamera.RemoveAllCommandBuffers();
+			TargetCamera.RemoveAllCommandBuffers();
 
 			RebuildWorld();
 			InitDenoisers();
@@ -438,11 +439,11 @@ namespace Unity
 		void Update()
 		{
 			uint2 currentSize = uint2(
-				(uint) ceil(targetCamera.pixelWidth * resolutionScaling),
-				(uint) ceil(targetCamera.pixelHeight * resolutionScaling));
+				(uint) ceil(TargetCamera.pixelWidth * resolutionScaling),
+				(uint) ceil(TargetCamera.pixelHeight * resolutionScaling));
 
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
-			bool cameraDirty = targetCamera.transform.hasChanged;
+			bool cameraDirty = TargetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
 			bool samplingModeChanged = importanceSampling != lastSamplingMode;
 			bool samplesPerPixelDecreased =
@@ -560,15 +561,15 @@ namespace Unity
 		{
 			// Debug.Log($"Scheduling accumulate (firstBatch = {firstBatch})");
 
-			Transform cameraTransform = targetCamera.transform;
+			Transform cameraTransform = TargetCamera.transform;
 			Vector3 origin = cameraTransform.localPosition;
 			Vector3 lookAt = origin + cameraTransform.forward;
 
 			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
 
-			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, targetCamera.fieldOfView,
-				bufferSize.x / bufferSize.y, targetCamera.GetComponent<CameraData>().ApertureSize, focusDistance);
+			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, TargetCamera.fieldOfView,
+				bufferSize.x / bufferSize.y, TargetCamera.GetComponent<CameraData>().ApertureSize, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -924,7 +925,7 @@ namespace Unity
 		void CleanCamera()
 		{
 #if UNITY_EDITOR
-			targetCamera.transform.hasChanged = false;
+			TargetCamera.transform.hasChanged = false;
 #endif
 		}
 
@@ -1010,15 +1011,15 @@ namespace Unity
 						break;
 				}
 
-				targetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
+				TargetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
 				commandBufferHooked = true;
 			}
 		}
 
 		void EnsureBuffersBuilt()
 		{
-			int width = (int) ceil(targetCamera.pixelWidth * resolutionScaling);
-			int height = (int) ceil(targetCamera.pixelHeight * resolutionScaling);
+			int width = (int) ceil(TargetCamera.pixelWidth * resolutionScaling);
+			int height = (int) ceil(TargetCamera.pixelHeight * resolutionScaling);
 
 			float2 lastBufferSize = bufferSize;
 			bufferSize = float2(width, height);
@@ -1042,7 +1043,7 @@ namespace Unity
 			{
 				if (commandBufferHooked)
 				{
-					targetCamera.RemoveCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
+					TargetCamera.RemoveCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
 					commandBufferHooked = false;
 				}
 

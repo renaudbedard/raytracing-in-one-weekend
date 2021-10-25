@@ -3,8 +3,7 @@
   <component name="ContentModelUserStore">
     <attachedFolders />
     <explicitIncludes>
-      <Path>Assets</Path>
-      <Path>Library/PackageCache/com.unity.burst@1.6.0</Path>
+      <Path>Library/PackageCache/com.unity.burst@1.6.1</Path>
       <Path>Library/PackageCache/com.unity.collections@1.0.0-pre.6</Path>
       <Path>Library/PackageCache/com.unity.ext.nunit@1.0.6</Path>
       <Path>Library/PackageCache/com.unity.ide.rider@3.0.7</Path>
@@ -13,7 +12,6 @@
       <Path>Library/PackageCache/com.unity.recorder@3.0.1</Path>
       <Path>Library/PackageCache/com.unity.test-framework@1.1.29</Path>
       <Path>Library/PackageCache/com.unity.timeline@1.6.2</Path>
-      <Path>Packages</Path>
       <Path>ProjectSettings</Path>
     </explicitIncludes>
     <explicitExcludes>
