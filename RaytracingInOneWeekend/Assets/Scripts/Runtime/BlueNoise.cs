@@ -19,8 +19,7 @@ namespace Runtime
 			this.seed = seed;
 		}
 
-		public PerPixelBlueNoise GetPerPixelData(uint2 coordinates) =>
-			new PerPixelBlueNoise(seed, coordinates, NoiseData, RowStride);
+		public PerPixelBlueNoise GetPerPixelData(uint2 coordinates) => new(seed, coordinates, NoiseData, RowStride);
 	}
 
 	unsafe struct PerPixelBlueNoise

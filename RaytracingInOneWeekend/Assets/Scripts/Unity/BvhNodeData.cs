@@ -99,18 +99,18 @@ namespace Unity
 		public NativeList<Entity> BvhEntities;
 		public NativeList<BvhNodeData> BvhNodes;
 
-		public unsafe void Execute()
+		public void Execute()
 		{
 			BvhNodes.AddNoResize(default);
-			((BvhNodeData*) BvhNodes.GetUnsafePtr())[0] = new BvhNodeData(Entities, BvhEntities, BvhNodes, MaxDepth);
+			BvhNodes[0] = new BvhNodeData(Entities, BvhEntities, BvhNodes, MaxDepth);
 		}
 	}
 
 	readonly unsafe struct BvhNodeData
 	{
-		static readonly ProfilerMarker encloseEntireBoundsMarker = new ProfilerMarker("Enclose entire bounds");
-		static readonly ProfilerMarker sortEntitiesMarker = new ProfilerMarker("Sort entities");
-		static readonly ProfilerMarker determinePartitionSizeMarker = new ProfilerMarker("Determine partition size");
+		static readonly ProfilerMarker encloseEntireBoundsMarker = new("Enclose entire bounds");
+		static readonly ProfilerMarker sortEntitiesMarker = new("Sort entities");
+		static readonly ProfilerMarker determinePartitionSizeMarker = new("Determine partition size");
 
 		public readonly AxisAlignedBoundingBox Bounds;
 		public readonly Entity* EntitiesStart;
@@ -152,16 +152,21 @@ namespace Unity
 
 			int biggestAxis = (int) biggestPartition;
 
-			if (depth == maxDepth || entities.Length == 1)
+			if (depth == maxDepth || entities.Length <= 1)
 			{
-				EntitiesStart = (Entity*) bvhEntities.GetUnsafePtr() + bvhEntities.Length;
+				EntitiesStart =  bvhEntities.GetUnsafeList()->Ptr + bvhEntities.Length;
 				// TODO: Sorting desc by entity size would make sense here
 				for (int i = 0; i < entities.Length; i++)
 					bvhEntities.AddNoResize(*entities[i].Entity);
 
-				Bounds = entities[0].Bounds;
-				for (int i = 1; i < entities.Length; i++)
-					Bounds = AxisAlignedBoundingBox.Enclose(Bounds, entities[i].Bounds);
+				if (entities.Length > 0)
+				{
+					Bounds = entities[0].Bounds;
+					for (int i = 1; i < entities.Length; i++)
+						Bounds = AxisAlignedBoundingBox.Enclose(Bounds, entities[i].Bounds);
+				}
+				else
+					Bounds = default;
 
 				EntityCount = entities.Length;
 				Left = Right = null;
@@ -212,6 +217,7 @@ namespace Unity
 			get
 			{
 				if (IsLeaf) return 1;
+				if (Left == null && Right == null) return 1;
 				return Left->ChildCount + Right->ChildCount + 1;
 			}
 		}

@@ -114,13 +114,14 @@ namespace Unity
 		UnityEngine.Material viewRangeMaterial;
 		NativeArray<Diagnostics> diagnosticsBuffer;
 
-		NativeArray<Sphere> sphereBuffer;
-		NativeArray<Rect> rectBuffer;
-		NativeArray<Box> boxBuffer;
-		NativeArray<Triangle> triangleBuffer;
-		NativeArray<Entity> entityBuffer;
-		UnsafePtrList<Entity> importanceSamplingEntityPointers;
-		NativeArray<Material> materialBuffer;
+		// NativeArray<Sphere> sphereBuffer;
+		// NativeArray<Rect> rectBuffer;
+		// NativeArray<Box> boxBuffer;
+		//UnsafePtrList<Entity> importanceSamplingEntityPointers;
+
+		NativeList<Triangle> triangleBuffer;
+		NativeList<Entity> entityBuffer;
+		NativeList<Material> materialBuffer;
 #if PATH_DEBUGGING
 		NativeArray<DebugPath> debugPaths;
 #endif
@@ -129,19 +130,20 @@ namespace Unity
 		NativeArray<BvhNode> bvhNodeBuffer;
 		NativeList<Entity> bvhEntities;
 
-		BvhNodeData? BvhRootData => bvhNodeDataBuffer.IsCreated ? (BvhNodeData?) bvhNodeDataBuffer[0] : null;
+		BvhNodeData? BvhRootData => bvhNodeDataBuffer.IsCreated ? bvhNodeDataBuffer[0] : null;
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 
-		private UnityEngine.Material SkyboxMaterial => RenderSettings.skybox ?? FindObjectOfType<Skybox>()?.material;
+		UnityEngine.Material SkyboxMaterial =>
+			RenderSettings.skybox ? RenderSettings.skybox : FindObjectOfType<Skybox>()?.material;
 
-		private SkyType SkyType =>
+		SkyType SkyType =>
 			SkyboxMaterial?.mainTexture is UnityEngine.Cubemap ? SkyType.CubeMap :
 			SkyboxMaterial?.shader == gradientSkyShader ? SkyType.GradientSky :
 			SkyType.None;
 
 		[UsedImplicitly] bool BvhEnabled => true;
 
-		readonly PerlinNoiseData perlinNoise = new PerlinNoiseData();
+		readonly PerlinNoiseData perlinNoise = new();
 
 		OidnDevice oidnDevice;
 		OidnFilter oidnFilter;
@@ -382,10 +384,10 @@ namespace Unity
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Handle.Complete();
 
 			entityBuffer.SafeDispose();
-			importanceSamplingEntityPointers.Dispose();
-			sphereBuffer.SafeDispose();
-			rectBuffer.SafeDispose();
-			boxBuffer.SafeDispose();
+			// importanceSamplingEntityPointers.Dispose();
+			// sphereBuffer.SafeDispose();
+			// rectBuffer.SafeDispose();
+			// boxBuffer.SafeDispose();
 			triangleBuffer.SafeDispose();
 			materialBuffer.SafeDispose();
 
@@ -657,10 +659,11 @@ namespace Unity
 					OutputDiagnostics = diagnosticsBuffer,
 					ImportanceSampler = new ImportanceSampler
 					{
-						TargetEntityPointers = importanceSamplingEntityPointers,
-						Mode = importanceSamplingEntityPointers.Length == 0
-							? ImportanceSamplingMode.None
-							: importanceSampling
+						// TargetEntityPointers = importanceSamplingEntityPointers,
+						// Mode = importanceSamplingEntityPointers.Length == 0
+						// 	? ImportanceSamplingMode.None
+						// 	: importanceSampling
+						Mode = ImportanceSamplingMode.None
 					},
 #if PATH_DEBUGGING
 					DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
@@ -1096,8 +1099,8 @@ namespace Unity
 		}
 #endif
 
-		static readonly ProfilerMarker rebuildEntityBuffersMarker = new ProfilerMarker("Rebuild Entity Buffers");
-		static readonly ProfilerMarker rebuildBvhMarker = new ProfilerMarker("Rebuild BVH");
+		static readonly ProfilerMarker rebuildEntityBuffersMarker = new("Rebuild Entity Buffers");
+		static readonly ProfilerMarker rebuildBvhMarker = new("Rebuild BVH");
 
 		void RebuildWorld()
 		{
@@ -1125,8 +1128,18 @@ namespace Unity
 			// TODO: Importance sampling
 			// TODO: Movement support
 
-			// TODO: These should all be lists
-			int triangleIndex = 0, entityIndex = 0, materialIndex = 0;
+			int entityCount = FindObjectsOfType<MeshRenderer>().Count(x => x.enabled);
+			int triangleCount = FindObjectsOfType<MeshFilter>().Sum(x => x.sharedMesh.triangles.Length);
+
+			// Preallocate lists
+			materialBuffer.EnsureCapacity(entityCount);
+			entityBuffer.EnsureCapacity(triangleCount);
+			triangleBuffer.EnsureCapacity(triangleCount);
+
+			// Clear lists
+			materialBuffer.Clear();
+			entityBuffer.Clear();
+			triangleBuffer.Clear();
 
 			// Collect mesh renderers
 			foreach (var meshRenderer in FindObjectsOfType<MeshRenderer>().Where(x => x.enabled))
@@ -1134,7 +1147,7 @@ namespace Unity
 				// TODO: Only add new materials
 				// TODO: Material properties
 				var material = new Material();
-				materialBuffer[materialIndex++] = material;
+				materialBuffer.AddNoResize(material);
 
 				Transform meshTransform = meshRenderer.transform;
 				var rigidTransform = new RigidTransform(meshTransform.rotation, meshTransform.position);
@@ -1142,30 +1155,22 @@ namespace Unity
 				var meshFilter = meshRenderer.gameObject.GetComponent<MeshFilter>();
 
 				using Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(meshFilter.mesh);
-				using var triangleIndexRef = new NativeReference<int>(triangleIndex, AllocatorManager.TempJob);
-				using var entityIndexRef = new NativeReference<int>(entityIndex, AllocatorManager.TempJob);
 
 				var addMeshJob = new AddMeshRuntimeEntitiesJob
 				{
 					Entities = entityBuffer,
 					Triangles = triangleBuffer,
-					ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
-
-					TriangleIndex = triangleIndexRef,
-					EntityIndex = entityIndexRef,
+					//ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
 
 					// TODO: Face normals support
 					//FaceNormals = e.MeshData.FaceNormals,
 
-					Material = (Material*) materialBuffer.GetUnsafeReadOnlyPtr() + (materialIndex - 1),
+					Material = materialBuffer.GetUnsafeList()->Ptr + (materialBuffer.Length - 1),
 					MeshDataArray = meshDataArray,
 					RigidTransform = rigidTransform,
 					Scale = meshTransform.lossyScale.magnitude
 				};
 				addMeshJob.Schedule().Complete();
-
-				triangleIndex = triangleIndexRef.Value;
-				entityIndex = entityIndexRef.Value;
 			}
 
 			Debug.Log($"Rebuilt entity buffer of {entityBuffer.Length} entities");
@@ -1176,7 +1181,7 @@ namespace Unity
 			bvhEntities.EnsureCapacity(entityBuffer.Length);
 			bvhEntities.Clear();
 
-			bvhNodeDataBuffer.EnsureCapacity(entityBuffer.Length * 2);
+			bvhNodeDataBuffer.EnsureCapacity(max(entityBuffer.Length * 2, 1));
 			bvhNodeDataBuffer.Clear();
 
 			int nodeCount = 0;

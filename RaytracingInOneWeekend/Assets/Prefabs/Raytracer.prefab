@@ -55,12 +55,12 @@ MonoBehaviour:
     - {fileID: 2800000, guid: 0b7589618c08aa74d881b177cfaae3aa, type: 3}
     - {fileID: 2800000, guid: 6c9f7b3ed06d98a4f9837e65e97aa804, type: 3}
   gradientSkyShader: {fileID: 4800000, guid: 1b1032babd6d64921a50506aa07cf3b2, type: 3}
-  interlacing: 2
-  maxBvhDepth: 16
-  resolutionScaling: 0.5
+  interlacing: 1
+  maxBvhDepth: 32
+  resolutionScaling: 1
   samplesPerPixel: 1000
-  samplesPerBatch: 10
-  traceDepth: 35
+  samplesPerBatch: 1
+  traceDepth: 32
   importanceSampling: 0
   denoiseMode: 0
   noiseColor: 0
@@ -76,6 +76,6 @@ MonoBehaviour:
   LastTraceDuration: 0
   BufferMinValue: 0
   BufferMaxValue: 0
-  debugFailedSamples: 0
+  debugFailedSamples: 1
   previewBvh: 0
   bufferView: 0

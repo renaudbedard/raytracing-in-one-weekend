@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 1905500816723645303}
   - component: {fileID: 8108254603881432432}
   - component: {fileID: 1971519180537257923}
+  - component: {fileID: 7590431677327032638}
   m_Layer: 0
   m_Name: Raytracing Camera
   m_TagString: MainCamera
@@ -90,3 +91,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   camera: {fileID: 8108254603881432432}
   movementSpeed: 1
+--- !u!114 &7590431677327032638
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7565083540559066066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac579aeb985247388c5bca2fa3aec0c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ApertureSize: 0.1

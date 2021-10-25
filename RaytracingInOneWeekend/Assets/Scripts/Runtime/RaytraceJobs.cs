@@ -48,11 +48,9 @@ namespace Runtime
 		[ReadOnly] public Mesh.MeshDataArray MeshDataArray;
 		[ReadOnly] [NativeDisableUnsafePtrRestriction] public Material* Material;
 
-		[WriteOnly] public NativeArray<Triangle> Triangles;
-		[WriteOnly] public NativeArray<Entity> Entities;
-		[WriteOnly] public UnsafePtrList<Entity> ImportanceSampledEntityPointers;
-
-		public NativeReference<int> TriangleIndex, EntityIndex;
+		public NativeList<Triangle> Triangles;
+		public NativeList<Entity> Entities;
+		//[WriteOnly] public UnsafePtrList<Entity> ImportanceSampledEntityPointers;
 
 		public bool FaceNormals, Moving;
 		public RigidTransform RigidTransform;
@@ -62,6 +60,9 @@ namespace Runtime
 
 		public void Execute()
 		{
+			float3* worldSpaceVertices = stackalloc float3[3];
+			float3* worldSpaceNormals = stackalloc float3[3];
+
 			for (int meshIndex = 0; meshIndex < MeshDataArray.Length; meshIndex++)
 			{
 				Mesh.MeshData meshData = MeshDataArray[meshIndex];
@@ -82,8 +83,6 @@ namespace Runtime
 					int3 triangleIndices = int3(indices[i], indices[i + 1], indices[i + 2]);
 
 					// Bake transform
-					float3* worldSpaceVertices = stackalloc float3[3];
-					float3* worldSpaceNormals = stackalloc float3[3];
 					for (int j = 0; j < 3; j++)
 					{
 						worldSpaceVertices[j] = transform(RigidTransform, vertices[triangleIndices[j]]) * Scale;
@@ -91,22 +90,22 @@ namespace Runtime
 					}
 
 					if (FaceNormals)
-						Triangles[TriangleIndex.Value] = new Triangle(worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2]);
+						Triangles.AddNoResize(new Triangle(worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2]));
 					else
-						Triangles[TriangleIndex.Value] = new Triangle(
+						Triangles.AddNoResize(new Triangle(
 							worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2],
-							worldSpaceNormals[0], worldSpaceNormals[1], worldSpaceNormals[2]);
+							worldSpaceNormals[0], worldSpaceNormals[1], worldSpaceNormals[2]));
 
-					var contentPointer = (Triangle*) Triangles.GetUnsafePtr() + TriangleIndex.Value++;
+					var contentPointer = Triangles.GetUnsafeList()->Ptr + (Triangles.Length - 1);
 
 					Entity entity = Moving
 						? new Entity(EntityType.Triangle, contentPointer, default, Material, true, DestinationOffset, TimeRange)
 						: new Entity(EntityType.Triangle, contentPointer, default, Material);
 
-					Entities[EntityIndex.Value++] = entity;
+					Entities.AddNoResize(entity);
 
-					if (Material->Type == MaterialType.DiffuseLight)
-						ImportanceSampledEntityPointers.AddNoResize((Entity*) Entities.GetUnsafePtr() + (EntityIndex.Value - 1));
+					// if (Material->Type == MaterialType.DiffuseLight)
+					//	ImportanceSampledEntityPointers.AddNoResize((Entity*) Entities.GetUnsafePtr() + (EntityIndex.Value - 1));
 				}
 
 				if (!FaceNormals)
@@ -132,8 +131,8 @@ namespace Runtime
 
 			if (!nodeData->IsLeaf)
 			{
-				leftNode = WalkBvh(nodeData->Left);
-				rightNode = WalkBvh(nodeData->Right);
+				if (nodeData->Left != null) leftNode = WalkBvh(nodeData->Left);
+				if (nodeData->Right != null) rightNode = WalkBvh(nodeData->Right);
 			}
 
 			BvhNodeBuffer[nodeIndex] = new BvhNode(nodeData->Bounds, nodeData->EntitiesStart, nodeData->EntityCount,
@@ -144,7 +143,7 @@ namespace Runtime
 		public unsafe void Execute()
 		{
 			nodeIndex = NodeCount - 1;
-			WalkBvh((BvhNodeData*) BvhNodeDataBuffer.GetUnsafeReadOnlyPtr());
+			WalkBvh(BvhNodeDataBuffer.GetUnsafeList()->Ptr);
 		}
 	}
 
@@ -245,7 +244,7 @@ namespace Runtime
 
 			for (int s = 0; s < SampleCount; s++)
 			{
-				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? blueNoise.NextFloat2() : 0.5f)) / Size;
+				float2 normalizedCoordinates = (coordinates + (SubPixelJitter ? rng.NextFloat2() : 0.5f)) / Size;
 				Ray eyeRay = View.GetRay(normalizedCoordinates, ref rng);
 
 				if (Sample(eyeRay, ref rng, emissionStack, attenuationStack, ref nodeTraversalStack, ref hitCandidateStack, ref hitRecordList,

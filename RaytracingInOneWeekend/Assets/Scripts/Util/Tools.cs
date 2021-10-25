@@ -45,9 +45,7 @@ namespace Util
 
 		public static void Swap<T>(ref T lhs, ref T rhs) where T : struct
 		{
-			T temp = lhs;
-			lhs = rhs;
-			rhs = temp;
+			(lhs, rhs) = (rhs, lhs);
 		}
 
 		public static bool EnsureCapacity<T>(this ref NativeArray<T> array, int size) where T : struct
