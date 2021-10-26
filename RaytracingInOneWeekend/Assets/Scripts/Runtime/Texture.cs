@@ -32,8 +32,8 @@ namespace Runtime
 		float NoiseFrequency => Parameter;
 		float ScalarValue => Parameter;
 
-		public Texture(TextureType type, float3 mainColor, float3 secondaryColor, float parameter, byte* pImage,
-			int imageWidth, int imageHeight)
+		public Texture(TextureType type, float3 mainColor,
+			float3 secondaryColor = default, float parameter = default, byte* pImage = default, int imageWidth = default, int imageHeight = default)
 		{
 			Type = type;
 			MainColor = mainColor;

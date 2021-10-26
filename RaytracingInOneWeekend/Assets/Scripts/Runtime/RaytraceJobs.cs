@@ -685,7 +685,7 @@ namespace Runtime
 		}
 
 		[BurstDiscard]
-		[Conditional("TRACE")]
+		[Conditional("TRACE_LOGGING")]
 		void Trace(string text)
 		{
 			Debug.Log(text);

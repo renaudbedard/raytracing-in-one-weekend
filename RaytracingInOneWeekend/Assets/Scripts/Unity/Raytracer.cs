@@ -1151,8 +1151,27 @@ namespace Unity
 			foreach (var meshRenderer in FindObjectsOfType<MeshRenderer>().Where(x => x.enabled))
 			{
 				// TODO: Only add new materials
-				// TODO: Material properties
-				var material = new Material();
+				// TODO: Roughness map
+
+				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterial;
+
+				float metallic = unityMaterial.GetFloat("_Metallic");
+				float glossiness = unityMaterial.GetFloat("_Glossiness");
+				Color albedo = unityMaterial.GetColor("_Color");
+				Texture2D albedoMap = unityMaterial.GetTexture("_MainTex") as Texture2D;
+
+				Runtime.Texture albedoTexture;
+				if (albedoMap == null)
+					albedoTexture = new Runtime.Texture(TextureType.Constant, albedo.ToFloat3());
+				else
+					albedoTexture = new Runtime.Texture(TextureType.Constant, albedo.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
+
+				Material material;
+				if (Mathf.Approximately(metallic, 0))
+					material = new Material(MaterialType.Lambertian, 1, albedoTexture);
+				else
+					material = new Material(MaterialType.Metal, 1, albedoTexture, roughness: new Runtime.Texture(TextureType.Constant, glossiness));
+
 				materialBuffer.AddNoResize(material);
 
 				Transform meshTransform = meshRenderer.transform;

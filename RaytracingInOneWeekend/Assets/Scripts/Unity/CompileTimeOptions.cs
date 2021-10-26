@@ -29,12 +29,12 @@ namespace Unity
 			newDefinitions.Remove("FULL_DIAGNOSTICS");
 			newDefinitions.Remove("PATH_DEBUGGING");
 			newDefinitions.Remove("ENABLE_OPTIX");
-			newDefinitions.Remove("TRACE");
+			newDefinitions.Remove("TRACE_LOGGING");
 
 			if (fullDiagnostics) newDefinitions.Add("FULL_DIAGNOSTICS");
 			if (pathDebugging) newDefinitions.Add("PATH_DEBUGGING");
 			if (enableNvidiaOptix) newDefinitions.Add("ENABLE_OPTIX");
-			if (trace) newDefinitions.Add("TRACE");
+			if (trace) newDefinitions.Add("TRACE_LOGGING");
 
 			if (!newDefinitions.SetEquals(originalDefinitions))
 			{
