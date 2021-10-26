@@ -85,7 +85,7 @@ namespace Runtime
 					// Bake transform
 					for (int j = 0; j < 3; j++)
 					{
-						worldSpaceVertices[j] = transform(RigidTransform, vertices[triangleIndices[j]]) * Scale;
+						worldSpaceVertices[j] = transform(RigidTransform, vertices[triangleIndices[j]] * Scale);
 						if (!FaceNormals) worldSpaceNormals[j] = mul(RigidTransform.rot, normals[triangleIndices[j]]);
 					}
 
@@ -685,8 +685,8 @@ namespace Runtime
 		}
 
 		[BurstDiscard]
-		[Conditional("PATH_DEBUGGING")]
-		private void Trace(string text)
+		[Conditional("TRACE")]
+		void Trace(string text)
 		{
 			Debug.Log(text);
 		}

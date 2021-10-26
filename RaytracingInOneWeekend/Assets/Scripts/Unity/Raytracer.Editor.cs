@@ -55,6 +55,34 @@ namespace Unity
 		[SerializeField] [DisableInPlayMode] bool previewBvh = false;
 		[SerializeField] [DisableInEditorMode] BufferView bufferView = BufferView.Front;
 
+		[InitializeOnLoadMethod]
+		static void Construct()
+		{
+			ObjectChangeEvents.changesPublished += OnChangesPublished;
+		}
+
+		static void OnChangesPublished(ref ObjectChangeEventStream stream)
+		{
+			var raytracer = FindObjectOfType<Raytracer>();
+			if (!raytracer)
+				return;
+
+			for (int i = 0; i < stream.length; i++)
+			{
+				switch (stream.GetEventType(i))
+				{
+					case ObjectChangeKind.ChangeGameObjectParent:
+					case ObjectChangeKind.ChangeGameObjectStructure:
+					case ObjectChangeKind.CreateGameObjectHierarchy:
+					case ObjectChangeKind.ChangeGameObjectStructureHierarchy:
+					case ObjectChangeKind.ChangeGameObjectOrComponentProperties:
+					case ObjectChangeKind.UpdatePrefabInstances:
+						raytracer.worldNeedsRebuild = true;
+						break;
+				}
+			}
+		}
+
 		void ForceUpdateInspector()
 		{
 			EditorUtility.SetDirty(this);

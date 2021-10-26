@@ -23,7 +23,6 @@ using Environment = Runtime.Environment;
 using float3 = Unity.Mathematics.float3;
 using Material = Runtime.Material;
 using Ray = Runtime.Ray;
-using Rect = Runtime.EntityTypes.Rect;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 
 #if ENABLE_OPTIX
@@ -190,10 +189,10 @@ namespace Unity
 			public NativeArray<float3> Color, Normal, Albedo;
 		}
 
-		readonly Queue<ScheduledJobData<AccumulateOutputData>> scheduledAccumulateJobs = new Queue<ScheduledJobData<AccumulateOutputData>>();
-		readonly Queue<ScheduledJobData<PassOutputData>> scheduledCombineJobs = new Queue<ScheduledJobData<PassOutputData>>();
-		readonly Queue<ScheduledJobData<PassOutputData>> scheduledDenoiseJobs = new Queue<ScheduledJobData<PassOutputData>>();
-		readonly Queue<ScheduledJobData<PassOutputData>> scheduledFinalizeJobs = new Queue<ScheduledJobData<PassOutputData>>();
+		readonly Queue<ScheduledJobData<AccumulateOutputData>> scheduledAccumulateJobs = new();
+		readonly Queue<ScheduledJobData<PassOutputData>> scheduledCombineJobs = new();
+		readonly Queue<ScheduledJobData<PassOutputData>> scheduledDenoiseJobs = new();
+		readonly Queue<ScheduledJobData<PassOutputData>> scheduledFinalizeJobs = new();
 
 		bool commandBufferHooked, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
 		float focusDistance = 1;
@@ -202,10 +201,10 @@ namespace Unity
 		bool queuedAccumulate;
 		ImportanceSamplingMode lastSamplingMode;
 
-		readonly Stopwatch traceTimer = new Stopwatch();
-		readonly List<float> mraysPerSecResults = new List<float>();
+		readonly Stopwatch traceTimer = new();
+		readonly List<float> mraysPerSecResults = new();
 
-		readonly List<UnityEngine.Material> activeMaterials = new List<UnityEngine.Material>();
+		readonly List<UnityEngine.Material> activeMaterials = new();
 
 		float2 bufferSize;
 
@@ -282,12 +281,19 @@ namespace Unity
 		void InitDenoisers()
 		{
 			// Open Image Denoise
-			oidnDevice = OidnDevice.New(OidnDevice.Type.Default);
-			OidnDevice.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
-			OidnDevice.Commit(oidnDevice);
+			try
+			{
+				oidnDevice = OidnDevice.New(OidnDevice.Type.Default);
+				OidnDevice.SetErrorFunction(oidnDevice, OnOidnError, IntPtr.Zero);
+				OidnDevice.Commit(oidnDevice);
 
-			oidnFilter = OidnFilter.New(oidnDevice, "RT");
-			OidnFilter.Set(oidnFilter, "hdr", true);
+				oidnFilter = OidnFilter.New(oidnDevice, "RT");
+				OidnFilter.Set(oidnFilter, "hdr", true);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError($"Could not initialize Intel ODIN.\n{ex}");
+			}
 
 #if ENABLE_OPTIX
 			// nVidia OptiX
@@ -550,7 +556,7 @@ namespace Unity
 			{
 				ScheduleAccumulate(traceNeedsReset || AccumulatedSamples >= samplesPerPixel,
 					scheduledAccumulateJobs.Count > 0
-						? (JobHandle?) JobHandle.CombineDependencies(
+						? JobHandle.CombineDependencies(
 							scheduledAccumulateJobs.Peek().Handle,
 							scheduledAccumulateJobs.Peek().OutputData.ReduceRayCountJobHandle)
 						: null);
@@ -564,14 +570,14 @@ namespace Unity
 			// Debug.Log($"Scheduling accumulate (firstBatch = {firstBatch})");
 
 			Transform cameraTransform = TargetCamera.transform;
-			Vector3 origin = cameraTransform.localPosition;
+			Vector3 origin = cameraTransform.position;
 			Vector3 lookAt = origin + cameraTransform.forward;
 
 			if (HitWorld(new Ray(origin, cameraTransform.forward), out HitRecord hitRec))
 				focusDistance = hitRec.Distance;
 
 			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, TargetCamera.fieldOfView,
-				bufferSize.x / bufferSize.y, TargetCamera.GetComponent<CameraData>().ApertureSize, focusDistance);
+				TargetCamera.aspect, TargetCamera.GetComponent<CameraData>().ApertureSize, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -1168,7 +1174,7 @@ namespace Unity
 					Material = materialBuffer.GetUnsafeList()->Ptr + (materialBuffer.Length - 1),
 					MeshDataArray = meshDataArray,
 					RigidTransform = rigidTransform,
-					Scale = meshTransform.lossyScale.magnitude
+					Scale = csum(meshTransform.lossyScale) / 3
 				};
 				addMeshJob.Schedule().Complete();
 			}

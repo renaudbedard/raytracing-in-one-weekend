@@ -213,7 +213,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 220480673}
   m_LocalRotation: {x: -0.24043635, y: -0.072252296, z: -0.3177252, w: 0.91434175}
-  m_LocalPosition: {x: 0.19, y: 0, z: -5.98}
+  m_LocalPosition: {x: 0, y: 0, z: -5.98}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -326,6 +326,7 @@ MonoBehaviour:
   fullDiagnostics: 1
   pathDebugging: 0
   enableNvidiaOptix: 0
+  trace: 0
 --- !u!4 &1224240840
 Transform:
   m_ObjectHideFlags: 0
@@ -360,8 +361,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4640589406651769888, guid: 4a9c9da470b674124a327834bec9e672,
         type: 3}
+      propertyPath: samplesPerPixel
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4640589406651769888, guid: 4a9c9da470b674124a327834bec9e672,
+        type: 3}
       propertyPath: resolutionScaling
-      value: 0.1
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7080320701072629987, guid: 4a9c9da470b674124a327834bec9e672,
         type: 3}
