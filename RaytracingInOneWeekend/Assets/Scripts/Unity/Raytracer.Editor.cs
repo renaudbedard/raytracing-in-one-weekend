@@ -63,21 +63,35 @@ namespace Unity
 
 		static void OnChangesPublished(ref ObjectChangeEventStream stream)
 		{
+			if (!Application.isPlaying)
+				return;
+
 			var raytracer = FindObjectOfType<Raytracer>();
 			if (!raytracer)
 				return;
 
 			for (int i = 0; i < stream.length; i++)
 			{
-				switch (stream.GetEventType(i))
+				var eventType = stream.GetEventType(i);
+				switch (eventType)
 				{
+					case ObjectChangeKind.ChangeGameObjectOrComponentProperties:
+						stream.GetChangeGameObjectOrComponentPropertiesEvent(i, out var data);
+						var modifiedObject = EditorUtility.InstanceIDToObject(data.instanceId);
+						raytracer.worldNeedsRebuild = true;
+						Debug.Log($"World needs rebuild, {eventType} on {modifiedObject.name}", modifiedObject);
+						break;
+
 					case ObjectChangeKind.ChangeGameObjectParent:
 					case ObjectChangeKind.ChangeGameObjectStructure:
 					case ObjectChangeKind.CreateGameObjectHierarchy:
 					case ObjectChangeKind.ChangeGameObjectStructureHierarchy:
-					case ObjectChangeKind.ChangeGameObjectOrComponentProperties:
 					case ObjectChangeKind.UpdatePrefabInstances:
+					case ObjectChangeKind.ChangeAssetObjectProperties:
+					case ObjectChangeKind.CreateAssetObject:
+					case ObjectChangeKind.DestroyAssetObject:
 						raytracer.worldNeedsRebuild = true;
+						Debug.Log($"World needs rebuild, {eventType} detected");
 						break;
 				}
 			}

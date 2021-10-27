@@ -24,6 +24,7 @@ using float3 = Unity.Mathematics.float3;
 using Material = Runtime.Material;
 using Ray = Runtime.Ray;
 using RigidTransform = Unity.Mathematics.RigidTransform;
+using Texture = Runtime.Texture;
 
 #if ENABLE_OPTIX
 using OptiX;
@@ -136,7 +137,7 @@ namespace Unity
 			RenderSettings.skybox ? RenderSettings.skybox : FindObjectOfType<Skybox>()?.material;
 
 		SkyType SkyType =>
-			SkyboxMaterial?.mainTexture is UnityEngine.Cubemap ? SkyType.CubeMap :
+			SkyboxMaterial != null && SkyboxMaterial.HasTexture("_Tex") && SkyboxMaterial.GetTexture("_Tex") is UnityEngine.Cubemap ? SkyType.CubeMap :
 			SkyboxMaterial?.shader == gradientSkyShader ? SkyType.GradientSky :
 			SkyType.None;
 
@@ -649,9 +650,9 @@ namespace Unity
 					View = raytracingCamera,
 					Environment = new Environment
 					{
-						SkyBottomColor = SkyboxMaterial == null ? default : SkyboxMaterial.GetColor("_Color1").ToFloat3(),
-						SkyTopColor = SkyboxMaterial == null ? default : SkyboxMaterial.GetColor("_Color2").ToFloat3(),
-						SkyCubemap = SkyboxMaterial != null && SkyboxMaterial.mainTexture is UnityEngine.Cubemap ? new Cubemap(SkyboxMaterial.mainTexture as UnityEngine.Cubemap) : default,
+						SkyBottomColor = SkyType == SkyType.GradientSky ? SkyboxMaterial.GetColor("_Color1").ToFloat3() : default,
+						SkyTopColor = SkyType == SkyType.GradientSky ? SkyboxMaterial.GetColor("_Color2").ToFloat3() : default,
+						SkyCubemap = SkyType == SkyType.CubeMap ? new Cubemap(SkyboxMaterial.GetTexture("_Tex") as UnityEngine.Cubemap) : default,
 						SkyType = SkyType,
 					},
 					Seed = frameSeed,
@@ -1155,22 +1156,33 @@ namespace Unity
 
 				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterial;
 
-				float metallic = unityMaterial.GetFloat("_Metallic");
+				float metallic = unityMaterial.HasFloat("_Metallic") ? unityMaterial.GetFloat("_Metallic") : default;
 				float glossiness = unityMaterial.GetFloat("_Glossiness");
 				Color albedo = unityMaterial.GetColor("_Color");
 				Texture2D albedoMap = unityMaterial.GetTexture("_MainTex") as Texture2D;
 
-				Runtime.Texture albedoTexture;
+				Texture albedoTexture;
 				if (albedoMap == null)
-					albedoTexture = new Runtime.Texture(TextureType.Constant, albedo.ToFloat3());
+					albedoTexture = new Texture(TextureType.Constant, albedo.ToFloat3());
 				else
-					albedoTexture = new Runtime.Texture(TextureType.Constant, albedo.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
+					albedoTexture = new Texture(TextureType.Constant, albedo.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 
 				Material material;
-				if (Mathf.Approximately(metallic, 0))
+				if (unityMaterial.IsKeywordEnabled("_EMISSION"))
+				{
+					Color emission = unityMaterial.GetColor("_EmissionColor");
+					var emissionTexture = new Texture(TextureType.Constant, emission.ToFloat3());
+					material = new Material(MaterialType.DiffuseLight, emission: emissionTexture);
+				}
+				else if (unityMaterial.HasProperty("_RefractiveIndex"))
+				{
+					float refractiveIndex = unityMaterial.GetFloat("_RefractiveIndex");
+					material = new Material(MaterialType.Dielectric, 1, albedoTexture, refractiveIndex: refractiveIndex);
+				}
+				else if (Mathf.Approximately(metallic, 0))
 					material = new Material(MaterialType.Lambertian, 1, albedoTexture);
 				else
-					material = new Material(MaterialType.Metal, 1, albedoTexture, roughness: new Runtime.Texture(TextureType.Constant, glossiness));
+					material = new Material(MaterialType.Metal, 1, albedoTexture, roughness: new Texture(TextureType.Constant, 1 - glossiness));
 
 				materialBuffer.AddNoResize(material);
 

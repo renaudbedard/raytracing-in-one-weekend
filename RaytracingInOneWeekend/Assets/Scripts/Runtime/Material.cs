@@ -26,7 +26,7 @@ namespace Runtime
 		float RefractiveIndex => Parameter; // for Dielectric
 		public float Density => Parameter; // for ProbabilisticVolume
 
-		public Material(MaterialType type, float2 textureScale, Texture albedo = default,
+		public Material(MaterialType type, float2 textureScale = default, Texture albedo = default,
 			Texture emission = default, Texture roughness = default, float refractiveIndex = 1, float density = 1) : this()
 		{
 			Type = type;
