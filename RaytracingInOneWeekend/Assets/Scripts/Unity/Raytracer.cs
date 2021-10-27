@@ -1168,7 +1168,7 @@ namespace Unity
 					albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 
 				Material material;
-				if (unityMaterial.IsKeywordEnabled("_EMISSION"))
+				if (unityMaterial.IsKeywordEnabled("_EMISSION") && unityMaterial.GetColor("_EmissionColor").maxColorComponent > 0)
 				{
 					Color emission = unityMaterial.GetColor("_EmissionColor");
 					var emissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
