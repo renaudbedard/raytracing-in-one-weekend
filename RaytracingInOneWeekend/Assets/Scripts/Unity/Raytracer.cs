@@ -1163,15 +1163,15 @@ namespace Unity
 
 				Texture albedoTexture;
 				if (albedoMap == null)
-					albedoTexture = new Texture(TextureType.Constant, albedo.ToFloat3());
+					albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
 				else
-					albedoTexture = new Texture(TextureType.Constant, albedo.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
+					albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 
 				Material material;
 				if (unityMaterial.IsKeywordEnabled("_EMISSION"))
 				{
 					Color emission = unityMaterial.GetColor("_EmissionColor");
-					var emissionTexture = new Texture(TextureType.Constant, emission.ToFloat3());
+					var emissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
 					material = new Material(MaterialType.DiffuseLight, emission: emissionTexture);
 				}
 				else if (unityMaterial.HasProperty("_RefractiveIndex"))
