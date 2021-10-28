@@ -1154,12 +1154,13 @@ namespace Unity
 				// TODO: Only add new materials
 				// TODO: Roughness map
 
-				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterial;
+				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterials.Last();
 
 				float metallic = unityMaterial.HasFloat("_Metallic") ? unityMaterial.GetFloat("_Metallic") : default;
-				float glossiness = unityMaterial.GetFloat("_Glossiness");
+				float glossiness = unityMaterial.HasFloat("_Glossiness") ? unityMaterial.GetFloat("_Glossiness") : default;
+				Texture2D albedoMap = unityMaterial.HasTexture("_MainTex") ? unityMaterial.GetTexture("_MainTex") as Texture2D : default;
+
 				Color albedo = unityMaterial.GetColor("_Color");
-				Texture2D albedoMap = unityMaterial.GetTexture("_MainTex") as Texture2D;
 
 				Texture albedoTexture;
 				if (albedoMap == null)
@@ -1168,7 +1169,12 @@ namespace Unity
 					albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 
 				Material material;
-				if (unityMaterial.IsKeywordEnabled("_EMISSION") && unityMaterial.GetColor("_EmissionColor").maxColorComponent > 0)
+				if (unityMaterial.HasFloat("_Density"))
+				{
+					float density = unityMaterial.GetFloat("_Density");
+					material = new Material(MaterialType.ProbabilisticVolume, albedo: albedoTexture, density: density);
+				}
+				else if (unityMaterial.IsKeywordEnabled("_EMISSION") && unityMaterial.GetColor("_EmissionColor").maxColorComponent > 0)
 				{
 					Color emission = unityMaterial.GetColor("_EmissionColor");
 					var emissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());

@@ -48,7 +48,7 @@ namespace Runtime
 			if (Type != MaterialType.ProbabilisticVolume)
 				return false;
 
-			float volumeHitDistance = -(1 / Density) * log(rng.NextFloat());
+			float volumeHitDistance = -(1 / max(Density, EPSILON)) * log(rng.NextFloat());
 
 			if (volumeHitDistance < hitDistance)
 			{
