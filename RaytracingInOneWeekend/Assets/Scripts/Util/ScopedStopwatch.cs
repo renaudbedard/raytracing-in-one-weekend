@@ -17,7 +17,9 @@ namespace Util
 		public void Dispose()
 		{
 			stopwatch.Stop();
+#if PROFILING
 			UnityEngine.Debug.Log($"{name} : {stopwatch.Elapsed}");
+#endif
 		}
 	}
 }

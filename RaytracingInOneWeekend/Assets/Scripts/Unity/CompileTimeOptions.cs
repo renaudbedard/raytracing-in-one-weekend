@@ -12,7 +12,8 @@ namespace Unity
 	[ExecuteInEditMode]
 	class CompileTimeOptions : MonoBehaviour
 	{
-		[SerializeField] [DisableInPlayMode] bool fullDiagnostics = false, pathDebugging = false, enableNvidiaOptix = false, trace = false;
+		[SerializeField] [DisableInPlayMode]
+		bool fullDiagnostics = false, pathDebugging = false, enableNvidiaOptix = false, trace = false, profiling = false;
 
 #if UNITY_EDITOR
 		void OnValidate()
@@ -30,11 +31,13 @@ namespace Unity
 			newDefinitions.Remove("PATH_DEBUGGING");
 			newDefinitions.Remove("ENABLE_OPTIX");
 			newDefinitions.Remove("TRACE_LOGGING");
+			newDefinitions.Remove("PROFILING");
 
 			if (fullDiagnostics) newDefinitions.Add("FULL_DIAGNOSTICS");
 			if (pathDebugging) newDefinitions.Add("PATH_DEBUGGING");
 			if (enableNvidiaOptix) newDefinitions.Add("ENABLE_OPTIX");
 			if (trace) newDefinitions.Add("TRACE_LOGGING");
+			if (profiling) newDefinitions.Add("PROFILING");
 
 			if (!newDefinitions.SetEquals(originalDefinitions))
 			{
