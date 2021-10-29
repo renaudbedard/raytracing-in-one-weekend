@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
 
 namespace Util
@@ -128,9 +130,64 @@ namespace Util
 
 		public static unsafe T* Pop<T>(this ref UnsafePtrList<T> list) where T : unmanaged
 		{
-			T* element = list[list.Length - 1];
+			T* element = list[^1];
 			list.Resize(list.Length - 1);
 			return element;
+		}
+
+		public static bool TryGetProperty(this Material material, string name, out float value)
+		{
+			if (!material.HasFloat(name))
+			{
+				value = default;
+				return false;
+			}
+			value = material.GetFloat(name);
+			return true;
+		}
+
+		public static bool TryGetProperty(this Material material, string name, out Texture2D value)
+		{
+			if (!material.HasTexture(name))
+			{
+				value = default;
+				return false;
+			}
+			value = material.GetTexture(name) as Texture2D;
+			return true;
+		}
+
+		public static bool TryGetProperty(this Material material, string name, out Cubemap value)
+		{
+			if (!material.HasTexture(name))
+			{
+				value = default;
+				return false;
+			}
+			value = material.GetTexture(name) as Cubemap;
+			return true;
+		}
+
+		public static bool TryGetProperty(this Material material, string name, out int value)
+		{
+			if (!material.HasInt(name))
+			{
+				value = default;
+				return false;
+			}
+			value = material.GetInt(name);
+			return true;
+		}
+
+		public static bool TryGetProperty(this Material material, string name, out Color value)
+		{
+			if (!material.HasColor(name))
+			{
+				value = default;
+				return false;
+			}
+			value = material.GetColor(name);
+			return true;
 		}
 	}
 }

@@ -137,8 +137,8 @@ namespace Unity
 			RenderSettings.skybox ? RenderSettings.skybox : FindObjectOfType<Skybox>()?.material;
 
 		SkyType SkyType =>
-			SkyboxMaterial != null && SkyboxMaterial.HasTexture("_Tex") && SkyboxMaterial.GetTexture("_Tex") is UnityEngine.Cubemap ? SkyType.CubeMap :
-			SkyboxMaterial?.shader == gradientSkyShader ? SkyType.GradientSky :
+			SkyboxMaterial != null && SkyboxMaterial.TryGetProperty("_Tex", out UnityEngine.Cubemap _) ? SkyType.CubeMap :
+			SkyboxMaterial != null && SkyboxMaterial.shader == gradientSkyShader ? SkyType.GradientSky :
 			SkyType.None;
 
 		[UsedImplicitly] bool BvhEnabled => true;
@@ -1135,6 +1135,8 @@ namespace Unity
 			// TODO: Importance sampling
 			// TODO: Movement support
 
+			var materialMap = new Dictionary<UnityEngine.Material, int>();
+
 			int entityCount = FindObjectsOfType<MeshRenderer>().Count(x => x.enabled);
 			int triangleCount = FindObjectsOfType<MeshFilter>().Sum(x => x.sharedMesh.triangles.Length);
 
@@ -1155,42 +1157,45 @@ namespace Unity
 				// TODO: Roughness map
 
 				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterials.Last();
-
-				float metallic = unityMaterial.HasFloat("_Metallic") ? unityMaterial.GetFloat("_Metallic") : default;
-				float glossiness = unityMaterial.HasFloat("_Glossiness") ? unityMaterial.GetFloat("_Glossiness") : default;
-				Texture2D albedoMap = unityMaterial.HasTexture("_MainTex") ? unityMaterial.GetTexture("_MainTex") as Texture2D : default;
-
-				Color albedo = unityMaterial.GetColor("_Color");
-
-				Texture albedoTexture;
-				if (albedoMap == null)
-					albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
-				else
-					albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(), pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(), imageWidth: albedoMap.width, imageHeight: albedoMap.height);
-
-				Material material;
-				if (unityMaterial.HasFloat("_Density"))
+				if (!materialMap.TryGetValue(unityMaterial, out int materialIndex))
 				{
-					float density = unityMaterial.GetFloat("_Density");
-					material = new Material(MaterialType.ProbabilisticVolume, albedo: albedoTexture, density: density);
-				}
-				else if (unityMaterial.IsKeywordEnabled("_EMISSION") && unityMaterial.GetColor("_EmissionColor").maxColorComponent > 0)
-				{
-					Color emission = unityMaterial.GetColor("_EmissionColor");
-					var emissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
-					material = new Material(MaterialType.DiffuseLight, emission: emissionTexture);
-				}
-				else if (unityMaterial.HasProperty("_RefractiveIndex"))
-				{
-					float refractiveIndex = unityMaterial.GetFloat("_RefractiveIndex");
-					material = new Material(MaterialType.Dielectric, 1, albedoTexture, refractiveIndex: refractiveIndex);
-				}
-				else if (Mathf.Approximately(metallic, 0))
-					material = new Material(MaterialType.Lambertian, 1, albedoTexture);
-				else
-					material = new Material(MaterialType.Metal, 1, albedoTexture, roughness: new Texture(TextureType.Constant, 1 - glossiness));
+					unityMaterial.TryGetProperty("_Metallic", out float metallic);
+					unityMaterial.TryGetProperty("_Glossiness", out float glossiness);
+					unityMaterial.TryGetProperty("_MainTex", out Texture2D albedoMap);
+					unityMaterial.TryGetProperty("_Color", out Color albedo);
 
-				materialBuffer.AddNoResize(material);
+					Texture albedoTexture;
+					if (albedoMap == null)
+						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
+					else
+						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(),
+							pImage: (byte*)albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
+							imageWidth: albedoMap.width, imageHeight: albedoMap.height);
+
+					Material material;
+					if (unityMaterial.TryGetProperty("_Density", out float density))
+						material = new Material(MaterialType.ProbabilisticVolume, albedo: albedoTexture, density: density);
+					else if (unityMaterial.IsKeywordEnabled("_EMISSION") &&
+					         unityMaterial.TryGetProperty("_EmissionColor", out Color emission) &&
+					         emission.maxColorComponent > 0)
+					{
+						var emissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
+						material = new Material(MaterialType.DiffuseLight, emission: emissionTexture);
+					}
+					else if (unityMaterial.TryGetProperty("_RefractiveIndex", out float refractiveIndex))
+					{
+						material = new Material(MaterialType.Dielectric, 1, albedoTexture, refractiveIndex: refractiveIndex);
+					}
+					else if (Mathf.Approximately(metallic, 0))
+						material = new Material(MaterialType.Lambertian, 1, albedoTexture);
+					else
+						material = new Material(MaterialType.Metal, 1, albedoTexture,
+							roughness: new Texture(TextureType.Constant, 1 - glossiness));
+
+					materialBuffer.AddNoResize(material);
+					materialIndex = materialBuffer.Length - 1;
+					materialMap[unityMaterial] = materialIndex;
+				}
 
 				Transform meshTransform = meshRenderer.transform;
 				var rigidTransform = new RigidTransform(meshTransform.rotation, meshTransform.position);
@@ -1208,7 +1213,7 @@ namespace Unity
 					// TODO: Face normals support
 					//FaceNormals = e.MeshData.FaceNormals,
 
-					Material = materialBuffer.GetUnsafeList()->Ptr + (materialBuffer.Length - 1),
+					Material = materialBuffer.GetUnsafeList()->Ptr + materialIndex,
 					MeshDataArray = meshDataArray,
 					RigidTransform = rigidTransform,
 					Scale = csum(meshTransform.lossyScale) / 3
