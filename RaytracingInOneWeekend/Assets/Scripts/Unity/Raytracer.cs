@@ -25,11 +25,9 @@ using Material = Runtime.Material;
 using Ray = Runtime.Ray;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 using Texture = Runtime.Texture;
-
 #if ENABLE_OPTIX
 using OptiX;
 #endif
-
 #if ODIN_INSPECTOR
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
 #else
@@ -52,7 +50,6 @@ namespace Unity
 	{
 		[Title("References")]
 		[SerializeField] BlueNoiseData blueNoise;
-		[SerializeField] Shader gradientSkyShader;
 
 		[Title("Settings")]
 		[SerializeField] [Range(1, 100)] int interlacing = 2;
@@ -133,14 +130,6 @@ namespace Unity
 		BvhNodeData? BvhRootData => bvhNodeDataBuffer.IsCreated ? bvhNodeDataBuffer[0] : null;
 		unsafe BvhNode* BvhRoot => bvhNodeBuffer.IsCreated ? (BvhNode*) bvhNodeBuffer.GetUnsafePtr() : null;
 
-		UnityEngine.Material SkyboxMaterial =>
-			RenderSettings.skybox ? RenderSettings.skybox : FindObjectOfType<Skybox>()?.material;
-
-		SkyType SkyType =>
-			SkyboxMaterial != null && SkyboxMaterial.TryGetProperty("_Tex", out UnityEngine.Cubemap _) ? SkyType.CubeMap :
-			SkyboxMaterial != null && SkyboxMaterial.shader == gradientSkyShader ? SkyType.GradientSky :
-			SkyType.None;
-
 		[UsedImplicitly] bool BvhEnabled => true;
 
 		readonly PerlinNoiseData perlinNoise = new();
@@ -204,8 +193,6 @@ namespace Unity
 
 		readonly Stopwatch traceTimer = new();
 		readonly List<float> mraysPerSecResults = new();
-
-		readonly List<UnityEngine.Material> activeMaterials = new();
 
 		float2 bufferSize;
 
@@ -466,19 +453,23 @@ namespace Unity
 				int i = 0;
 				bool ShouldCancel() => i++ > 0 || traceAborted;
 				foreach (var jobData in scheduledAccumulateJobs)
-					if (ShouldCancel()) jobData.Cancel();
+					if (ShouldCancel())
+						jobData.Cancel();
 
 				i = 0;
 				foreach (var jobData in scheduledCombineJobs)
-					if (ShouldCancel()) jobData.Cancel();
+					if (ShouldCancel())
+						jobData.Cancel();
 
 				i = 0;
 				foreach (var jobData in scheduledDenoiseJobs)
-					if (ShouldCancel()) jobData.Cancel();
+					if (ShouldCancel())
+						jobData.Cancel();
 
 				i = 0;
 				foreach (var jobData in scheduledFinalizeJobs)
-					if (ShouldCancel()) jobData.Cancel();
+					if (ShouldCancel())
+						jobData.Cancel();
 
 				i = 0;
 
@@ -578,7 +569,7 @@ namespace Unity
 				focusDistance = hitRec.Distance;
 
 			var raytracingCamera = new View(origin, lookAt, cameraTransform.up, TargetCamera.fieldOfView,
-				TargetCamera.aspect, TargetCamera.GetComponent<CameraData>().ApertureSize, focusDistance);
+				TargetCamera.aspect, TargetCamera.GetComponent<CameraData>()?.ApertureSize ?? 0, focusDistance);
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 
@@ -627,6 +618,15 @@ namespace Unity
 				frameSeed = (uint) Time.frameCount + 1;
 			}
 
+
+			UnityEngine.Material skyboxMaterial = RenderSettings.skybox ? RenderSettings.skybox : FindObjectOfType<Skybox>()?.material;
+			Environment environment = default;
+
+			if (skyboxMaterial.TryGetProperty("_Color1", out Color bottomColor) && skyboxMaterial.TryGetProperty("_Color2", out Color topColor))
+				environment = new Environment { SkyType = SkyType.GradientSky, SkyBottomColor = bottomColor.ToFloat3(), SkyTopColor = topColor.ToFloat3() };
+			else if (skyboxMaterial.TryGetProperty("_Tex", out UnityEngine.Cubemap cubemap))
+				environment = new Environment { SkyType = SkyType.CubeMap, SkyCubemap = new Cubemap(cubemap) };
+
 			AccumulateJob accumulateJob;
 
 			unsafe
@@ -648,13 +648,7 @@ namespace Unity
 
 					Size = bufferSize,
 					View = raytracingCamera,
-					Environment = new Environment
-					{
-						SkyBottomColor = SkyType == SkyType.GradientSky ? SkyboxMaterial.GetColor("_Color1").ToFloat3() : default,
-						SkyTopColor = SkyType == SkyType.GradientSky ? SkyboxMaterial.GetColor("_Color2").ToFloat3() : default,
-						SkyCubemap = SkyType == SkyType.CubeMap ? new Cubemap(SkyboxMaterial.GetTexture("_Tex") as UnityEngine.Cubemap) : default,
-						SkyType = SkyType,
-					},
+					Environment = environment,
 					Seed = frameSeed,
 					SampleCount = min(samplesPerPixel, samplesPerBatch),
 					TraceDepth = traceDepth,
@@ -690,7 +684,7 @@ namespace Unity
 					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
 					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
 					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }
-					.Schedule(dependency ?? default)
+						.Schedule(dependency ?? default)
 				};
 
 				JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
@@ -980,15 +974,9 @@ namespace Unity
 
 			switch (bufferView)
 			{
-				case BufferView.Front:
-					frontBufferTexture.Apply(false);
-					break;
-				case BufferView.Normals:
-					normalsTexture.Apply(false);
-					break;
-				case BufferView.Albedo:
-					albedoTexture.Apply(false);
-					break;
+				case BufferView.Front: frontBufferTexture.Apply(false); break;
+				case BufferView.Normals: normalsTexture.Apply(false); break;
+				case BufferView.Albedo: albedoTexture.Apply(false); break;
 
 				default:
 					BufferMinValue = bufferMin;
@@ -1113,8 +1101,6 @@ namespace Unity
 		{
 			CollectActiveEntities();
 
-			activeMaterials.Clear();
-
 			using (rebuildEntityBuffersMarker.Auto())
 			using (new ScopedStopwatch("^"))
 				RebuildEntityBuffers();
@@ -1123,8 +1109,8 @@ namespace Unity
 			using (new ScopedStopwatch("^"))
 				RebuildBvh();
 
-			// TODO: Random seed as part of scene definition
-			perlinNoise.Generate(1); // scene.RandomSeed);
+			var seedProvider = FindObjectOfType<RandomSeedData>();
+			perlinNoise.Generate(seedProvider == null ? 1 : seedProvider.RandomSeed);
 
 			worldNeedsRebuild = false;
 		}
@@ -1169,7 +1155,7 @@ namespace Unity
 						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
 					else
 						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(),
-							pImage: (byte*)albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
+							pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
 							imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 
 					Material material;
@@ -1202,7 +1188,7 @@ namespace Unity
 
 				var meshFilter = meshRenderer.gameObject.GetComponent<MeshFilter>();
 
-				using Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(meshFilter.mesh);
+				using Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(meshFilter.sharedMesh);
 
 				var addMeshJob = new AddMeshRuntimeEntitiesJob
 				{

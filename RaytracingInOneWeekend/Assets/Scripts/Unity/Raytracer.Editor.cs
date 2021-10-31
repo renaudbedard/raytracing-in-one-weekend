@@ -78,8 +78,9 @@ namespace Unity
 					case ObjectChangeKind.ChangeGameObjectOrComponentProperties:
 						stream.GetChangeGameObjectOrComponentPropertiesEvent(i, out var data);
 						var modifiedObject = EditorUtility.InstanceIDToObject(data.instanceId);
+						if (modifiedObject == raytracer)
+							continue;
 						raytracer.worldNeedsRebuild = true;
-						Debug.Log($"World needs rebuild, {eventType} on {modifiedObject.name}", modifiedObject);
 						break;
 
 					case ObjectChangeKind.ChangeGameObjectParent:
@@ -91,7 +92,6 @@ namespace Unity
 					case ObjectChangeKind.CreateAssetObject:
 					case ObjectChangeKind.DestroyAssetObject:
 						raytracer.worldNeedsRebuild = true;
-						Debug.Log($"World needs rebuild, {eventType} detected");
 						break;
 				}
 			}
@@ -104,8 +104,14 @@ namespace Unity
 
 		void OnDrawGizmos()
 		{
-			if (previewBvh && BvhRootData.HasValue)
+			if (previewBvh)
 			{
+				if (!BvhRootData.HasValue)
+				{
+					RebuildEntityBuffers();
+					RebuildBvh(true);
+				}
+
 				float silverRatio = (sqrt(5.0f) - 1.0f) / 2.0f;
 				(AxisAlignedBoundingBox _, int Depth)[] subBounds = BvhRootData.Value.GetAllSubBounds().ToArray();
 				int maxDepth = subBounds.Max(x => x.Depth);
@@ -119,6 +125,8 @@ namespace Unity
 					Gizmos.color = Color.HSVToRGB(frac(i * silverRatio), 1, 1).GetAlphaReplaced(0.6f);
 					Gizmos.DrawCube(bounds.Center, bounds.Size);
 				}
+
+				SceneView.RepaintAll();
 			}
 
 #if PATH_DEBUGGING
