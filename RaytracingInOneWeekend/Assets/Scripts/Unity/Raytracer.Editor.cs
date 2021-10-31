@@ -102,6 +102,12 @@ namespace Unity
 			EditorUtility.SetDirty(this);
 		}
 
+		void OnValidate()
+		{
+			TargetCamera.RemoveAllCommandBuffers();
+			commandBufferHooked = false;
+		}
+
 		void OnDrawGizmos()
 		{
 			if (previewBvh)

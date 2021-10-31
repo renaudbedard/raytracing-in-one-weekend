@@ -1083,8 +1083,7 @@ namespace Unity
 			OptixDenoiserSizes newSizes = default;
 			OptixDenoiser.ComputeMemoryResources(optixDenoiser, newBufferSize.x, newBufferSize.y, &newSizes);
 
-			Check(optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes,
-				newSizes.RecommendedScratchSizeInBytes));
+			Check(optixScratchMemory.EnsureCapacity(lastSizes.RecommendedScratchSizeInBytes, newSizes.RecommendedScratchSizeInBytes));
 			Check(optixDenoiserState.EnsureCapacity(lastSizes.StateSizeInBytes, newSizes.StateSizeInBytes));
 
 			optixDenoiserSizes = newSizes;
@@ -1139,7 +1138,6 @@ namespace Unity
 			// Collect mesh renderers
 			foreach (var meshRenderer in FindObjectsOfType<MeshRenderer>().Where(x => x.enabled))
 			{
-				// TODO: Only add new materials
 				// TODO: Roughness map
 
 				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterials.Last();
@@ -1218,7 +1216,6 @@ namespace Unity
 			bvhNodeDataBuffer.EnsureCapacity(max(entityBuffer.Length * 2, 1));
 			bvhNodeDataBuffer.Clear();
 
-			int nodeCount = 0;
 			using (var bvhBuildingEntityBuffer = new NativeArray<BvhBuildingEntity>(entityBuffer.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory))
 			{
 				var initJob = new CreateBvhBuildingEntitiesJob
@@ -1241,8 +1238,7 @@ namespace Unity
 				buildJobHandle.Complete();
 			}
 
-			nodeCount = BvhRootData.Value.ChildCount;
-
+			int nodeCount = BvhRootData.Value.ChildCount;
 			Debug.Log($"Rebuilt BVH ({BvhRootData.Value.ChildCount} nodes for {entityBuffer.Length} entities)");
 
 			if (editorOnly)
