@@ -52,7 +52,7 @@ namespace Unity
 		void AbortTrace() => traceAborted = true;
 
 		[SerializeField] bool debugFailedSamples = false;
-		[SerializeField] [DisableInPlayMode] bool previewBvh = false;
+		[SerializeField] bool previewBvh = false;
 		[SerializeField] [DisableInEditorMode] BufferView bufferView = BufferView.Front;
 
 		[InitializeOnLoadMethod]
