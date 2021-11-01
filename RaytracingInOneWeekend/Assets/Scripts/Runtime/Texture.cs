@@ -44,10 +44,8 @@ namespace Runtime
 		}
 
 		[Pure]
-		public float3 Value(float3 position, float3 normal, float2 scale, PerlinNoise perlinNoise)
+		public float3 Value(float2 textureCoordinates, PerlinNoise perlinNoise)
 		{
-			// TODO: make this use UVW coordinates instead
-
 			switch (Type)
 			{
 				case TextureType.Constant:
@@ -56,34 +54,31 @@ namespace Runtime
 				case TextureType.ConstantScalar:
 					return ScalarValue;
 
-				case TextureType.CheckerPattern:
-				{
-					// from iq : https://www.shadertoy.com/view/ltl3D8
-					float3 n = abs(normal);
-					float3 v = n.x > n.y && n.x > n.z ? normal.xyz :
-						n.y > n.x && n.y > n.z ? normal.yzx :
-						normal.zxy;
-					float2 q = v.yz / v.x;
-					float2 uv = 0.5f + 0.5f * q;
-
-					float2 sines = sin(PI * scale * uv);
-					return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
-				}
-
-				case TextureType.PerlinNoise:
-					return 0.5f * (1 + sin(NoiseFrequency * position.z +
-					                       10 * perlinNoise.Turbulence(position))) *
-					       MainColor;
+				// case TextureType.CheckerPattern:
+				// {
+				// 	// from iq : https://www.shadertoy.com/view/ltl3D8
+				// 	float3 n = abs(normal);
+				// 	float3 v = n.x > n.y && n.x > n.z ? normal.xyz :
+				// 		n.y > n.x && n.y > n.z ? normal.yzx :
+				// 		normal.zxy;
+				// 	float2 q = v.yz / v.x;
+				// 	float2 uv = 0.5f + 0.5f * q;
+				//
+				// 	float2 sines = sin(PI * scale * uv);
+				// 	return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
+				// }
+				//
+				// case TextureType.PerlinNoise:
+				// 	return 0.5f * (1 + sin(NoiseFrequency * position.z +
+				// 	                       10 * perlinNoise.Turbulence(position))) *
+				// 	       MainColor;
 
 				case TextureType.Image:
 				{
 					if (ImagePointer == null)
 						return 0;
 
-					float phi = atan2(normal.z, normal.x);
-					float theta = asin(normal.y);
-					float2 uv = float2((phi + PI) / (2 * PI), (theta + PI / 2) / PI);
-					int2 coords = (int2) (uv * ImageSize);
+					int2 coords = (int2) (textureCoordinates * ImageSize);
 
 					byte* pPixelData = ImagePointer + (coords.y * ImageSize.x + coords.x) * 3;
 					return float3(pPixelData[0], pPixelData[1], pPixelData[2]) / 255 * MainColor;

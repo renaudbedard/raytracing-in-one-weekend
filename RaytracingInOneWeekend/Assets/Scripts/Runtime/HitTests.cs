@@ -113,12 +113,14 @@ namespace Runtime
 		}
 
 		// ray direction is assumed to be normalized
-		public static bool Hit(this Triangle tri, Ray r, float tMin, float tMax, out float distance, out float3 normal)
+		public static bool Hit(this Triangle tri, Ray r, float tMin, float tMax,
+			out float distance, out float3 normal, out float2 texCoord)
 		{
 			// from "Fast, Minimum Storage Ray/Triangle Intersection" (Möller & Trumbore)
 			// https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
 			distance = 0;
 			normal = 0;
+			texCoord = 0;
 
 			float3 pvec = cross(r.Direction, tri.Data[0]);
 			float det = dot(tri.Data[1], pvec);
@@ -139,10 +141,11 @@ namespace Runtime
 			distance = dot(tri.Data[0], qvec) * invDet;
 			if (distance < tMin || distance > tMax) return false;
 
-			// interpolate normals based on barycentric coordinates
+			// interpolate normals & texture coordinates based on barycentric coordinates
 			// https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates
 			float3 barycentricCoords = float3(1 - u - v, u, v);
 			normal = mul(tri.Normals, barycentricCoords);
+			texCoord = mul(tri.TextureCoordinates, barycentricCoords);
 			return true;
 		}
 

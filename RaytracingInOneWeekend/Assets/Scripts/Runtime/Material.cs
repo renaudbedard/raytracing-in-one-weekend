@@ -67,7 +67,7 @@ namespace Runtime
 			{
 				case MaterialType.Lambertian:
 				{
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
+					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
 					//float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
 					float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
 					scattered = new Ray(rec.Point, randomDirection, ray.Time);
@@ -90,17 +90,17 @@ namespace Runtime
 
 					// Peter Shirley's fuzzy metal
 					float3 reflected = reflect(ray.Direction, rec.Normal);
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
-					float roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise).x;
+					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
+					float roughness = Roughness.Value(rec.TexCoords, perlinNoise).x;
 					scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
 					break;
 				}
 
 				case MaterialType.Dielectric:
 				{
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
+					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
 
-					float roughness = Roughness.Value(rec.Point, rec.Normal, TextureScale, perlinNoise).x;
+					float roughness = Roughness.Value(rec.TexCoords, perlinNoise).x;
 					float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction());
 
 					float niOverNt, cosine;
@@ -133,7 +133,7 @@ namespace Runtime
 
 				case MaterialType.ProbabilisticVolume:
 					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
-					reflectance = Texture.Value(rec.Point, rec.Normal, TextureScale, perlinNoise);
+					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
 					break;
 
 				default:
@@ -167,11 +167,11 @@ namespace Runtime
 		}
 
 		[Pure]
-		public float3 Emit(float3 position, float3 normal, PerlinNoise perlinNoise)
+		public float3 Emit(float2 texCoords, PerlinNoise perlinNoise)
 		{
 			switch (Type)
 			{
-				case MaterialType.DiffuseLight: return Texture.Value(position, normal, TextureScale, perlinNoise);
+				case MaterialType.DiffuseLight: return Texture.Value(texCoords, perlinNoise);
 				default: return 0;
 			}
 		}

@@ -8,20 +8,23 @@ namespace Runtime.EntityTypes
 	{
 		public readonly float3x3 Data; // { 0: v2 - v0, 1: v1 - v0, 2: v0 }
 		public readonly float3x3 Normals;
+		public readonly float2x3 TextureCoordinates;
 
 		// Face Normal
-		public Triangle(float3 v1, float3 v2, float3 v3)
+		public Triangle(float3 v1, float3 v2, float3 v3, float2 t1, float2 t2, float2 t3)
 		{
 			Data = float3x3(v3 - v1, v2 - v1, v1);
 			float3 faceNormal = normalize(cross(Data[1], Data[0]));
 			Normals = float3x3(faceNormal, faceNormal, faceNormal);
+			TextureCoordinates = float2x3(t1, t2, t3);
 		}
 
 		// Vertex Normals
-		public Triangle(float3 v1, float3 v2, float3 v3, float3 n1, float3 n2, float3 n3)
+		public Triangle(float3 v1, float3 v2, float3 v3, float3 n1, float3 n2, float3 n3, float2 t1, float2 t2, float2 t3)
 		{
 			Data = float3x3(v3 - v1, v2 - v1, v1);
 			Normals = float3x3(normalize(n1), normalize(n2), normalize(n3));
+			TextureCoordinates = float2x3(t1, t2, t3);
 		}
 
 		public float3 RandomPoint(ref RandomSource rng)

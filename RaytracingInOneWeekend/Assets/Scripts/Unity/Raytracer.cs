@@ -96,9 +96,10 @@ namespace Unity
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
-		Pool<NativeReference<int>> intReferences;
 		Pool<NativeArray<long>> longBuffers;
-		Pool<NativeArray<bool>> boolBuffers;
+
+		Pool<NativeReference<int>> intReferences;
+		Pool<NativeReference<bool>> boolReferences;
 
 		int interlacingOffsetIndex;
 		int[] interlacingOffsets;
@@ -153,11 +154,11 @@ namespace Unity
 			public JobHandle Handle;
 			public Action OnComplete;
 			public T OutputData;
-			public NativeArray<bool> CancellationToken;
+			public NativeReference<bool> CancellationToken;
 
 			public unsafe void Cancel()
 			{
-				*((bool*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(CancellationToken)) = true;
+				*(bool*) CancellationToken.GetUnsafePtrWithoutChecks() = true;
 			}
 
 			public void Complete()
@@ -233,7 +234,6 @@ namespace Unity
 #else
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
 #endif
-
 			viewRangeMaterial = new UnityEngine.Material(viewRangeShader);
 			channelPropertyId = Shader.PropertyToID("_Channel");
 			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
@@ -244,14 +244,21 @@ namespace Unity
 			float4Buffers = new Pool<NativeArray<float4>>(() => new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<float4>") { Capacity = 16 };
 
-			intReferences = new Pool<NativeReference<int>>(() => new NativeReference<int>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
-				itemNameOverride: "NativeReference<int>") { Capacity = 4 };
-
 			longBuffers = new Pool<NativeArray<long>>(() => new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
 				itemNameOverride: "NativeArray<long>") { Capacity = 4 };
 
-			boolBuffers = new Pool<NativeArray<bool>>(() => new NativeArray<bool>(1, Allocator.Persistent),
-				itemNameOverride: "NativeArray<bool>", cleanupMethod: buffer => buffer[0] = false) { Capacity = 64 };
+			intReferences = new Pool<NativeReference<int>>(() => new NativeReference<int>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
+				itemNameOverride: "NativeReference<int>") { Capacity = 4 };
+
+			boolReferences = new Pool<NativeReference<bool>>(() => new NativeReference<bool>(AllocatorManager.Persistent),
+				itemNameOverride: "NativeReference<bool>", cleanupMethod: reference =>
+				{
+					unsafe
+					{
+						// Doing it the safe way caused the sentinels to complain for reasons unclear
+						*(bool*)reference.GetUnsafePtrWithoutChecks() = false;
+					}
+				}) { Capacity = 64 };
 
 			ignoreBatchTimings = true;
 
@@ -378,9 +385,10 @@ namespace Unity
 
 			float3Buffers?.Dispose();
 			float4Buffers?.Dispose();
-			intReferences?.Dispose();
 			longBuffers?.Dispose();
-			boolBuffers?.Dispose();
+
+			intReferences?.Dispose();
+			boolReferences?.Dispose();
 
 			bvhNodeDataBuffer.SafeDispose();
 			bvhEntities.SafeDispose();
@@ -460,8 +468,6 @@ namespace Unity
 				foreach (var jobData in scheduledFinalizeJobs)
 					if (ShouldCancel())
 						jobData.Cancel();
-
-				i = 0;
 
 				foreach (var jobData in scheduledAccumulateJobs) jobData.Handle.Complete();
 				foreach (var jobData in scheduledCombineJobs) jobData.Handle.Complete();
@@ -593,8 +599,7 @@ namespace Unity
 			NativeArray<float3> normalOutputBuffer = float3Buffers.Take();
 			NativeArray<float3> albedoOutputBuffer = float3Buffers.Take();
 
-			// TODO: This should be a NativeReference<bool>
-			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+			NativeReference<bool> cancellationToken = boolReferences.Take();
 
 			if (interlacingOffsets == null || interlacing != interlacingOffsets.Length)
 				interlacingOffsets = Tools.SpaceFillingSeries(interlacing).ToArray();
@@ -623,7 +628,7 @@ namespace Unity
 			{
 				accumulateJob = new AccumulateJob
 				{
-					CancellationToken = cancellationBuffer,
+					CancellationToken = cancellationToken,
 
 					InputColor = colorAccumulationBuffer,
 					InputNormal = normalAccumulationBuffer,
@@ -670,10 +675,10 @@ namespace Unity
 			{
 				using var handles = new NativeArray<JobHandle>(4, Allocator.Temp)
 				{
-					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
-					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
-					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
-					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationBuffer, Buffer = diagnosticsBuffer }
+					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationToken, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
+					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
+					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
+					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationToken, Buffer = diagnosticsBuffer }
 						.Schedule(dependency ?? default)
 				};
 
@@ -704,9 +709,9 @@ namespace Unity
 			};
 
 			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { CancellationToken = cancellationBuffer, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationBuffer, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
+				new CopyFloat4BufferJob { CancellationToken = cancellationToken, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
+				new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
 			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
@@ -714,7 +719,7 @@ namespace Unity
 
 			scheduledAccumulateJobs.Enqueue(new ScheduledJobData<AccumulateOutputData>
 			{
-				CancellationToken = cancellationBuffer,
+				CancellationToken = cancellationToken,
 				Handle = combinedDependency,
 				OutputData = outputData,
 				OnComplete = () =>
@@ -722,7 +727,7 @@ namespace Unity
 					float4Buffers.Return(colorInputBuffer);
 					float3Buffers.Return(normalInputBuffer);
 					float3Buffers.Return(albedoInputBuffer);
-					boolBuffers.Return(cancellationBuffer);
+					boolReferences.Return(cancellationToken);
 				}
 			});
 
@@ -731,8 +736,7 @@ namespace Unity
 			normalAccumulationBuffer = normalOutputBuffer;
 			albedoAccumulationBuffer = albedoOutputBuffer;
 
-			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel ||
-			    previewAfterBatch)
+			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel || previewAfterBatch)
 				ScheduleCombine(combinedDependency, outputData);
 
 			// schedule another accumulate (but no more than one)
@@ -747,11 +751,11 @@ namespace Unity
 
 		void ScheduleCombine(JobHandle dependency, AccumulateOutputData accumulateOutput)
 		{
-			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+			NativeReference<bool> cancellationToken = boolReferences.Take();
 
 			var combineJob = new CombineJob
 			{
-				CancellationToken = cancellationBuffer,
+				CancellationToken = cancellationToken,
 
 				DebugMode = debugFailedSamples,
 #if ENABLE_OPTIX
@@ -782,7 +786,7 @@ namespace Unity
 
 			scheduledCombineJobs.Enqueue(new ScheduledJobData<PassOutputData>
 			{
-				CancellationToken = cancellationBuffer,
+				CancellationToken = cancellationToken,
 				Handle = combineJobHandle,
 				OutputData = copyOutputData,
 				OnComplete = () =>
@@ -790,7 +794,7 @@ namespace Unity
 					float4Buffers.Return(accumulateOutput.Color);
 					float3Buffers.Return(accumulateOutput.Normal);
 					float3Buffers.Return(accumulateOutput.Albedo);
-					boolBuffers.Return(cancellationBuffer);
+					boolReferences.Return(cancellationToken);
 				}
 			});
 
@@ -803,7 +807,7 @@ namespace Unity
 		void ScheduleDenoise(JobHandle dependency, PassOutputData combineOutput)
 		{
 			NativeArray<float3> denoiseColorOutputBuffer = float3Buffers.Take();
-			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+			NativeReference<bool> cancellationToken = boolReferences.Take();
 
 			JobHandle denoiseJobHandle = default;
 
@@ -817,7 +821,7 @@ namespace Unity
 				{
 					var denoiseJob = new OpenImageDenoiseJob
 					{
-						CancellationToken = cancellationBuffer,
+						CancellationToken = cancellationToken,
 						Width = (ulong) bufferSize.x,
 						Height = (ulong) bufferSize.y,
 						InputColor = combineOutput.Color,
@@ -864,13 +868,13 @@ namespace Unity
 
 			scheduledDenoiseJobs.Enqueue(new ScheduledJobData<PassOutputData>
 			{
-				CancellationToken = cancellationBuffer,
+				CancellationToken = cancellationToken,
 				Handle = denoiseJobHandle,
 				OutputData = copyOutputData,
 				OnComplete = () =>
 				{
 					float3Buffers.Return(combineOutput.Color);
-					boolBuffers.Return(cancellationBuffer);
+					boolReferences.Return(cancellationToken);
 				}
 			});
 
@@ -879,11 +883,11 @@ namespace Unity
 
 		void ScheduleFinalize(JobHandle dependency, PassOutputData lastPassOutput)
 		{
-			NativeArray<bool> cancellationBuffer = boolBuffers.Take();
+			NativeReference<bool> cancellationToken = boolReferences.Take();
 
 			var finalizeJob = new FinalizeTexturesJob
 			{
-				CancellationToken = cancellationBuffer,
+				CancellationToken = cancellationToken,
 
 				InputColor = lastPassOutput.Color,
 				InputNormal = lastPassOutput.Normal,
@@ -904,14 +908,14 @@ namespace Unity
 
 			scheduledFinalizeJobs.Enqueue(new ScheduledJobData<PassOutputData>
 			{
-				CancellationToken = cancellationBuffer,
+				CancellationToken = cancellationToken,
 				Handle = finalizeJobHandle,
 				OnComplete = () =>
 				{
 					float3Buffers.Return(lastPassOutput.Color);
 					float3Buffers.Return(lastPassOutput.Normal);
 					float3Buffers.Return(lastPassOutput.Albedo);
-					boolBuffers.Return(cancellationBuffer);
+					boolReferences.Return(cancellationToken);
 				}
 			});
 		}
@@ -926,8 +930,7 @@ namespace Unity
 		unsafe void SwapBuffers()
 		{
 			float bufferMin = float.MaxValue, bufferMax = float.MinValue;
-			Diagnostics* diagnosticsPtr =
-				(Diagnostics*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(diagnosticsBuffer);
+			var diagnosticsPtr = (Diagnostics*) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(diagnosticsBuffer);
 
 			switch (bufferView)
 			{
@@ -1135,7 +1138,7 @@ namespace Unity
 					if (albedoMap == null)
 						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
 					else
-						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3(),
+						albedoTexture = new Texture(TextureType.Image, albedo.linear.ToFloat3(),
 							pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
 							imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 
@@ -1168,6 +1171,7 @@ namespace Unity
 				var rigidTransform = new RigidTransform(meshTransform.rotation, meshTransform.position);
 
 				var meshFilter = meshRenderer.gameObject.GetComponent<MeshFilter>();
+				var meshData = meshRenderer.gameObject.GetComponentInParent<MeshData>();
 
 				using Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(meshFilter.sharedMesh);
 
@@ -1176,10 +1180,7 @@ namespace Unity
 					Entities = entityBuffer,
 					Triangles = triangleBuffer,
 					//ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
-
-					// TODO: Face normals support
-					//FaceNormals = e.MeshData.FaceNormals,
-
+					FaceNormals = meshData && meshData.FaceNormals,
 					Material = materialBuffer.GetUnsafeList()->Ptr + materialIndex,
 					MeshDataArray = meshDataArray,
 					RigidTransform = rigidTransform,

@@ -16,8 +16,7 @@ namespace Runtime
 		Sphere,
 		Rect,
 		Box,
-		Triangle,
-		Mesh
+		Triangle
 	}
 
 	static class EntityTypeExtensions
@@ -59,10 +58,11 @@ namespace Runtime
 		public bool Hit(Ray ray, float tMin, float tMax, out HitRecord rec)
 		{
 			if (HitInternal(ray, tMin, tMax,
-				out float distance, out float3 entityLocalNormal, out RigidTransform transformAtTime, out _))
+				out float distance, out float3 entityLocalNormal, out float2 texCoord,
+				out RigidTransform transformAtTime, out _))
 			{
 				// TODO: normal is disregarded for isotropic materials
-				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)));
+				rec = new HitRecord(distance, ray.GetPoint(distance), normalize(rotate(transformAtTime, entityLocalNormal)), texCoord);
 
 				return true;
 			}
@@ -72,7 +72,8 @@ namespace Runtime
 		}
 
 		bool HitInternal(Ray ray, float tMin, float tMax,
-			out float distance, out float3 entitySpaceNormal, out RigidTransform transformAtTime, out Ray entitySpaceRay)
+			out float distance, out float3 entitySpaceNormal, out float2 texCoord,
+			out RigidTransform transformAtTime, out Ray entitySpaceRay)
 		{
 			RigidTransform inverseTransform;
 
@@ -95,20 +96,23 @@ namespace Runtime
 					transform(inverseTransform, ray.Origin),
 					rotate(inverseTransform, ray.Direction));
 
-			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal))
+			if (!HitContent(entitySpaceRay, tMin, tMax, out distance, out entitySpaceNormal, out texCoord))
 				return false;
 
 			return true;
 		}
 
-		bool HitContent(Ray r, float tMin, float tMax, out float distance, out float3 normal)
+		bool HitContent(Ray r, float tMin, float tMax, out float distance, out float3 normal, out float2 texCoord)
 		{
+			// TODO: Texcoord support for primitives
+			texCoord = 0;
+
 			switch (Type)
 			{
 				case EntityType.Sphere: return ((Sphere*) Content)->Hit(r, tMin, tMax, out distance, out normal);
 				case EntityType.Rect: return ((Rect*) Content)->Hit(r, tMin, tMax, out distance, out normal);
 				case EntityType.Box: return ((Box*) Content)->Hit(r, tMin, tMax, out distance, out normal);
-				case EntityType.Triangle: return ((Triangle*) Content)->Hit(r, tMin, tMax, out distance, out normal);
+				case EntityType.Triangle: return ((Triangle*) Content)->Hit(r, tMin, tMax, out distance, out normal, out texCoord);
 
 				default:
 					distance = 0;
@@ -120,7 +124,7 @@ namespace Runtime
 		public float Pdf(Ray r)
 		{
 			if (HitInternal(r, 0.001f, float.PositiveInfinity,
-				out float distance, out float3 entitySpaceNormal, out _, out Ray entitySpaceRay))
+				out float distance, out float3 entitySpaceNormal, out _, out _, out Ray entitySpaceRay))
 			{
 				switch (Type)
 				{
@@ -146,7 +150,7 @@ namespace Runtime
 		}
 
 		public RigidTransform TransformAtTime(float t) =>
-			new RigidTransform(OriginTransform.rot,
+			new(OriginTransform.rot,
 				OriginTransform.pos +
 				DestinationOffset * clamp(unlerp(TimeRange.x, TimeRange.y, t), 0.0f, 1.0f));
 	}

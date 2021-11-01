@@ -10,6 +10,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Util;
 using static Unity.Mathematics.math;
 using Random = Unity.Mathematics.Random;
@@ -62,6 +63,7 @@ namespace Runtime
 		{
 			float3* worldSpaceVertices = stackalloc float3[3];
 			float3* worldSpaceNormals = stackalloc float3[3];
+			float2* triangleUv = stackalloc float2[3];
 
 			for (int meshIndex = 0; meshIndex < MeshDataArray.Length; meshIndex++)
 			{
@@ -77,6 +79,13 @@ namespace Runtime
 					meshData.GetNormals(normals);
 				}
 
+				NativeArray<Vector2> texCoords = default;
+				if (meshData.HasVertexAttribute(VertexAttribute.TexCoord0))
+				{
+					texCoords = new NativeArray<Vector2>(meshData.vertexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+					meshData.GetUVs(0, texCoords);
+				}
+
 				NativeArray<ushort> indices = meshData.GetIndexData<ushort>();
 				for (int i = 0; i < indices.Length; i += 3)
 				{
@@ -87,14 +96,18 @@ namespace Runtime
 					{
 						worldSpaceVertices[j] = transform(RigidTransform, vertices[triangleIndices[j]] * Scale);
 						if (!FaceNormals) worldSpaceNormals[j] = mul(RigidTransform.rot, normals[triangleIndices[j]]);
+						triangleUv[j] = texCoords.IsCreated ? texCoords[triangleIndices[j]] : default;
 					}
 
 					if (FaceNormals)
-						Triangles.AddNoResize(new Triangle(worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2]));
+						Triangles.AddNoResize(new Triangle(
+							worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2],
+							triangleUv[0], triangleUv[1], triangleUv[2]));
 					else
 						Triangles.AddNoResize(new Triangle(
 							worldSpaceVertices[0], worldSpaceVertices[1], worldSpaceVertices[2],
-							worldSpaceNormals[0], worldSpaceNormals[1], worldSpaceNormals[2]));
+							worldSpaceNormals[0], worldSpaceNormals[1], worldSpaceNormals[2],
+							triangleUv[0], triangleUv[1], triangleUv[2]));
 
 					var contentPointer = Triangles.GetUnsafeList()->Ptr + (Triangles.Length - 1);
 
@@ -108,8 +121,8 @@ namespace Runtime
 					//	ImportanceSampledEntityPointers.AddNoResize((Entity*) Entities.GetUnsafePtr() + (EntityIndex.Value - 1));
 				}
 
-				if (!FaceNormals)
-					normals.Dispose();
+				normals.SafeDispose();
+				texCoords.SafeDispose();
 			}
 		}
 	}
@@ -154,7 +167,7 @@ namespace Runtime
 		const int EntityStackAllocSize = 64;
 		const int HitRecordStackAllocSize = 32;
 
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public float2 Size;
 		[ReadOnly] public int SliceOffset;
@@ -188,7 +201,7 @@ namespace Runtime
 		[SkipLocalsInit]
 		public void Execute(int index)
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			int2 coordinates = int2(
@@ -403,7 +416,7 @@ namespace Runtime
 								// TODO: Normal is sort of undefined here, but should still be set
 								Trace($"#{depth} : We hit inside the volume");
 								float totalDistance = probabilisticVolumeEntryDistance + distanceInProbabilisticVolume;
-								rec = new HitRecord(totalDistance, ray.GetPoint(totalDistance), -ray.Direction);
+								rec = new HitRecord(totalDistance, ray.GetPoint(totalDistance), -ray.Direction, default);
 								material = currentProbabilisticVolumeMaterial;
 							}
 							else
@@ -441,7 +454,7 @@ namespace Runtime
 #endif
 					material->Scatter(ray, rec, ref rng, PerlinNoise, out float3 albedo, out Ray scatteredRay);
 
-					float3 emission = material->Emit(rec.Point, rec.Normal, PerlinNoise);
+					float3 emission = material->Emit(rec.TexCoords, PerlinNoise);
 					*emissionCursor++ = emission;
 
 					if (depth == 0)
@@ -701,7 +714,7 @@ namespace Runtime
 		public bool DebugMode;
 		public bool LdrAlbedo;
 
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public NativeArray<float4> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
@@ -714,7 +727,7 @@ namespace Runtime
 
 		public void Execute(int index)
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			float4 inputColor = InputColor[index];
@@ -760,13 +773,13 @@ namespace Runtime
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct ClearBufferJob<T> : IJob where T : unmanaged
 	{
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[WriteOnly] public NativeArray<T> Buffer;
 
 		public void Execute()
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			Buffer.ZeroMemory();
@@ -776,14 +789,14 @@ namespace Runtime
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct CopyFloat3BufferJob : IJob
 	{
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public NativeArray<float3> Input;
 		[WriteOnly] public NativeArray<float3> Output;
 
 		public void Execute()
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			NativeArray<float3>.Copy(Input, Output);
@@ -793,14 +806,14 @@ namespace Runtime
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct CopyFloat4BufferJob : IJob
 	{
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public NativeArray<float4> Input;
 		[WriteOnly] public NativeArray<float4> Output;
 
 		public void Execute()
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			NativeArray<float4>.Copy(Input, Output);
@@ -810,7 +823,7 @@ namespace Runtime
 	// because the OIDN API uses strings, we can't use Burst here
 	struct OpenImageDenoiseJob : IJob
 	{
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public NativeArray<float3> InputColor, InputNormal, InputAlbedo;
 		[ReadOnly] public ulong Width, Height;
@@ -821,7 +834,7 @@ namespace Runtime
 
 		public unsafe void Execute()
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			OidnFilter.SetSharedImage(DenoiseFilter, "color", new IntPtr(InputColor.GetUnsafeReadOnlyPtr()),
@@ -844,7 +857,7 @@ namespace Runtime
 	// [BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 	struct OptixDenoiseJob : IJob
 	{
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public NativeArray<float3> InputColor, InputAlbedo;
 		[ReadOnly] public uint2 BufferSize;
@@ -870,7 +883,7 @@ namespace Runtime
 
 		public unsafe void Execute()
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			Check(CudaBuffer.Copy(new IntPtr(InputColor.GetUnsafeReadOnlyPtr()), InputColorBuffer.Handle,
@@ -923,7 +936,7 @@ namespace Runtime
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct FinalizeTexturesJob : IJobParallelFor
 	{
-		[ReadOnly] public NativeArray<bool> CancellationToken;
+		[ReadOnly] public NativeReference<bool> CancellationToken;
 
 		[ReadOnly] public NativeArray<float3> InputColor;
 		[ReadOnly] public NativeArray<float3> InputNormal;
@@ -935,7 +948,7 @@ namespace Runtime
 
 		public void Execute(int index)
 		{
-			if (CancellationToken[0])
+			if (CancellationToken.Value)
 				return;
 
 			// TODO: tone-mapping

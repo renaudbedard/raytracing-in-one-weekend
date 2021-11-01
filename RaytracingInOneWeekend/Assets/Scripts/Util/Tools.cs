@@ -45,11 +45,6 @@ namespace Util
 			return normalize(result);
 		}
 
-		public static void Swap<T>(ref T lhs, ref T rhs) where T : struct
-		{
-			(lhs, rhs) = (rhs, lhs);
-		}
-
 		public static bool EnsureCapacity<T>(this ref NativeArray<T> array, int size) where T : struct
 		{
 			if (array.IsCreated && array.Length == size)

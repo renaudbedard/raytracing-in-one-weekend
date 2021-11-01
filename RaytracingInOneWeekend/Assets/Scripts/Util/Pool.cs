@@ -11,7 +11,7 @@ namespace Util
 		readonly string itemName;
 		int freeIndex;
 
-		T[] items = new T[0];
+		T[] items = Array.Empty<T>();
 
 		public Pool(Func<T> factoryMethod = null, Action<T> cleanupMethod = null, string itemNameOverride = null)
 		{
@@ -88,9 +88,7 @@ namespace Util
 			int destinationIndex = freeIndex;
 			int sourceIndex = Array.IndexOf(items, item, 0, freeIndex + 1);
 
-			T swappedItem = items[destinationIndex];
-			items[destinationIndex] = items[sourceIndex];
-			items[sourceIndex] = swappedItem;
+			(items[destinationIndex], items[sourceIndex]) = (items[sourceIndex], items[destinationIndex]);
 		}
 
 		public void ReturnAll()
