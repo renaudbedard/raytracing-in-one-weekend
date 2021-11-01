@@ -8,37 +8,32 @@ namespace Runtime
 {
 	enum MaterialType
 	{
-		None,
-		Lambertian,
-		Metal,
+		Standard,
 		Dielectric,
-		DiffuseLight,
 		ProbabilisticVolume
 	}
 
 	readonly struct Material
 	{
 		public readonly MaterialType Type;
-		public readonly Texture Texture, Roughness;
-		public readonly float2 TextureScale;
-		public readonly float Parameter;
+		public readonly Texture Albedo, Glossiness, Emission, Metallic;
 
-		float RefractiveIndex => Parameter; // for Dielectric
-		public float Density => Parameter; // for ProbabilisticVolume
+		readonly float parameter;
+		public float RefractiveIndex => parameter; // for Dielectric
+		public float Density => parameter; // for ProbabilisticVolume
 
-		public Material(MaterialType type, float2 textureScale = default, Texture albedo = default,
-			Texture emission = default, Texture roughness = default, float refractiveIndex = 1, float density = 1) : this()
+		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float refractiveIndex = 1.46f, float density = 1) : this()
 		{
 			Type = type;
-			TextureScale = textureScale;
+			Albedo = albedo;
+			Emission = emission;
+			Glossiness = glossiness;
+			Metallic = metallic;
 
 			switch (type)
 			{
-				case MaterialType.Lambertian: Texture = albedo; break;
-				case MaterialType.Metal: Roughness = roughness; Texture = albedo; break;
-				case MaterialType.Dielectric: Roughness = roughness; Parameter = refractiveIndex; Texture = albedo; break;
-				case MaterialType.DiffuseLight: Texture = emission; break;
-				case MaterialType.ProbabilisticVolume: Parameter = density; Texture = albedo; break;
+				case MaterialType.Dielectric: parameter = refractiveIndex; break;
+				case MaterialType.ProbabilisticVolume: parameter = density; break;
 			}
 		}
 
@@ -63,44 +58,50 @@ namespace Runtime
 		public void Scatter(Ray ray, HitRecord rec, ref RandomSource rng, PerlinNoise perlinNoise,
 			out float3 reflectance, out Ray scattered)
 		{
+			reflectance = Albedo.SampleColor(rec.TexCoords, perlinNoise);
+
 			switch (Type)
 			{
-				case MaterialType.Lambertian:
+				case MaterialType.Standard:
 				{
-					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
-					//float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
-					float3 randomDirection = rng.OnUniformHemisphere(rec.Normal);
-					scattered = new Ray(rec.Point, randomDirection, ray.Time);
-					break;
-				}
+					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
+					if (rng.NextFloat() < metallicChance)
+					{
+						// Peter Shirley's fuzzy metal
+						float3 reflected = reflect(ray.Direction, rec.Normal);
+						float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
+						scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
+					}
+					else
+					{
+						// Rough Plastic
+						float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
+						float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction());
+						float cosine;
+						if (dot(ray.Direction, roughNormal) > 0)
+							cosine = RefractiveIndex * dot(ray.Direction, roughNormal);
+						else
+							cosine = -dot(ray.Direction, roughNormal);
 
-				case MaterialType.Metal:
-				{
-					// GGX (probably wrong though)
-					// float3 outgoingDirection = WorldToTangentSpace(-ray.Direction, rec.Normal);
-					// if (GgxMicrofacet.ImportanceSample(Texture.Value(rec.Point, rec.Normal, TextureScale, perlinData),
-					// 	Roughness, ref rng, outgoingDirection, out float3 toLight, out reflectance))
-					// {
-					// 	float3 scatterDirection = TangentToWorldSpace(toLight, rec.Normal);
-					// 	scattered = new Ray(rec.Point, scatterDirection, ray.Time);
-					// 	return true;
-					// }
-					// scattered = default;
-					// return false;
-
-					// Peter Shirley's fuzzy metal
-					float3 reflected = reflect(ray.Direction, rec.Normal);
-					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
-					float roughness = Roughness.Value(rec.TexCoords, perlinNoise).x;
-					scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
+						// TODO: Using this Fresnel equation might not make sense for conductors (or plastics)
+						if (rng.NextFloat() < Schlick(cosine, RefractiveIndex))
+						{
+							// Lambertian diffuse
+							float3 randomDirection = rng.OnUniformHemisphere(rec.Normal); // TODO: Is cosine hemisphere more accurate?
+							scattered = new Ray(rec.Point, randomDirection, ray.Time);
+						}
+						else
+						{
+							// Glossy reflection
+							scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
+						}
+					}
 					break;
 				}
 
 				case MaterialType.Dielectric:
 				{
-					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
-
-					float roughness = Roughness.Value(rec.TexCoords, perlinNoise).x;
+					float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 					float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction());
 
 					float niOverNt, cosine;
@@ -133,47 +134,17 @@ namespace Runtime
 
 				case MaterialType.ProbabilisticVolume:
 					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
-					reflectance = Texture.Value(rec.TexCoords, perlinNoise);
 					break;
 
 				default:
-					reflectance = default;
-					scattered = default;
-					break;
-			}
-		}
-
-		[Pure]
-		public float Pdf(float3 incomingLightDirection, float3 outgoingLightDirection, float3 geometricNormal)
-		{
-			switch (Type)
-			{
-				case MaterialType.Lambertian:
-					return max(dot(geometricNormal, incomingLightDirection) / PI, 0);
-
-				case MaterialType.ProbabilisticVolume:
-					return 1.0f / (4.0f * PI);
-
-				case MaterialType.Metal:
 					throw new NotImplementedException();
-					// Disabled because it currently does not work right
-					//return GgxMicrofacet.Pdf(incomingLightDirection, outgoingLightDirection, geometricNormal, Roughness);
-
-				case MaterialType.DiffuseLight:
-					return 0; // Doesn't matter, because there is no scattering or albedo
-
-				default: throw new NotImplementedException();
 			}
 		}
 
 		[Pure]
 		public float3 Emit(float2 texCoords, PerlinNoise perlinNoise)
 		{
-			switch (Type)
-			{
-				case MaterialType.DiffuseLight: return Texture.Value(texCoords, perlinNoise);
-				default: return 0;
-			}
+			return Emission.SampleColor(texCoords, perlinNoise);
 		}
 
 		public bool IsPerfectSpecular
@@ -182,8 +153,12 @@ namespace Runtime
 			{
 				switch (Type)
 				{
-					case MaterialType.Dielectric: return true;
-					case MaterialType.Metal: return Roughness.Type == TextureType.Constant && all(Roughness.MainColor.AlmostEquals(0));
+					case MaterialType.Dielectric:
+						return true;
+
+					case MaterialType.Standard:
+						return Metallic.Type == TextureType.Constant && all(Metallic.MainColor.AlmostEquals(1)) &&
+						       Glossiness.Type == TextureType.Constant && all(Glossiness.MainColor.AlmostEquals(1));
 				}
 				return false;
 			}

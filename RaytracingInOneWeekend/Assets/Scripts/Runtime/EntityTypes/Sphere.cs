@@ -13,16 +13,6 @@ namespace Runtime.EntityTypes
 			SquaredRadius = radius * radius;
 		}
 
-		public float Pdf(float3 entityLocalRayOrigin)
-		{
-			float cosThetaMax = sqrt(1 - SquaredRadius / lengthsq(-entityLocalRayOrigin));
-			float solidAngle = 2 * PI * (1 - cosThetaMax);
-			return 1 / solidAngle;
-		}
-
-		// TODO: this could (should?) be view-dependent
-		public float3 RandomPoint(ref RandomSource rng) => rng.NextFloat3Direction() * Radius;
-
 		public AxisAlignedBoundingBox Bounds
 		{
 			get

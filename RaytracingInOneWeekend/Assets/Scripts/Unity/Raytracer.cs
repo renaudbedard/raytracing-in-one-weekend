@@ -62,7 +62,6 @@ namespace Unity
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
 		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
-		[SerializeField] ImportanceSamplingMode importanceSampling = ImportanceSamplingMode.None;
 		[SerializeField] DenoiseMode denoiseMode = DenoiseMode.None;
 		[SerializeField] NoiseColor noiseColor = NoiseColor.White;
 		[SerializeField] bool subPixelJitter = true;
@@ -118,7 +117,6 @@ namespace Unity
 		// NativeArray<Sphere> sphereBuffer;
 		// NativeArray<Rect> rectBuffer;
 		// NativeArray<Box> boxBuffer;
-		//UnsafePtrList<Entity> importanceSamplingEntityPointers;
 
 		NativeList<Triangle> triangleBuffer;
 		NativeList<Entity> entityBuffer;
@@ -193,7 +191,6 @@ namespace Unity
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
 		bool queuedAccumulate;
-		ImportanceSamplingMode lastSamplingMode;
 
 		readonly Stopwatch traceTimer = new();
 		readonly List<float> mraysPerSecResults = new();
@@ -376,7 +373,6 @@ namespace Unity
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Handle.Complete();
 
 			entityBuffer.SafeDispose();
-			// importanceSamplingEntityPointers.Dispose();
 			// sphereBuffer.SafeDispose();
 			// rectBuffer.SafeDispose();
 			// boxBuffer.SafeDispose();
@@ -440,11 +436,10 @@ namespace Unity
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
 			bool cameraDirty = TargetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
-			bool samplingModeChanged = importanceSampling != lastSamplingMode;
 			bool samplesPerPixelDecreased =
 				lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 
-			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged || samplingModeChanged || samplesPerPixelDecreased;
+			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged || samplesPerPixelDecreased;
 
 			if (traceNeedsReset || traceAborted)
 			{
@@ -587,7 +582,6 @@ namespace Unity
 				mraysPerSecResults.Clear();
 				AccumulatedSamples = 0;
 				lastTraceDepth = traceDepth;
-				lastSamplingMode = importanceSampling;
 				lastSamplesPerPixel = samplesPerPixel;
 				traceAborted = false;
 #if UNITY_EDITOR
@@ -653,14 +647,6 @@ namespace Unity
 					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
 					NoiseColor = noiseColor,
 					OutputDiagnostics = diagnosticsBuffer,
-					ImportanceSampler = new ImportanceSampler
-					{
-						// TargetEntityPointers = importanceSamplingEntityPointers,
-						// Mode = importanceSamplingEntityPointers.Length == 0
-						// 	? ImportanceSamplingMode.None
-						// 	: importanceSampling
-						Mode = ImportanceSamplingMode.None
-					},
 #if PATH_DEBUGGING
 					DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
 					DebugCoordinates = int2 (bufferSize / 2)
@@ -678,8 +664,7 @@ namespace Unity
 					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationToken, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
 					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
 					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
-					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationToken, Buffer = diagnosticsBuffer }
-						.Schedule(dependency ?? default)
+					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationToken, Buffer = diagnosticsBuffer }.Schedule(dependency ?? default)
 				};
 
 				JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
@@ -695,8 +680,7 @@ namespace Unity
 			accumulateJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 1 }.Schedule(accumulateJobHandle);
 
 			NativeReference<int> reducedRayCountReference = intReferences.Take();
-			JobHandle reduceRayCountJobHandle = new ReduceRayCountJob { Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountReference }
-				.Schedule(accumulateJobHandle);
+			JobHandle reduceRayCountJobHandle = new ReduceRayCountJob { Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountReference }.Schedule(accumulateJobHandle);
 
 			var outputData = new AccumulateOutputData
 			{
@@ -740,8 +724,7 @@ namespace Unity
 				ScheduleCombine(combinedDependency, outputData);
 
 			// schedule another accumulate (but no more than one)
-			if (!dependency.HasValue &&
-			    AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing < samplesPerPixel)
+			if (!dependency.HasValue && AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing < samplesPerPixel)
 				ScheduleAccumulate(false, JobHandle.CombineDependencies(combinedDependency, reduceRayCountJobHandle));
 
 			JobHandle.ScheduleBatchedJobs();
@@ -1103,7 +1086,6 @@ namespace Unity
 		unsafe void RebuildEntityBuffers()
 		{
 			// TODO: Non-mesh primitives
-			// TODO: Importance sampling
 			// TODO: Movement support
 
 			var materialMap = new Dictionary<UnityEngine.Material, int>();
@@ -1122,45 +1104,77 @@ namespace Unity
 			triangleBuffer.Clear();
 
 			// Collect mesh renderers
+			// TODO: Sub-mesh support
 			foreach (var meshRenderer in FindObjectsOfType<MeshRenderer>().Where(x => x.enabled))
 			{
-				// TODO: Roughness map
-
 				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterials.Last();
 				if (!materialMap.TryGetValue(unityMaterial, out int materialIndex))
 				{
-					unityMaterial.TryGetProperty("_Metallic", out float metallic);
-					unityMaterial.TryGetProperty("_Glossiness", out float glossiness);
-					unityMaterial.TryGetProperty("_MainTex", out Texture2D albedoMap);
 					unityMaterial.TryGetProperty("_Color", out Color albedo);
-
-					Texture albedoTexture;
-					if (albedoMap == null)
-						albedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
-					else
-						albedoTexture = new Texture(TextureType.Image, albedo.linear.ToFloat3(),
+					Texture meshAlbedoTexture;
+					if (unityMaterial.TryGetProperty("_MainTex", out Texture2D albedoMap) && albedoMap.format == TextureFormat.RGB24)
+						meshAlbedoTexture = new Texture(TextureType.Image, albedo.linear.ToFloat3(),
 							pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
 							imageWidth: albedoMap.width, imageHeight: albedoMap.height);
+					else
+						meshAlbedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
+
+					unityMaterial.TryGetProperty("_EmissionColor", out Color emission);
+					Texture meshEmissionTexture;
+					if (unityMaterial.TryGetProperty("_EmissionMap", out Texture2D emissionMap) && emissionMap.format == TextureFormat.RGB24)
+						meshEmissionTexture = new Texture(TextureType.Image, emission.linear.ToFloat3(),
+							pImage: (byte*) emissionMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
+							imageWidth: emissionMap.width, imageHeight: emissionMap.height);
+					else
+						meshEmissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
+
+					unityMaterial.TryGetProperty("_Metallic", out float metallic);
+					metallic = Mathf.GammaToLinearSpace(metallic);
+					Texture meshMetallicTexture;
+					if (unityMaterial.TryGetProperty("_MetallicGlossMap", out Texture2D metallicMap))
+					{
+						int pixelStride;
+						byte* imagePointer;
+						switch (metallicMap.format)
+						{
+							case TextureFormat.RGB24:
+								imagePointer = (byte*) metallicMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr();
+								pixelStride = 3;
+								break;
+							case TextureFormat.RGBA32:
+								imagePointer = (byte*)metallicMap.GetRawTextureData<RGBA32>().GetUnsafeReadOnlyPtr();
+								pixelStride = 4;
+								break;
+							default:
+								throw new NotSupportedException($"Unsupported texture format for metallic/gloss map : {metallicMap.format}");
+						}
+						meshMetallicTexture = new Texture(TextureType.Image, metallic, pImage: imagePointer, imageWidth: metallicMap.width, imageHeight: metallicMap.height, pixelStride: pixelStride);
+					}
+					else
+						meshMetallicTexture = new Texture(TextureType.Constant, metallic);
+
+					unityMaterial.TryGetProperty("_Glossiness", out float glossiness);
+					Texture meshGlossinessTexture;
+					if (unityMaterial.shaderKeywords.Contains("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A") && albedoMap && albedoMap.format == TextureFormat.RGBA32)
+					{
+						meshGlossinessTexture = new Texture(TextureType.Image, glossiness,
+							pImage: (byte*) albedoMap.GetRawTextureData<RGBA32>().GetUnsafeReadOnlyPtr(),
+							imageWidth: albedoMap.width, imageHeight: albedoMap.height, pixelStride: 4, scalarValueChannel: 3);
+					}
+					else if (metallicMap && metallicMap.format == TextureFormat.RGBA32)
+						meshGlossinessTexture = new Texture(TextureType.Image, glossiness,
+							pImage: (byte*) metallicMap.GetRawTextureData<RGBA32>().GetUnsafeReadOnlyPtr(),
+							imageWidth: metallicMap.width, imageHeight: metallicMap.height, pixelStride: 4, scalarValueChannel: 3);
+					else
+						meshGlossinessTexture = new Texture(TextureType.Constant, glossiness);
 
 					Material material;
 					if (unityMaterial.TryGetProperty("_Density", out float density))
-						material = new Material(MaterialType.ProbabilisticVolume, albedo: albedoTexture, density: density);
-					else if (unityMaterial.IsKeywordEnabled("_EMISSION") &&
-					         unityMaterial.TryGetProperty("_EmissionColor", out Color emission) &&
-					         emission.maxColorComponent > 0)
-					{
-						var emissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
-						material = new Material(MaterialType.DiffuseLight, emission: emissionTexture);
-					}
+						material = new Material(MaterialType.ProbabilisticVolume, meshAlbedoTexture, density: density);
 					else if (unityMaterial.TryGetProperty("_RefractiveIndex", out float refractiveIndex))
-					{
-						material = new Material(MaterialType.Dielectric, 1, albedoTexture, refractiveIndex: refractiveIndex);
-					}
-					else if (Mathf.Approximately(metallic, 0))
-						material = new Material(MaterialType.Lambertian, 1, albedoTexture);
+						material = new Material(MaterialType.Dielectric, meshAlbedoTexture, refractiveIndex: refractiveIndex);
 					else
-						material = new Material(MaterialType.Metal, 1, albedoTexture,
-							roughness: new Texture(TextureType.Constant, 1 - glossiness));
+						material = new Material(MaterialType.Standard, meshAlbedoTexture, meshEmissionTexture, meshGlossinessTexture, meshMetallicTexture);
 
 					materialBuffer.AddNoResize(material);
 					materialIndex = materialBuffer.Length - 1;
@@ -1179,7 +1193,6 @@ namespace Unity
 				{
 					Entities = entityBuffer,
 					Triangles = triangleBuffer,
-					//ImportanceSampledEntityPointers = importanceSamplingEntityPointers,
 					FaceNormals = meshData && meshData.FaceNormals,
 					Material = materialBuffer.GetUnsafeList()->Ptr + materialIndex,
 					MeshDataArray = meshDataArray,

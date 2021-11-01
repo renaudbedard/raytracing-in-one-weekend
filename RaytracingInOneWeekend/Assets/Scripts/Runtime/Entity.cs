@@ -121,34 +121,6 @@ namespace Runtime
 			}
 		}
 
-		public float Pdf(Ray r)
-		{
-			if (HitInternal(r, 0.001f, float.PositiveInfinity,
-				out float distance, out float3 entitySpaceNormal, out _, out _, out Ray entitySpaceRay))
-			{
-				switch (Type)
-				{
-					case EntityType.Rect: return ((Rect*) Content)->Pdf(entitySpaceRay.Direction, distance, entitySpaceNormal);
-					case EntityType.Sphere: return ((Sphere*) Content)->Pdf(entitySpaceRay.Origin);
-					default: throw new NotImplementedException();
-				}
-			}
-			return 0;
-		}
-
-		public float3 RandomPoint(float time, ref RandomSource rng)
-		{
-			float3 localPoint;
-			switch (Type)
-			{
-				case EntityType.Rect: localPoint = ((Rect*) Content)->RandomPoint(ref rng); break;
-				case EntityType.Sphere: localPoint = ((Sphere*) Content)->RandomPoint(ref rng); break;
-				case EntityType.Triangle: localPoint = ((Triangle*) Content)->RandomPoint(ref rng); break;
-				default: throw new NotImplementedException();
-			}
-			return transform(!Moving ? OriginTransform : TransformAtTime(time), localPoint);
-		}
-
 		public RigidTransform TransformAtTime(float t) =>
 			new(OriginTransform.rot,
 				OriginTransform.pos +

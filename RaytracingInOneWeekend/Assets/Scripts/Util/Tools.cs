@@ -149,7 +149,7 @@ namespace Util
 				return false;
 			}
 			value = material.GetTexture(name) as Texture2D;
-			return true;
+			return value != null;
 		}
 
 		public static bool TryGetProperty(this Material material, string name, out Cubemap value)
@@ -160,7 +160,7 @@ namespace Util
 				return false;
 			}
 			value = material.GetTexture(name) as Cubemap;
-			return true;
+			return value != null;
 		}
 
 		public static bool TryGetProperty(this Material material, string name, out int value)

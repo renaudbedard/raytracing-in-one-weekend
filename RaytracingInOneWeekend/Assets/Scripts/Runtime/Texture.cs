@@ -28,12 +28,14 @@ namespace Runtime
 		public readonly float Parameter;
 		public readonly int2 ImageSize;
 		public readonly byte* ImagePointer;
+		public readonly int PixelStride;
+		public readonly int ScalarValueChannel;
 
 		float NoiseFrequency => Parameter;
-		float ScalarValue => Parameter;
+		float ConstantValue => Parameter;
 
 		public Texture(TextureType type, float3 mainColor,
-			float3 secondaryColor = default, float parameter = default, byte* pImage = default, int imageWidth = default, int imageHeight = default)
+			float3 secondaryColor = default, float parameter = default, byte* pImage = default, int imageWidth = default, int imageHeight = default, int pixelStride = 3, int scalarValueChannel = 0)
 		{
 			Type = type;
 			MainColor = mainColor;
@@ -41,10 +43,12 @@ namespace Runtime
 			Parameter = parameter;
 			ImagePointer = pImage;
 			ImageSize = int2(imageWidth, imageHeight);
+			PixelStride = pixelStride;
+			ScalarValueChannel = scalarValueChannel;
 		}
 
 		[Pure]
-		public float3 Value(float2 textureCoordinates, PerlinNoise perlinNoise)
+		public float3 SampleColor(float2 textureCoordinates, PerlinNoise perlinNoise)
 		{
 			switch (Type)
 			{
@@ -52,7 +56,7 @@ namespace Runtime
 					return MainColor;
 
 				case TextureType.ConstantScalar:
-					return ScalarValue;
+					return ConstantValue;
 
 				// case TextureType.CheckerPattern:
 				// {
@@ -80,8 +84,53 @@ namespace Runtime
 
 					int2 coords = (int2) (textureCoordinates * ImageSize);
 
-					byte* pPixelData = ImagePointer + (coords.y * ImageSize.x + coords.x) * 3;
+					byte* pPixelData = ImagePointer + (coords.y * ImageSize.x + coords.x) * PixelStride;
 					return float3(pPixelData[0], pPixelData[1], pPixelData[2]) / 255 * MainColor;
+				}
+			}
+
+			return default;
+		}
+
+		[Pure]
+		public float SampleScalar(float2 textureCoordinates, PerlinNoise perlinNoise)
+		{
+			switch (Type)
+			{
+				case TextureType.Constant:
+					return MainColor[ScalarValueChannel];
+
+				case TextureType.ConstantScalar:
+					return ConstantValue;
+
+				// case TextureType.CheckerPattern:
+				// {
+				// 	// from iq : https://www.shadertoy.com/view/ltl3D8
+				// 	float3 n = abs(normal);
+				// 	float3 v = n.x > n.y && n.x > n.z ? normal.xyz :
+				// 		n.y > n.x && n.y > n.z ? normal.yzx :
+				// 		normal.zxy;
+				// 	float2 q = v.yz / v.x;
+				// 	float2 uv = 0.5f + 0.5f * q;
+				//
+				// 	float2 sines = sin(PI * scale * uv);
+				// 	return sines.x * sines.y < 0 ? MainColor : SecondaryColor;
+				// }
+				//
+				// case TextureType.PerlinNoise:
+				// 	return 0.5f * (1 + sin(NoiseFrequency * position.z +
+				// 	                       10 * perlinNoise.Turbulence(position))) *
+				// 	       MainColor;
+
+				case TextureType.Image:
+				{
+					if (ImagePointer == null)
+						return 0;
+
+					int2 coords = (int2) (textureCoordinates * ImageSize);
+
+					byte* pPixelData = ImagePointer + (coords.y * ImageSize.x + coords.x) * PixelStride;
+					return pPixelData[ScalarValueChannel] / 255.0f * MainColor[ScalarValueChannel];
 				}
 			}
 

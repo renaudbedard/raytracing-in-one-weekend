@@ -51,7 +51,6 @@ namespace Runtime
 
 		public NativeList<Triangle> Triangles;
 		public NativeList<Entity> Entities;
-		//[WriteOnly] public UnsafePtrList<Entity> ImportanceSampledEntityPointers;
 
 		public bool FaceNormals, Moving;
 		public RigidTransform RigidTransform;
@@ -116,9 +115,6 @@ namespace Runtime
 						: new Entity(EntityType.Triangle, contentPointer, default, Material);
 
 					Entities.AddNoResize(entity);
-
-					// if (Material->Type == MaterialType.DiffuseLight)
-					//	ImportanceSampledEntityPointers.AddNoResize((Entity*) Entities.GetUnsafePtr() + (EntityIndex.Value - 1));
 				}
 
 				normals.SafeDispose();
@@ -178,7 +174,6 @@ namespace Runtime
 		[ReadOnly] public uint SampleCount;
 		[ReadOnly] public int TraceDepth;
 		[ReadOnly] public bool SubPixelJitter;
-		[ReadOnly] public ImportanceSampler ImportanceSampler;
 		[ReadOnly] [NativeDisableUnsafePtrRestriction] public BvhNode* BvhRoot;
 		[ReadOnly] public PerlinNoise PerlinNoise;
 		[ReadOnly] public BlueNoise BlueNoise;
@@ -468,44 +463,14 @@ namespace Runtime
 						}
 						else
 						{
-							sampleAlbedo = material->Type == MaterialType.DiffuseLight ? emission : albedo;
+							sampleAlbedo = emission + albedo;
 							sampleNormal = rec.Normal;
 							firstNonSpecularHit = true;
 						}
 					}
 
-					if (ImportanceSampler.Mode == ImportanceSamplingMode.None || material->IsPerfectSpecular)
-					{
-						*attenuationCursor++ = albedo;
-						ray = scatteredRay;
-					}
-					else
-					{
-						float3 outgoingLightDirection = -ray.Direction;
-						float scatterPdfValue = material->Pdf(scatteredRay.Direction, outgoingLightDirection, rec.Normal);
-
-						// We reached our target, stop tracing
-						if (explicitSamplingTarget != null)
-							stopTracing = true;
-
-						ImportanceSampler.Sample(scatteredRay, outgoingLightDirection, rec, material, ref rng,
-							out ray, out float pdfValue, out explicitSamplingTarget);
-
-						// We already hit the target, stop tracing
-						stopTracing |= explicitSamplingTarget != null && rec.EntityPtr != null && explicitSamplingTarget == rec.EntityPtr->Content;
-
-						// Ignore probabilistic volume containment when doing explicit light sampling
-						currentProbabilisticVolumeMaterial = null;
-
-						// Scatter ray is likely parallel to the surface, and division would cause a NaN
-						if (pdfValue.AlmostEquals(0))
-						{
-							*attenuationCursor++ = 1;
-							break;
-						}
-
-						*attenuationCursor++ = albedo * scatterPdfValue / pdfValue;
-					}
+					*attenuationCursor++ = albedo;
+					ray = scatteredRay;
 
 					ray = ray.OffsetTowards(dot(scatteredRay.Direction, rec.Normal) >= 0 ? rec.Normal : -rec.Normal);
 					break;
