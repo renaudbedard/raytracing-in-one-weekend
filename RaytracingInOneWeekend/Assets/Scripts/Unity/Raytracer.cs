@@ -48,6 +48,9 @@ namespace Unity
 
 	partial class Raytracer : MonoBehaviour
 	{
+		static readonly ProfilerMarker RebuildEntityBuffersMarker = new("Rebuild Entity Buffers");
+		static readonly ProfilerMarker RebuildBvhMarker = new("Rebuild BVH");
+
 		[Title("References")]
 		[SerializeField] BlueNoiseData blueNoise;
 
@@ -184,7 +187,7 @@ namespace Unity
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledDenoiseJobs = new();
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledFinalizeJobs = new();
 
-		bool commandBufferHooked, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
+		bool commandBufferNeedsRehook, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
 		float focusDistance = 1;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
@@ -257,8 +260,6 @@ namespace Unity
 
 		void Start()
 		{
-			TargetCamera.RemoveAllCommandBuffers();
-
 			RebuildWorld();
 			InitDenoisers();
 			EnsureBuffersBuilt();
@@ -335,18 +336,10 @@ namespace Unity
 		{
 			switch (level)
 			{
-				case OptixLogLevel.Fatal:
-					Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}");
-					break;
-				case OptixLogLevel.Error:
-					Debug.LogError($"nVidia OptiX Error : {tag} - {message}");
-					break;
-				case OptixLogLevel.Warning:
-					Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}");
-					break;
-				case OptixLogLevel.Print:
-					Debug.Log($"nVidia OptiX Trace : {tag} - {message}");
-					break;
+				case OptixLogLevel.Fatal: Debug.LogError($"nVidia OptiX Fatal Error : {tag} - {message}"); break;
+				case OptixLogLevel.Error: Debug.LogError($"nVidia OptiX Error : {tag} - {message}"); break;
+				case OptixLogLevel.Warning: Debug.LogWarning($"nVidia OptiX Warning : {tag} - {message}"); break;
+				case OptixLogLevel.Print: Debug.Log($"nVidia OptiX Trace : {tag} - {message}"); break;
 			}
 		}
 #endif
@@ -354,10 +347,8 @@ namespace Unity
 		[MonoPInvokeCallback(typeof(OidnErrorFunction))]
 		static void OnOidnError(IntPtr userPtr, OidnError code, string message)
 		{
-			if (string.IsNullOrWhiteSpace(message))
-				Debug.LogError(code);
-			else
-				Debug.LogError($"{code} : {message}");
+			if (string.IsNullOrWhiteSpace(message)) Debug.LogError(code);
+			else Debug.LogError($"{code} : {message}");
 		}
 
 		void OnDestroy()
@@ -445,8 +436,7 @@ namespace Unity
 			bool samplesPerPixelDecreased =
 				lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
 
-			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged ||
-			                       samplingModeChanged || samplesPerPixelDecreased;
+			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged || samplingModeChanged || samplesPerPixelDecreased;
 
 			if (traceNeedsReset || traceAborted)
 			{
@@ -986,7 +976,7 @@ namespace Unity
 					break;
 			}
 
-			if (!commandBufferHooked)
+			if (commandBufferNeedsRehook)
 			{
 				commandBuffer.Clear();
 				var blitTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget);
@@ -1009,8 +999,9 @@ namespace Unity
 						break;
 				}
 
+				TargetCamera.RemoveAllCommandBuffers();
 				TargetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
-				commandBufferHooked = true;
+				commandBufferNeedsRehook = true;
 			}
 		}
 
@@ -1039,11 +1030,7 @@ namespace Unity
 			    normalsTexture.width != width || normalsTexture.height != height ||
 			    albedoTexture.width != width || albedoTexture.height != height)
 			{
-				if (commandBufferHooked)
-				{
-					TargetCamera.RemoveCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
-					commandBufferHooked = false;
-				}
+				commandBufferNeedsRehook = true;
 
 				void PrepareTexture<T>(Texture2D texture, out NativeArray<T> buffer) where T : struct
 				{
@@ -1092,19 +1079,15 @@ namespace Unity
 				newSizes.StateSizeInBytes, optixScratchMemory, newSizes.RecommendedScratchSizeInBytes);
 		}
 #endif
-
-		static readonly ProfilerMarker rebuildEntityBuffersMarker = new("Rebuild Entity Buffers");
-		static readonly ProfilerMarker rebuildBvhMarker = new("Rebuild BVH");
-
 		void RebuildWorld()
 		{
 			CollectActiveEntities();
 
-			using (rebuildEntityBuffersMarker.Auto())
+			using (RebuildEntityBuffersMarker.Auto())
 			using (new ScopedStopwatch("^"))
 				RebuildEntityBuffers();
 
-			using (rebuildBvhMarker.Auto())
+			using (RebuildBvhMarker.Auto())
 			using (new ScopedStopwatch("^"))
 				RebuildBvh();
 

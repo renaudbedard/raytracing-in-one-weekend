@@ -104,8 +104,7 @@ namespace Unity
 
 		void OnValidate()
 		{
-			TargetCamera.RemoveAllCommandBuffers();
-			commandBufferHooked = false;
+			commandBufferNeedsRehook = true;
 		}
 
 		void OnDrawGizmos()
