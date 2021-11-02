@@ -80,10 +80,9 @@ namespace Runtime
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
 
-						// TODO: Microfacet distribution & shadowing terms
-						//float3 halfVector = normalizesafe(-ray.Direction + scattered.Direction);
-						//float d = MicrofacetDistribution(roughness, dot(halfVector, rec.Normal));
-						//reflectance *= d / 4 * incidentCosine;
+						// TODO: Cook-Torrance BRDF
+						//float maskingShadowing = Microfacet.SmithMaskingShadowing(ray.Direction, roughness, rec.Normal);
+						//reflectance *= maskingShadowing;
 					}
 					else
 					{
@@ -201,24 +200,12 @@ namespace Runtime
 			return sqAlpha / (PI * sqCosine * sqCosine * x * x);
 		}
 
-		/*
-		float MicrofacetShadowing1D(float alpha, float3 v, float3 h)
-		{
-			float cos_theta = cos_theta(v);
-			if Vec3::dot(v, h) * cos_theta <= 0.0 {
-				return 0.0;
-			}
-
-			let alpha2 = alpha * alpha;
-			let cos_theta2 = cos_theta * cos_theta;
-			let tan_theta2 = (1.0 - cos_theta2) / cos_theta2;
-			2.0 / (1.0 + (1.0 + alpha2 * tan_theta2).sqrt())
-		}
-
-		pub fn shadowing(alpha: f32, dir_in: Vec3, dir_out: Vec3, h: Vec3) -> f32
-		{
-			shadowing_1d(alpha, -dir_in, h) * shadowing_1d(alpha, dir_out, h)
-		}
-		*/
+		// Float TrowbridgeReitzDistribution::Lambda(const Vector3f &w) const {
+		// 	Float absTanTheta = std::abs(TanTheta(w));
+		// 	if (std::isinf(absTanTheta)) return 0.;
+		// 		<<Compute alpha for direction w>>
+		// 		Float alpha2Tan2Theta = (alpha * absTanTheta) * (alpha * absTanTheta);
+		// 	return (-1 + std::sqrt(1.f + alpha2Tan2Theta)) / 2;
+		// }
 	}
 }
