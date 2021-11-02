@@ -22,7 +22,7 @@ namespace Runtime
 		public float IndexOfRefraction => parameter; // for Dielectric and Standard
 		public float Density => parameter; // for ProbabilisticVolume
 
-		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float indexOfRefraction = 1.46f, float density = 1) : this()
+		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float indexOfRefraction = 1.5f, float density = 1) : this()
 		{
 			Type = type;
 			Albedo = albedo;
@@ -32,8 +32,14 @@ namespace Runtime
 
 			switch (type)
 			{
-				case MaterialType.Dielectric: parameter = indexOfRefraction; break;
-				case MaterialType.ProbabilisticVolume: parameter = density; break;
+				case MaterialType.Dielectric:
+				case MaterialType.Standard:
+					parameter = indexOfRefraction;
+					break;
+
+				case MaterialType.ProbabilisticVolume:
+					parameter = density;
+					break;
 			}
 		}
 
@@ -65,33 +71,33 @@ namespace Runtime
 				case MaterialType.Standard:
 				{
 					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
+					float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
+					float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction() * 0.5f);
+					float incidentCosine = -dot(ray.Direction, rec.Normal); // TODO: Should this use the rough normal instead?
+
 					if (rng.NextFloat() < metallicChance)
 					{
-						// Peter Shirley's fuzzy metal
-						float3 reflected = reflect(ray.Direction, rec.Normal);
-						float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
-						scattered = new Ray(rec.Point, normalize(reflected + roughness * rng.NextFloat3Direction()), ray.Time);
+						// Rough metal
+						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
+
+						// TODO: Microfacet distribution & shadowing terms
+						//float3 halfVector = normalizesafe(-ray.Direction + scattered.Direction);
+						//float d = MicrofacetDistribution(roughness, dot(halfVector, rec.Normal));
+						//reflectance *= d / 4 * incidentCosine;
 					}
 					else
 					{
-						float eta = 1 / IndexOfRefraction;
-
-						// Rough Plastic
-						float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
-						float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction());
-						float cosTheta = min(dot(-ray.Direction, roughNormal), 1);
-
-						// TODO: Using this Fresnel equation might not make sense for conductors (or plastics)
-						if (rng.NextFloat() < Schlick(cosTheta, IndexOfRefraction))
+						// Rough plastic
+						if (rng.NextFloat() < Schlick(incidentCosine, IndexOfRefraction))
+						{
+							// Glossy reflection
+							scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
+						}
+						else
 						{
 							// Lambertian diffuse
 							float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
 							scattered = new Ray(rec.Point, randomDirection, ray.Time);
-						}
-						else
-						{
-							// Glossy reflection
-							scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
 						}
 					}
 					break;
@@ -183,23 +189,36 @@ namespace Runtime
 			return r0 + (1 - r0) * pow(1 - cosine, 5);
 		}
 
-		// From : https://github.com/yblein/tracing/blob/master/src/material.rs#L648
-		static float PlasticFresnel(float eta, float cos_i)
+		static float MicrofacetDistribution(float alpha, float cosine)
 		{
-			// clamp cos_i before using trigonometric identities
-			cos_i = clamp(cos_i, -1, 1);
+			if (cosine <= 0)
+				return 0;
 
-			float sin_t2 = eta * eta * (1 - cos_i * cos_i);
-			if (sin_t2 > 1.0)
-			{
-				// Total Internal Reflection
-				return 1;
+			float sqAlpha = alpha * alpha;
+			float sqCosine = cosine * cosine;
+			float sqTanTheta = (1 - sqCosine) / sqCosine;
+			float x = sqAlpha + sqTanTheta;
+			return sqAlpha / (PI * sqCosine * sqCosine * x * x);
+		}
+
+		/*
+		float MicrofacetShadowing1D(float alpha, float3 v, float3 h)
+		{
+			float cos_theta = cos_theta(v);
+			if Vec3::dot(v, h) * cos_theta <= 0.0 {
+				return 0.0;
 			}
 
-			float cos_t = sqrt(1 - sin_t2);
-			float r_s = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
-			float r_p = (eta * cos_t - cos_i) / (eta * cos_t + cos_i);
-			return (r_s * r_s + r_p * r_p) * 0.5f;
+			let alpha2 = alpha * alpha;
+			let cos_theta2 = cos_theta * cos_theta;
+			let tan_theta2 = (1.0 - cos_theta2) / cos_theta2;
+			2.0 / (1.0 + (1.0 + alpha2 * tan_theta2).sqrt())
 		}
+
+		pub fn shadowing(alpha: f32, dir_in: Vec3, dir_out: Vec3, h: Vec3) -> f32
+		{
+			shadowing_1d(alpha, -dir_in, h) * shadowing_1d(alpha, dir_out, h)
+		}
+		*/
 	}
 }

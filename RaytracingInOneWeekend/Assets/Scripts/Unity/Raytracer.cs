@@ -612,7 +612,7 @@ namespace Unity
 			Environment environment = default;
 
 			if (skyboxMaterial.TryGetProperty("_Color1", out Color bottomColor) && skyboxMaterial.TryGetProperty("_Color2", out Color topColor))
-				environment = new Environment { SkyType = SkyType.GradientSky, SkyBottomColor = bottomColor.ToFloat3(), SkyTopColor = topColor.ToFloat3() };
+				environment = new Environment { SkyType = SkyType.GradientSky, SkyBottomColor = bottomColor.linear.ToFloat3(), SkyTopColor = topColor.linear.ToFloat3() };
 			else if (skyboxMaterial.TryGetProperty("_Tex", out UnityEngine.Cubemap cubemap))
 				environment = new Environment { SkyType = SkyType.CubeMap, SkyCubemap = new Cubemap(cubemap) };
 
