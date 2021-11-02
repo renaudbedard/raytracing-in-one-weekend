@@ -80,9 +80,12 @@ namespace Runtime
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
 
-						// TODO: Cook-Torrance BRDF
-						//float maskingShadowing = Microfacet.SmithMaskingShadowing(ray.Direction, roughness, rec.Normal);
-						//reflectance *= maskingShadowing;
+						// TODO: Not sure if this fresnel term can be used here
+						//float fresnel = Schlick(incidentCosine, IndexOfRefraction);
+
+						// TODO: Not sure if we need to pass roughNormal
+						// TODO: This is just broken so...
+						//reflectance *= Microfacet.TorranceSparrowBrdf(-ray.Direction, scattered.Direction, rec.Normal, roughness, fresnel);
 					}
 					else
 					{

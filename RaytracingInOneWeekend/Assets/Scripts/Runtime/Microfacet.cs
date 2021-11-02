@@ -6,82 +6,54 @@ namespace Runtime
 {
 	public static class Microfacet
 	{
-		public static float SmithMaskingShadowing(float3 w, float roughness, float3 normal)
+		public static float TorranceSparrowBrdf(float3 wi, float3 wo, float3 normal, float roughness, float fresnel)
 		{
-			return 1 / (1 + Beckmann.Lambda(w, roughness, normal));
+			float3 wh = normalize(wi + wo);
+			float absCosThetaO = abs(dot(wo, normal));
+			float absCosThetaI = abs(dot(wi, normal));
+
+			return TrowbridgeReitz.D(wh, normal, roughness) * TrowbridgeReitz.G(wi, wo, normal, roughness) *
+				fresnel / (4 * absCosThetaI * absCosThetaO);
 		}
 
-		public static float TorranceSparrowBrdf()
+		public static class TrowbridgeReitz
 		{
-			// TODO
-			return default;
-		}
-
-		public static class Beckmann
-		{
-			public static float D(float3 w, float roughness, float3 normal)
+			public static float D(float3 wh, float3 normal, float roughness)
 			{
 				Tools.GetOrthonormalBasis(normal, out float3 tangent, out float3 bitangent);
 				float alpha = RoughnessToAlpha(roughness);
+				float sqAlpha = alpha * alpha;
 
-				float cosTheta = dot(normal, w);
+				float cosTheta = dot(normal, wh);
 				float sqCosTheta = cosTheta * cosTheta;
 				float sqSinTheta = max(0, 1 - sqCosTheta);
 				float sinTheta = sqrt(sqSinTheta);
 				float tanTheta = sinTheta / cosTheta;
 				float sqTanTheta = tanTheta * tanTheta;
-				float cosPhi = sinTheta == 0 ? 1 : clamp(dot(w, tangent) / sinTheta, -1, 1);
-				float sinPhi = sinTheta == 0 ? 1 : clamp(dot(w, bitangent) / sinTheta, -1, 1);
+				float cosPhi = sinTheta == 0 ? 1 : clamp(dot(wh, tangent) / sinTheta, -1, 1);
+				float sinPhi = sinTheta == 0 ? 1 : clamp(dot(wh, bitangent) / sinTheta, -1, 1);
 
 				if (isinf(sqTanTheta))
 					return 0;
 
-				return exp(-sqTanTheta * (cosPhi * cosPhi / (alpha * alpha) + sinPhi * sinPhi / (alpha * alpha))) /
-				       (PI * alpha * alpha * sqCosTheta * sqCosTheta);
+				float e = (cosPhi * cosPhi / sqAlpha + sinPhi * sinPhi / sqAlpha) * sqTanTheta;
+				return 1 / (PI * sqAlpha * sqCosTheta * sqCosTheta * (1 + e) * (1 + e));
 			}
 
-			public static float Lambda(float3 w, float roughness, float3 normal)
+			public static float G(float3 wi, float3 wo, float3 normal, float roughness)
 			{
-				float cosine = dot(normal, w);
-				float sqCosine = cosine * cosine;
-				float sqSine = max(0, 1 - sqCosine);
-				float sine = sqrt(sqSine);
-				float tangent = sine / cosine;
-
-				float absTanTheta = abs(tangent);
-				if (isinf(absTanTheta))
-					return 0;
-
-				float alpha = RoughnessToAlpha(roughness);
-
-				float a = 1 / (alpha * absTanTheta);
-				if (a >= 1.6f)
-					return 0;
-
-				return (1 - 1.259f * a + 0.396f * a * a) /
-				       (3.535f * a + 2.181f * a * a);
+				return 1 / (1 + Lambda(wo, normal, roughness) + Lambda(wi, normal, roughness));
 			}
 
-			static float RoughnessToAlpha(float roughness)
+			public static float Lambda(float3 w, float3 normal, float roughness)
 			{
-				roughness = max(roughness, 1e-3f);
-				float x = log(roughness);
-				return 1.62142f + 0.819955f * x + 0.1734f * x * x +
-				       0.0171201f * x * x * x + 0.000640711f * x * x * x * x;
-			}
-		}
+				float cosTheta = dot(normal, w);
+				float sqCosTheta = cosTheta * cosTheta;
+				float sqSinTheta = max(0, 1 - sqCosTheta);
+				float sinTheta = sqrt(sqSinTheta);
+				float tanTheta = sinTheta / cosTheta;
 
-		public static class TrowbridgeReitz
-		{
-			public static float Lambda(float3 w, float roughness, float3 normal)
-			{
-				float cosine = dot(normal, w);
-				float sqCosine = cosine * cosine;
-				float sqSine = max(0, 1 - sqCosine);
-				float sine = sqrt(sqSine);
-				float tangent = sine / cosine;
-
-				float absTanTheta = abs(tangent);
+				float absTanTheta = abs(tanTheta);
 				if (isinf(absTanTheta))
 					return 0;
 
