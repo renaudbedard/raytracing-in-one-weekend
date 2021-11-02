@@ -19,10 +19,10 @@ namespace Runtime
 		public readonly Texture Albedo, Glossiness, Emission, Metallic;
 
 		readonly float parameter;
-		public float RefractiveIndex => parameter; // for Dielectric
+		public float IndexOfRefraction => parameter; // for Dielectric and Standard
 		public float Density => parameter; // for ProbabilisticVolume
 
-		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float refractiveIndex = 1.46f, float density = 1) : this()
+		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float indexOfRefraction = 1.46f, float density = 1) : this()
 		{
 			Type = type;
 			Albedo = albedo;
@@ -32,7 +32,7 @@ namespace Runtime
 
 			switch (type)
 			{
-				case MaterialType.Dielectric: parameter = refractiveIndex; break;
+				case MaterialType.Dielectric: parameter = indexOfRefraction; break;
 				case MaterialType.ProbabilisticVolume: parameter = density; break;
 			}
 		}
@@ -74,20 +74,18 @@ namespace Runtime
 					}
 					else
 					{
+						float eta = 1 / IndexOfRefraction;
+
 						// Rough Plastic
 						float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 						float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction());
-						float cosine;
-						if (dot(ray.Direction, roughNormal) > 0)
-							cosine = RefractiveIndex * dot(ray.Direction, roughNormal);
-						else
-							cosine = -dot(ray.Direction, roughNormal);
+						float cosTheta = min(dot(-ray.Direction, roughNormal), 1);
 
 						// TODO: Using this Fresnel equation might not make sense for conductors (or plastics)
-						if (rng.NextFloat() < Schlick(cosine, RefractiveIndex))
+						if (rng.NextFloat() < Schlick(cosTheta, IndexOfRefraction))
 						{
 							// Lambertian diffuse
-							float3 randomDirection = rng.OnUniformHemisphere(rec.Normal); // TODO: Is cosine hemisphere more accurate?
+							float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
 							scattered = new Ray(rec.Point, randomDirection, ray.Time);
 						}
 						else
@@ -109,19 +107,19 @@ namespace Runtime
 					if (dot(ray.Direction, roughNormal) > 0)
 					{
 						outwardRoughNormal = -roughNormal;
-						niOverNt = RefractiveIndex;
-						cosine = RefractiveIndex * dot(ray.Direction, roughNormal);
+						niOverNt = IndexOfRefraction;
+						cosine = IndexOfRefraction * dot(ray.Direction, roughNormal);
 					}
 					else
 					{
 						outwardRoughNormal = roughNormal;
-						niOverNt = 1 / RefractiveIndex;
+						niOverNt = 1 / IndexOfRefraction;
 						cosine = -dot(ray.Direction, roughNormal);
 					}
 
 					float3 scatterDirection;
 					if (Refract(ray.Direction, outwardRoughNormal, niOverNt, out float3 refracted) &&
-					    rng.NextFloat() > Schlick(cosine, RefractiveIndex))
+					    rng.NextFloat() > Schlick(cosine, IndexOfRefraction))
 					{
 						scatterDirection = refracted;
 					}
@@ -178,12 +176,30 @@ namespace Runtime
 			return false;
 		}
 
-		static float Schlick(float radians, float refractiveIndex)
+		static float Schlick(float cosine, float refractiveIndex)
 		{
 			float r0 = (1 - refractiveIndex) / (1 + refractiveIndex);
 			r0 *= r0;
-			float exponential = pow(1 - radians, 5);
-			return r0 + (1 - r0) * exponential;
+			return r0 + (1 - r0) * pow(1 - cosine, 5);
+		}
+
+		// From : https://github.com/yblein/tracing/blob/master/src/material.rs#L648
+		static float PlasticFresnel(float eta, float cos_i)
+		{
+			// clamp cos_i before using trigonometric identities
+			cos_i = clamp(cos_i, -1, 1);
+
+			float sin_t2 = eta * eta * (1 - cos_i * cos_i);
+			if (sin_t2 > 1.0)
+			{
+				// Total Internal Reflection
+				return 1;
+			}
+
+			float cos_t = sqrt(1 - sin_t2);
+			float r_s = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
+			float r_p = (eta * cos_t - cos_i) / (eta * cos_t + cos_i);
+			return (r_s * r_s + r_p * r_p) * 0.5f;
 		}
 	}
 }

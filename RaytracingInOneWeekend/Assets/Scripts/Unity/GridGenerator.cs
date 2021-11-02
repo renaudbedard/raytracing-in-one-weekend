@@ -42,8 +42,11 @@ namespace Unity
 			if (EditorApplication.isPlayingOrWillChangePlaymode)
 				return;
 
-			Debug.Log("Regenerating grid...");
+			EditorApplication.delayCall += Regenerate;
+		}
 
+		private void Regenerate()
+		{
 			instances.Clear();
 
 			foreach (Transform instance in transform)
@@ -51,11 +54,10 @@ namespace Unity
 					instances.Add(instance.gameObject);
 
 			foreach (GameObject instance in instances)
-				EditorApplication.delayCall += () =>
-				{
-					DestroyImmediate(instance.GetComponent<Renderer>().sharedMaterial);
-					DestroyImmediate(instance);
-				};
+			{
+				DestroyImmediate(instance.GetComponent<Renderer>().sharedMaterial);
+				DestroyImmediate(instance);
+			}
 
 			instances.Clear();
 
