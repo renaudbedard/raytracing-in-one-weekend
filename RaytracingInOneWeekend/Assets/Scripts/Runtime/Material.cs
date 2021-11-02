@@ -89,8 +89,9 @@ namespace Runtime
 						// Rough plastic
 						if (rng.NextFloat() < Schlick(incidentCosine, IndexOfRefraction))
 						{
-							// Glossy reflection
+							// Glossy reflection (untinted!)
 							scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
+							reflectance = 1;
 						}
 						else
 						{
@@ -129,7 +130,10 @@ namespace Runtime
 						scatterDirection = refracted;
 					}
 					else
+					{
 						scatterDirection = reflect(ray.Direction, roughNormal);
+						reflectance = 1;
+					}
 
 					scattered = new Ray(rec.Point, scatterDirection, ray.Time);
 					break;
