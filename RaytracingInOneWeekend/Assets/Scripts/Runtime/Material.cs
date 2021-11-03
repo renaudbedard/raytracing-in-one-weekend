@@ -82,7 +82,7 @@ namespace Runtime
 					{
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-						reflectance *= 1 - roughness; // Darkening factor
+						reflectance *= 1 - roughness; // Darkening factor (to match the look of Unity's rough metals)
 					}
 					else
 					{

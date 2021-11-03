@@ -15,6 +15,7 @@ using Unity.Mathematics;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
 using Util;
 using static Unity.Mathematics.math;
 using Cubemap = Runtime.Cubemap;
@@ -24,6 +25,7 @@ using float3 = Unity.Mathematics.float3;
 using Material = Runtime.Material;
 using Ray = Runtime.Ray;
 using RigidTransform = Unity.Mathematics.RigidTransform;
+using SkyType = Runtime.SkyType;
 using Texture = Runtime.Texture;
 #if ENABLE_OPTIX
 using OptiX;
@@ -73,8 +75,8 @@ namespace Unity
 #endif
 
 		[Title("Debug")]
-		[SerializeField] [DisableInPlayMode]
-		Shader viewRangeShader = null;
+		[SerializeField] [DisableInPlayMode] Shader viewRangeShader = null;
+		[SerializeField] [DisableInPlayMode] Shader blitShader = null;
 
 		[OdinReadOnly] public float AccumulatedSamples;
 
@@ -110,8 +112,7 @@ namespace Unity
 		Texture2D frontBufferTexture, normalsTexture, albedoTexture, diagnosticsTexture;
 		NativeArray<RGBA32> frontBuffer, normalsBuffer, albedoBuffer;
 
-		CommandBuffer commandBuffer;
-		UnityEngine.Material viewRangeMaterial;
+		UnityEngine.Material viewRangeMaterial, blitMaterial;
 		NativeArray<Diagnostics> diagnosticsBuffer;
 
 		// NativeArray<Sphere> sphereBuffer;
@@ -186,7 +187,7 @@ namespace Unity
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledDenoiseJobs = new();
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledFinalizeJobs = new();
 
-		bool commandBufferNeedsRehook, worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
+		bool worldNeedsRebuild, initialized, traceAborted, ignoreBatchTimings;
 		float focusDistance = 1;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
@@ -220,8 +221,6 @@ namespace Unity
 
 		void Awake()
 		{
-			commandBuffer = new CommandBuffer { name = "Raytracer" };
-
 			const HideFlags flags = HideFlags.HideAndDontSave;
 			frontBufferTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
 			normalsTexture = new Texture2D(0, 0, TextureFormat.RGBA32, false) { hideFlags = flags };
@@ -232,6 +231,8 @@ namespace Unity
 			diagnosticsTexture = new Texture2D(0, 0, TextureFormat.RFloat, false) { hideFlags = flags };
 #endif
 			viewRangeMaterial = new UnityEngine.Material(viewRangeShader);
+			blitMaterial = new UnityEngine.Material(blitShader);
+
 			channelPropertyId = Shader.PropertyToID("_Channel");
 			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
 
@@ -269,6 +270,7 @@ namespace Unity
 			EnsureBuffersBuilt();
 			CleanCamera();
 			ScheduleAccumulate(true);
+			TargetCamera.GetComponent<HDAdditionalCameraData>().customRender += OnCustomRender;
 		}
 
 		void InitDenoisers()
@@ -607,17 +609,15 @@ namespace Unity
 				frameSeed = (uint) Time.frameCount + 1;
 			}
 
-
-			UnityEngine.Material skyboxMaterial = RenderSettings.skybox ? RenderSettings.skybox : FindObjectOfType<Skybox>()?.material;
 			Environment environment = default;
+			if (FindObjectOfType<Volume>().profile.TryGet<HDRISky>(out var hdriSky))
+				environment = new Environment { SkyType = SkyType.CubeMap, SkyCubemap = new Cubemap(hdriSky.hdriSky.value as UnityEngine.Cubemap) };
 
-			if (skyboxMaterial.TryGetProperty("_Color1", out Color bottomColor) && skyboxMaterial.TryGetProperty("_Color2", out Color topColor))
-				environment = new Environment { SkyType = SkyType.GradientSky, SkyBottomColor = bottomColor.linear.ToFloat3(), SkyTopColor = topColor.linear.ToFloat3() };
-			else if (skyboxMaterial.TryGetProperty("_Tex", out UnityEngine.Cubemap cubemap))
-				environment = new Environment { SkyType = SkyType.CubeMap, SkyCubemap = new Cubemap(cubemap) };
+			// TODO: Reimplement gradient sky
+			// if (skyboxMaterial.TryGetProperty("_Color1", out Color bottomColor) && skyboxMaterial.TryGetProperty("_Color2", out Color topColor))
+			// 	environment = new Environment { SkyType = SkyType.GradientSky, SkyBottomColor = bottomColor.linear.ToFloat3(), SkyTopColor = topColor.linear.ToFloat3() };
 
 			AccumulateJob accumulateJob;
-
 			unsafe
 			{
 				accumulateJob = new AccumulateJob
@@ -962,36 +962,39 @@ namespace Unity
 					break;
 			}
 
-			if (commandBufferNeedsRehook)
-			{
-				commandBuffer.Clear();
-				var blitTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget);
-
-				switch (bufferView)
-				{
-					case BufferView.Front:
-						commandBuffer.Blit(frontBufferTexture, blitTarget);
-						break;
-					case BufferView.Normals:
-						commandBuffer.Blit(normalsTexture, blitTarget);
-						break;
-					case BufferView.Albedo:
-						commandBuffer.Blit(albedoTexture, blitTarget);
-						break;
-
-					default:
-						viewRangeMaterial.SetInt(channelPropertyId, (int) bufferView - 1);
-						commandBuffer.Blit(diagnosticsTexture, blitTarget, viewRangeMaterial);
-						break;
-				}
-
-				TargetCamera.RemoveAllCommandBuffers();
-				TargetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
-				commandBufferNeedsRehook = true;
-			}
-
 			if (AccumulatedSamples >= samplesPerPixel && stopWhenCompleted)
 				SaveFrontBuffer();
+		}
+
+		private void OnCustomRender(ScriptableRenderContext context, HDCamera hdCamera)
+		{
+			var commandBuffer = CommandBufferPool.Get("Raytracer Blit");
+			var blitTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget);
+
+			switch (bufferView)
+			{
+				case BufferView.Front:
+					blitMaterial.SetTexture("_MainTex", frontBufferTexture);
+					CoreUtils.DrawFullScreen(commandBuffer, blitMaterial, blitTarget);
+					break;
+				case BufferView.Normals:
+					blitMaterial.SetTexture("_MainTex", normalsTexture);
+					CoreUtils.DrawFullScreen(commandBuffer, blitMaterial, blitTarget);
+					break;
+				case BufferView.Albedo:
+					blitMaterial.SetTexture("_MainTex", albedoTexture);
+					CoreUtils.DrawFullScreen(commandBuffer, blitMaterial, blitTarget);
+					break;
+
+				default:
+					viewRangeMaterial.SetInt(channelPropertyId, (int) bufferView - 1);
+					viewRangeMaterial.SetTexture("_MainTex", diagnosticsTexture);
+					CoreUtils.DrawFullScreen(commandBuffer, viewRangeMaterial, blitTarget);
+					break;
+			}
+
+			context.ExecuteCommandBuffer(commandBuffer);
+			CommandBufferPool.Release(commandBuffer);
 		}
 
 		void EnsureBuffersBuilt()
@@ -1019,8 +1022,6 @@ namespace Unity
 			    normalsTexture.width != width || normalsTexture.height != height ||
 			    albedoTexture.width != width || albedoTexture.height != height)
 			{
-				commandBufferNeedsRehook = true;
-
 				void PrepareTexture<T>(Texture2D texture, out NativeArray<T> buffer) where T : struct
 				{
 					texture.Reinitialize(width, height);
@@ -1113,18 +1114,18 @@ namespace Unity
 				UnityEngine.Material unityMaterial = meshRenderer.sharedMaterials.Last();
 				if (!materialMap.TryGetValue(unityMaterial, out int materialIndex))
 				{
-					unityMaterial.TryGetProperty("_Color", out Color albedo);
+					unityMaterial.TryGetProperty("_BaseColor", out Color albedo);
 					Texture meshAlbedoTexture;
-					if (unityMaterial.TryGetProperty("_MainTex", out Texture2D albedoMap) && albedoMap.format == TextureFormat.RGB24)
+					if (unityMaterial.TryGetProperty("_BaseColorMap", out Texture2D albedoMap) && albedoMap.format == TextureFormat.RGB24)
 						meshAlbedoTexture = new Texture(TextureType.Image, albedo.linear.ToFloat3(),
 							pImage: (byte*) albedoMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
 							imageWidth: albedoMap.width, imageHeight: albedoMap.height);
 					else
 						meshAlbedoTexture = new Texture(TextureType.Constant, albedo.linear.ToFloat3());
 
-					unityMaterial.TryGetProperty("_EmissionColor", out Color emission);
+					unityMaterial.TryGetProperty("_EmissiveColor", out Color emission);
 					Texture meshEmissionTexture;
-					if (unityMaterial.TryGetProperty("_EmissionMap", out Texture2D emissionMap) && emissionMap.format == TextureFormat.RGB24)
+					if (unityMaterial.TryGetProperty("_EmissiveColorMap", out Texture2D emissionMap) && emissionMap.format == TextureFormat.RGB24)
 						meshEmissionTexture = new Texture(TextureType.Image, emission.linear.ToFloat3(),
 							pImage: (byte*) emissionMap.GetRawTextureData<RGB24>().GetUnsafeReadOnlyPtr(),
 							imageWidth: emissionMap.width, imageHeight: emissionMap.height);
@@ -1156,7 +1157,7 @@ namespace Unity
 					else
 						meshMetallicTexture = new Texture(TextureType.Constant, metallic);
 
-					unityMaterial.TryGetProperty("_Glossiness", out float glossiness);
+					unityMaterial.TryGetProperty("_Smoothness", out float glossiness);
 					Texture meshGlossinessTexture;
 					if (unityMaterial.shaderKeywords.Contains("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A") && albedoMap && albedoMap.format == TextureFormat.RGBA32)
 					{

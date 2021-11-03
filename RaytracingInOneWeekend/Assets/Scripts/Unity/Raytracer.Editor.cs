@@ -102,11 +102,6 @@ namespace Unity
 			EditorUtility.SetDirty(this);
 		}
 
-		void OnValidate()
-		{
-			commandBufferNeedsRehook = true;
-		}
-
 		void OnDrawGizmos()
 		{
 			if (previewBvh)

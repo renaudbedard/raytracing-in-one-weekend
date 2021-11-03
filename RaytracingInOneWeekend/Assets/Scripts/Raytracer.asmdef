@@ -1,12 +1,15 @@
 {
     "name": "Raytracer",
+    "rootNamespace": "",
     "references": [
         "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:75469ad4d38634e559750d17036d5f7c",
         "GUID:2665a8d13d1b3f18800f46e256720795",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:083d579124d04b60b2a0b68d50363cb2",
-        "GUID:aedadfd10fe00a640bb49222d1413a47"
+        "GUID:aedadfd10fe00a640bb49222d1413a47",
+        "GUID:df380645f10b7bc4b97d4f5eb6303d95",
+        "GUID:457756d89b35d2941b3e7b37b4ece6f1"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -15,5 +18,6 @@
     "precompiledReferences": [],
     "autoReferenced": false,
     "defineConstraints": [],
-    "versionDefines": []
+    "versionDefines": [],
+    "noEngineReferences": false
 }
