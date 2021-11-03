@@ -184,5 +184,11 @@ namespace Util
 			value = material.GetColor(name);
 			return true;
 		}
+
+		public static float LinearToGamma(float value)
+		{
+			value = max(value, 0);
+			return max(1.055f * pow(value, 0.416666667f) - 0.055f, 0);
+		}
 	}
 }

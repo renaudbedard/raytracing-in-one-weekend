@@ -285,7 +285,7 @@ namespace Unity
 			}
 			catch (Exception ex)
 			{
-				Debug.LogError($"Could not initialize Intel ODIN.\n{ex}");
+				Debug.LogError($"Could not initialize Intel OIDN.\n{ex}");
 			}
 
 #if ENABLE_OPTIX

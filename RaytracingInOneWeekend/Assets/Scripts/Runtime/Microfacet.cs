@@ -63,7 +63,7 @@ namespace Runtime
 				return (-1 + sqrt(1 + alpha2Tan2Theta)) / 2;
 			}
 
-			static float RoughnessToAlpha(float roughness)
+			public static float RoughnessToAlpha(float roughness)
 			{
 				roughness = max(roughness, 1e-3f);
 				float x = log(roughness);

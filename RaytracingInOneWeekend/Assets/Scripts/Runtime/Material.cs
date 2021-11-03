@@ -71,13 +71,19 @@ namespace Runtime
 				case MaterialType.Standard:
 				{
 					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
-					float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
-					float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction() * 0.5f);
+					float glossiness = Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
+
+					// Remapped roughness to match Unity's
+					float roughness = (1 - sqrt(glossiness)) * 0.6f;
+					float3 roughNormal = normalize(lerp(rec.Normal, rng.OnCosineWeightedHemisphere(rec.Normal), roughness));
 
 					if (rng.NextFloat() < metallicChance)
 					{
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
+
+						// Arbitrary darkening factor proportional to glossiness
+						reflectance *= lerp(glossiness, 1, 0.6f);
 					}
 					else
 					{
