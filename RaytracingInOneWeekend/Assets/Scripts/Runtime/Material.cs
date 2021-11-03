@@ -16,6 +16,7 @@ namespace Runtime
 	readonly struct Material
 	{
 		const float PlasticIor = 1.5f;
+		const float RoughnessAttenuation = 0.5f;
 
 		public readonly MaterialType Type;
 		public readonly Texture Albedo, Glossiness, Emission, Metallic;
@@ -74,14 +75,14 @@ namespace Runtime
 					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
 					float glossiness = Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 
-					float roughness = (1 - glossiness) * 0.5f; // Remapped roughness to match Unity's
+					float roughness = (1 - glossiness) * RoughnessAttenuation; // Remapped roughness to match Unity's
 					float3 roughNormal = roughness > 0 ? normalize(lerp(rec.Normal, rng.OnUniformHemisphere(rec.Normal), roughness)) : rec.Normal;
 
 					if (metallicChance > 0 && rng.NextFloat() < metallicChance)
 					{
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-						reflectance *= lerp(glossiness, 1, 0.525f); // Arbitrary darkening factor
+						reflectance *= 1 - roughness; // Darkening factor
 					}
 					else
 					{
