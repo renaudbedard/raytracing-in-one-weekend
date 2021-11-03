@@ -74,20 +74,19 @@ namespace Runtime
 					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
 					float glossiness = Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 
-					// Remapped roughness to match Unity's
-					float roughness = (1 - glossiness) * 0.5f;
+					float roughness = (1 - glossiness) * 0.5f; // Remapped roughness to match Unity's
 					float3 roughNormal = roughness > 0 ? normalize(lerp(rec.Normal, rng.OnUniformHemisphere(rec.Normal), roughness)) : rec.Normal;
-					float incidentCosine = dot(-ray.Direction, rec.Normal);
 
 					if (metallicChance > 0 && rng.NextFloat() < metallicChance)
 					{
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-						// Arbitrary darkening factor
-						reflectance *= lerp(glossiness, 1, 0.525f);
+						reflectance *= lerp(glossiness, 1, 0.525f); // Arbitrary darkening factor
 					}
 					else
 					{
+						float incidentCosine = -dot(ray.Direction, rec.Normal);
+
 						if (glossiness > 0 && rng.NextFloat() < Schlick(incidentCosine, PlasticIor) * sqrt(glossiness))
 						{
 							// Glossy reflection (untinted!)
