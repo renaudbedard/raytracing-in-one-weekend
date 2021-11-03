@@ -989,6 +989,9 @@ namespace Unity
 				TargetCamera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
 				commandBufferNeedsRehook = true;
 			}
+
+			if (AccumulatedSamples >= samplesPerPixel && stopWhenCompleted)
+				SaveFrontBuffer();
 		}
 
 		void EnsureBuffersBuilt()

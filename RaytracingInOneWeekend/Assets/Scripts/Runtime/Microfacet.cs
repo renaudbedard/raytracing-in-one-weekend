@@ -6,6 +6,11 @@ namespace Runtime
 {
 	public static class Microfacet
 	{
+		public static float SmithMaskingShadowing(float3 w, float3 normal, float roughness)
+		{
+			return 1 / (1 + TrowbridgeReitz.Lambda(w, normal, roughness));
+		}
+
 		public static float TorranceSparrowBrdf(float3 wi, float3 wo, float3 normal, float roughness, float fresnel)
 		{
 			float3 wh = normalize(wi + wo);

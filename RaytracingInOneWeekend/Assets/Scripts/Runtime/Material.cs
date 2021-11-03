@@ -15,6 +15,8 @@ namespace Runtime
 
 	readonly struct Material
 	{
+		const float PlasticIor = 1.5f;
+
 		public readonly MaterialType Type;
 		public readonly Texture Albedo, Glossiness, Emission, Metallic;
 
@@ -22,7 +24,7 @@ namespace Runtime
 		public float IndexOfRefraction => parameter; // for Dielectric and Standard
 		public float Density => parameter; // for ProbabilisticVolume
 
-		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float indexOfRefraction = 1.5f, float density = 1) : this()
+		public Material(MaterialType type, Texture albedo = default, Texture emission = default, Texture glossiness = default, Texture metallic = default, float indexOfRefraction = default, float density = 1) : this()
 		{
 			Type = type;
 			Albedo = albedo;
@@ -33,7 +35,6 @@ namespace Runtime
 			switch (type)
 			{
 				case MaterialType.Dielectric:
-				case MaterialType.Standard:
 					parameter = indexOfRefraction;
 					break;
 
@@ -74,23 +75,20 @@ namespace Runtime
 					float glossiness = Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 
 					// Remapped roughness to match Unity's
-					float roughness = (1 - sqrt(glossiness)) * 0.6f;
-					float3 roughNormal = normalize(lerp(rec.Normal, rng.OnCosineWeightedHemisphere(rec.Normal), roughness));
+					float roughness = (1 - glossiness) * 0.5f;
+					float3 roughNormal = roughness > 0 ? normalize(lerp(rec.Normal, rng.OnUniformHemisphere(rec.Normal), roughness)) : rec.Normal;
+					float incidentCosine = dot(-ray.Direction, rec.Normal);
 
-					if (rng.NextFloat() < metallicChance)
+					if (metallicChance > 0 && rng.NextFloat() < metallicChance)
 					{
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-
-						// Arbitrary darkening factor proportional to glossiness
-						reflectance *= lerp(glossiness, 1, 0.6f);
+						// Arbitrary darkening factor
+						reflectance *= lerp(glossiness, 1, 0.525f);
 					}
 					else
 					{
-						float incidentCosine = dot(-ray.Direction, rec.Normal); // TODO: Should this use the rough normal instead?
-
-						// Rough plastic
-						if (rng.NextFloat() < Schlick(incidentCosine, IndexOfRefraction))
+						if (glossiness > 0 && rng.NextFloat() < Schlick(incidentCosine, PlasticIor) * sqrt(glossiness))
 						{
 							// Glossy reflection (untinted!)
 							scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);

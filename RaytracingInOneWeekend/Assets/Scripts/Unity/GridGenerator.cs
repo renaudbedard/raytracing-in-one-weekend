@@ -45,6 +45,7 @@ namespace Unity
 			EditorApplication.delayCall += Regenerate;
 		}
 
+		[Button("Regenerate")]
 		void Regenerate()
 		{
 			instances.Clear();
