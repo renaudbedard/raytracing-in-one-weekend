@@ -12,8 +12,8 @@ namespace Runtime
 			float absCosThetaO = abs(dot(wo, normal));
 			float absCosThetaI = abs(dot(wi, normal));
 
-			return TrowbridgeReitz.D(wh, normal, roughness) * TrowbridgeReitz.G(wi, wo, normal, roughness) *
-				fresnel / (4 * absCosThetaI * absCosThetaO);
+			return TrowbridgeReitz.D(wh, normal, roughness) * TrowbridgeReitz.G(wi, wo, normal, roughness) * fresnel /
+			       (4 * absCosThetaI * absCosThetaO);
 		}
 
 		public static class TrowbridgeReitz
@@ -67,7 +67,10 @@ namespace Runtime
 			{
 				roughness = max(roughness, 1e-3f);
 				float x = log(roughness);
-				return 1.62142f + 0.819955f * x + 0.1734f * x * x + 0.0171201f * x * x * x +
+				return 1.62142f +
+				       0.819955f * x +
+				       0.1734f * x * x +
+				       0.0171201f * x * x * x +
 				       0.000640711f * x * x * x * x;
 			}
 		}

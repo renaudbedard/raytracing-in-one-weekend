@@ -73,22 +73,16 @@ namespace Runtime
 					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
 					float roughness = 1 - Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 					float3 roughNormal = normalize(rec.Normal + roughness * rng.NextFloat3Direction() * 0.5f);
-					float incidentCosine = -dot(ray.Direction, rec.Normal); // TODO: Should this use the rough normal instead?
 
 					if (rng.NextFloat() < metallicChance)
 					{
 						// Rough metal
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-
-						// TODO: Not sure if this fresnel term can be used here
-						//float fresnel = Schlick(incidentCosine, IndexOfRefraction);
-
-						// TODO: Not sure if we need to pass roughNormal
-						// TODO: This is just broken so...
-						//reflectance *= Microfacet.TorranceSparrowBrdf(-ray.Direction, scattered.Direction, rec.Normal, roughness, fresnel);
 					}
 					else
 					{
+						float incidentCosine = dot(-ray.Direction, rec.Normal); // TODO: Should this use the rough normal instead?
+
 						// Rough plastic
 						if (rng.NextFloat() < Schlick(incidentCosine, IndexOfRefraction))
 						{
@@ -194,25 +188,5 @@ namespace Runtime
 			r0 *= r0;
 			return r0 + (1 - r0) * pow(1 - cosine, 5);
 		}
-
-		static float MicrofacetDistribution(float alpha, float cosine)
-		{
-			if (cosine <= 0)
-				return 0;
-
-			float sqAlpha = alpha * alpha;
-			float sqCosine = cosine * cosine;
-			float sqTanTheta = (1 - sqCosine) / sqCosine;
-			float x = sqAlpha + sqTanTheta;
-			return sqAlpha / (PI * sqCosine * sqCosine * x * x);
-		}
-
-		// Float TrowbridgeReitzDistribution::Lambda(const Vector3f &w) const {
-		// 	Float absTanTheta = std::abs(TanTheta(w));
-		// 	if (std::isinf(absTanTheta)) return 0.;
-		// 		<<Compute alpha for direction w>>
-		// 		Float alpha2Tan2Theta = (alpha * absTanTheta) * (alpha * absTanTheta);
-		// 	return (-1 + std::sqrt(1.f + alpha2Tan2Theta)) / 2;
-		// }
 	}
 }
