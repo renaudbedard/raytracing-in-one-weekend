@@ -1175,7 +1175,7 @@ namespace Unity
 					if (unityMaterial.TryGetProperty("_Density", out float density))
 						material = new Material(MaterialType.ProbabilisticVolume, meshAlbedoTexture, density: density);
 					else if (unityMaterial.TryGetProperty("_RefractiveIndex", out float refractiveIndex))
-						material = new Material(MaterialType.Dielectric, meshAlbedoTexture, indexOfRefraction: refractiveIndex);
+						material = new Material(MaterialType.Dielectric, meshAlbedoTexture, glossiness: meshGlossinessTexture, indexOfRefraction: refractiveIndex);
 					else
 						material = new Material(MaterialType.Standard, meshAlbedoTexture, meshEmissionTexture, meshGlossinessTexture, meshMetallicTexture);
 
