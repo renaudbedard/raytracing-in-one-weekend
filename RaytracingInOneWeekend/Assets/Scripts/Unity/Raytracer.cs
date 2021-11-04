@@ -1133,7 +1133,6 @@ namespace Unity
 						meshEmissionTexture = new Texture(TextureType.Constant, emission.linear.ToFloat3());
 
 					unityMaterial.TryGetProperty("_Metallic", out float metallic);
-					metallic = Mathf.GammaToLinearSpace(metallic);
 					Texture meshMetallicTexture;
 					if (unityMaterial.TryGetProperty("_MetallicGlossMap", out Texture2D metallicMap))
 					{

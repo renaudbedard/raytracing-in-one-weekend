@@ -16,7 +16,7 @@ namespace Runtime
 	readonly struct Material
 	{
 		const float PlasticIor = 1.5f;
-		const float RoughnessAttenuation = 0.5f;
+		const float MetalIor = 1.1f; // Copper
 
 		public readonly MaterialType Type;
 		public readonly Texture Albedo, Glossiness, Emission, Metallic;
@@ -72,33 +72,34 @@ namespace Runtime
 			{
 				case MaterialType.Standard:
 				{
-					float metallicChance = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
+					float metallic = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
 					float glossiness = Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 
-					float roughness = (1 - glossiness) * RoughnessAttenuation; // Remapped roughness to match Unity's
-					float3 roughNormal = roughness > 0 ? normalize(lerp(rec.Normal, rng.OnUniformHemisphere(rec.Normal), roughness)) : rec.Normal;
+					float roughness = pow(1 - glossiness, 2);
+					float3 roughNormal = roughness > 0 ? normalize(lerp(rec.Normal, rng.OnCosineWeightedHemisphere(rec.Normal), roughness)) : rec.Normal;
 
-					if (metallicChance > 0 && rng.NextFloat() < metallicChance)
+					float incidentCosine = -dot(ray.Direction, roughNormal);
+					float ior = lerp(PlasticIor, MetalIor, metallic);
+					float fresnel = Schlick(incidentCosine, ior);
+					float maskingShadowing = Microfacet.SmithMaskingShadowing(ray.Direction, rec.Normal, roughness);
+
+					if (glossiness > 0 && rng.NextFloat() < fresnel * glossiness * maskingShadowing)
 					{
-						// Rough metal
+						// Glossy reflection (untinted!)
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-						reflectance *= 1 - roughness; // Darkening factor (to match the look of Unity's rough metals)
+						reflectance = 1;
 					}
 					else
 					{
-						float incidentCosine = -dot(ray.Direction, rec.Normal);
-
-						if (glossiness > 0 && rng.NextFloat() < Schlick(incidentCosine, PlasticIor) * sqrt(glossiness))
+						if (metallic > 0 && rng.NextFloat() < metallic)
 						{
-							// Glossy reflection (untinted!)
+							// Rough metal
 							scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
-							reflectance = 1;
 						}
 						else
 						{
 							// Lambertian diffuse
-							float3 randomDirection = rng.OnCosineWeightedHemisphere(rec.Normal);
-							scattered = new Ray(rec.Point, randomDirection, ray.Time);
+							scattered = new Ray(rec.Point, rng.OnCosineWeightedHemisphere(rec.Normal), ray.Time);
 						}
 					}
 					break;
