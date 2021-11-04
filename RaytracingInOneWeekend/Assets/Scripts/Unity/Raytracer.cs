@@ -7,6 +7,7 @@ using JetBrains.Annotations;
 using OpenImageDenoise;
 using Runtime;
 using Runtime.EntityTypes;
+using Runtime.Jobs;
 using Sirenix.OdinInspector;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -47,6 +48,27 @@ namespace Unity
 		NvidiaOptix
 #endif
 	}
+
+	struct Diagnostics
+	{
+#if FULL_DIAGNOSTICS
+		public float RayCount;
+		public float BoundsHitCount;
+		public float CandidateCount;
+#pragma warning disable 649
+		public float Padding;
+#pragma warning restore 649
+#else
+		public float RayCount;
+#endif
+	}
+
+#if PATH_DEBUGGING
+	struct DebugPath
+	{
+		public float3 From, To;
+	}
+#endif
 
 	partial class Raytracer : MonoBehaviour
 	{
