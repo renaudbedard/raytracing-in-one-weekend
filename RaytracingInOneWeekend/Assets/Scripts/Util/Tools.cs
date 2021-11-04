@@ -190,5 +190,37 @@ namespace Util
 			value = max(value, 0);
 			return max(1.055f * pow(value, 0.416666667f) - 0.055f, 0);
 		}
+
+		// ACES fitted implementation by Stephen Hill (@self_shadow)
+		// https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
+
+		// sRGB => XYZ => D65_2_D60 => AP1 => RRT_SAT
+		static readonly float3x3 ACESInputMat = float3x3(
+			0.59719f, 0.35458f, 0.04823f,
+			0.07600f, 0.90834f, 0.01566f,
+			0.02840f, 0.13383f, 0.83777f);
+
+		// ODT_SAT => XYZ => D60_2_D65 => sRGB
+		static readonly float3x3 ACESOutputMat = float3x3(
+			1.60475f, -0.53108f, -0.07367f,
+			-0.10208f, 1.10813f, -0.00605f,
+			-0.00327f, -0.07276f, 1.07602f
+		);
+
+		static float3 RRTAndODTFit(float3 v)
+		{
+			float3 a = v * (v + 0.0245786f) - 0.000090537f;
+			float3 b = v * (0.983729f * v + 0.4329510f) + 0.238081f;
+				return a / b;
+		}
+
+		public static float3 ACESFitted(float3 color)
+		{
+			color = mul(ACESInputMat, color);
+			color = RRTAndODTFit(color);
+			color = mul(ACESOutputMat, color);
+			color = saturate(color);
+			return color;
+		}
 	}
 }

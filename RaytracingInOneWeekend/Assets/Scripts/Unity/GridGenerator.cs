@@ -48,6 +48,9 @@ namespace Unity
 		[Button("Regenerate")]
 		void Regenerate()
 		{
+			if (this == null)
+				return;
+
 			instances.Clear();
 
 			foreach (Transform instance in transform)
