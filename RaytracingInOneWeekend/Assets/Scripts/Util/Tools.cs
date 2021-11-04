@@ -211,7 +211,7 @@ namespace Util
 		{
 			float3 a = v * (v + 0.0245786f) - 0.000090537f;
 			float3 b = v * (0.983729f * v + 0.4329510f) + 0.238081f;
-				return a / b;
+			return a / b;
 		}
 
 		public static float3 ACESFitted(float3 color)
@@ -221,6 +221,16 @@ namespace Util
 			color = mul(ACESOutputMat, color);
 			color = saturate(color);
 			return color;
+		}
+
+		public static float3 ACESFilm(float3 x)
+		{
+			const float a = 2.51f;
+			const float b = 0.03f;
+			const float c = 2.43f;
+			const float d = 0.59f;
+			const float e = 0.14f;
+			return saturate((x*(a*x+b))/(x*(c*x+d)+e));
 		}
 	}
 }

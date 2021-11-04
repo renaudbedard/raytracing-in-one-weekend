@@ -916,7 +916,7 @@ namespace Runtime
 			if (CancellationToken.Value)
 				return;
 
-			float3 outputColor = Tools.ACESFitted(InputColor[index].LinearToGamma()) * 255;
+			float3 outputColor = Tools.ACESFilm(InputColor[index]).LinearToGamma() * 255;
 			OutputColor[index] = new RGBA32
 			{
 				r = (byte) outputColor.x,
