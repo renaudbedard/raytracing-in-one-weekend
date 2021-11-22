@@ -25,9 +25,7 @@ namespace Unity
 		void SaveFrontBuffer()
 		{
 			byte[] pngBytes = frontBufferTexture.EncodeToPNG();
-			File.WriteAllBytes(
-				Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
-					$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
+			File.WriteAllBytes(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), $"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"), pngBytes);
 		}
 
 		[ButtonGroup("Save")]
@@ -35,15 +33,14 @@ namespace Unity
 		[UsedImplicitly]
 		void SaveView()
 		{
-			ScreenCapture.CaptureScreenshot(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
-				$"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"));
+			ScreenCapture.CaptureScreenshot(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), $"Raytracer {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png"));
 		}
 
 		[DisableIf(nameof(TraceActive))]
 		[DisableInEditorMode]
 		[ButtonGroup("Trace")]
 		[UsedImplicitly]
-		void TriggerTrace() => ScheduleAccumulate(true);
+		void TriggerTrace() => ScheduleSample(true);
 
 		[EnableIf(nameof(TraceActive))]
 		[DisableInEditorMode]

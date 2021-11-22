@@ -15,7 +15,7 @@ namespace Runtime
 			Time = time;
 		}
 
-		public Ray OffsetTowards(float3 normal) => new Ray(Origin + 0.001f * normal, Direction, Time);
+		public Ray OffsetTowards(float3 normal) => new(Origin + 0.001f * normal, Direction, Time);
 
 		public float3 GetPoint(float t) => Origin + t * Direction;
 	}

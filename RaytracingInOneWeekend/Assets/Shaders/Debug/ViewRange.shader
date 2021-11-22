@@ -75,7 +75,8 @@ Shader "Hidden/ViewRange"
         if (_NormalDisplay == 1)
             return float4(LinearToSRGB(normalize(sourceColor.yzw) * 0.5f + 0.5f), 1);
 
-        return float4(inferno(saturate((sourceColor[_Channel] - _Minimum_Range.x) / _Minimum_Range.y)), 1);
+        float value = saturate((sourceColor[_Channel] - _Minimum_Range.x) / _Minimum_Range.y);
+        return float4(inferno(value), 1);
     }
 
     ENDHLSL

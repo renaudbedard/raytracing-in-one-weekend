@@ -37,7 +37,7 @@ namespace Runtime
 
 		public Ray GetRay(float2 normalizedCoordinates, ref RandomSource rng)
 		{
-			float2 rd = LensRadius * rng.InUnitDisk();
+			float2 rd = LensRadius == 0 ? 0 : LensRadius * rng.InUnitDisk();
 			float3 offset = Right * rd.x + Up * rd.y;
 
 			return new Ray(Origin + offset,

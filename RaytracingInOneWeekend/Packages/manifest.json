@@ -1,11 +1,11 @@
 {
   "dependencies": {
-    "com.unity.burst": "1.6.1",
+    "com.unity.burst": "1.7.0-pre.1",
     "com.unity.collections": "1.0.0-pre.6",
     "com.unity.ide.rider": "3.0.7",
-    "com.unity.inputsystem": "1.1.1",
-    "com.unity.mathematics": "1.2.4",
-    "com.unity.render-pipelines.high-definition": "13.0.0",
+    "com.unity.inputsystem": "1.2.0",
+    "com.unity.mathematics": "1.2.5",
+    "com.unity.render-pipelines.high-definition": "13.1.0",
     "com.unity.test-framework": "1.1.30",
     "com.unity.ugui": "1.0.0",
     "com.unity.modules.ai": "1.0.0",

@@ -51,6 +51,8 @@ namespace Runtime
 			if (Type != MaterialType.ProbabilisticVolume)
 				return false;
 
+			rng.RandomEvents++;
+
 			float volumeHitDistance = -(1 / max(Density, EPSILON)) * log(rng.NextFloat());
 
 			if (volumeHitDistance < hitDistance)
@@ -75,6 +77,8 @@ namespace Runtime
 					float metallic = Metallic.SampleScalar(rec.TexCoords, perlinNoise);
 					float glossiness = Glossiness.SampleScalar(rec.TexCoords, perlinNoise);
 
+					// TODO: Rough normal random distribution should be Trowbridge-Reitz style, not this weird offset cosine lobe
+
 					float roughness = pow(1 - glossiness, 2);
 					float3 roughNormal = roughness > 0 ? normalize(lerp(rec.Normal, rng.OnCosineWeightedHemisphere(rec.Normal), roughness)) : rec.Normal;
 
@@ -82,8 +86,9 @@ namespace Runtime
 					float ior = lerp(PlasticIor, MetalIor, metallic);
 					float fresnel = Schlick(incidentCosine, ior);
 					float maskingShadowing = Microfacet.SmithMaskingShadowing(ray.Direction, rec.Normal, roughness);
+					float reflectionChance = saturate(fresnel * glossiness * maskingShadowing);
 
-					if (glossiness > 0 && rng.NextFloat() < fresnel * glossiness * maskingShadowing)
+					if (reflectionChance > 0 && rng.NextFloat() < reflectionChance)
 					{
 						// Glossy reflection (untinted!)
 						scattered = new Ray(rec.Point, reflect(ray.Direction, roughNormal), ray.Time);
@@ -102,6 +107,14 @@ namespace Runtime
 							scattered = new Ray(rec.Point, rng.OnCosineWeightedHemisphere(rec.Normal), ray.Time);
 						}
 					}
+
+					// Scatter type choices
+					if (reflectionChance is > 0 and < 1) rng.RandomEvents++;
+					if (metallic is > 0 and < 1) rng.RandomEvents++;
+
+					// Random lobe sizes
+					rng.RandomEvents += roughness * (reflectionChance + (1 - reflectionChance) * metallic);
+					rng.RandomEvents += (1 - reflectionChance) * (1 - metallic);
 					break;
 				}
 
@@ -138,11 +151,20 @@ namespace Runtime
 					}
 
 					scattered = new Ray(rec.Point, scatterDirection, ray.Time);
+
+					// Scatter type choices
+					rng.RandomEvents++;
+
+					// Random lobe sizes
+					rng.RandomEvents += roughness;
 					break;
 				}
 
 				case MaterialType.ProbabilisticVolume:
 					scattered = new Ray(rec.Point, rng.NextFloat3Direction());
+
+					// Random lobe sizes
+					rng.RandomEvents += 2;
 					break;
 
 				default:

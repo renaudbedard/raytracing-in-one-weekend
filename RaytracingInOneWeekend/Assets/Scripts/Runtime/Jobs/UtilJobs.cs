@@ -24,6 +24,23 @@ namespace Runtime.Jobs
 	}
 
 	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
+	struct CopyFloatBufferJob : IJob
+	{
+		[ReadOnly] public NativeReference<bool> CancellationToken;
+
+		[ReadOnly] public NativeArray<float> Input;
+		[WriteOnly] public NativeArray<float> Output;
+
+		public void Execute()
+		{
+			if (CancellationToken.Value)
+				return;
+
+			NativeArray<float>.Copy(Input, Output);
+		}
+	}
+
+	[BurstCompile(FloatPrecision.Medium, FloatMode.Fast, OptimizeFor = OptimizeFor.Performance)]
 	struct CopyFloat3BufferJob : IJob
 	{
 		[ReadOnly] public NativeReference<bool> CancellationToken;

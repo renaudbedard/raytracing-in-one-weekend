@@ -28,9 +28,11 @@ using Ray = Runtime.Ray;
 using RigidTransform = Unity.Mathematics.RigidTransform;
 using SkyType = Runtime.SkyType;
 using Texture = Runtime.Texture;
+
 #if ENABLE_OPTIX
 using OptiX;
 #endif
+
 #if ODIN_INSPECTOR
 using OdinReadOnly = Sirenix.OdinInspector.ReadOnlyAttribute;
 #else
@@ -55,9 +57,7 @@ namespace Unity
 		public float RayCount;
 		public float BoundsHitCount;
 		public float CandidateCount;
-#pragma warning disable 649
-		public float Padding;
-#pragma warning restore 649
+		public float SampleCountWeight;
 #else
 		public float RayCount;
 #endif
@@ -84,13 +84,15 @@ namespace Unity
 		[SerializeField] [EnableIf(nameof(BvhEnabled))] [Range(2, 32)] [UsedImplicitly] int maxBvhDepth = 16;
 		[SerializeField] [Range(0.01f, 2)] float resolutionScaling = 0.5f;
 		[SerializeField] [Range(1, 10000)] uint samplesPerPixel = 1000;
-		[SerializeField] [Range(1, 100)] uint samplesPerBatch = 10;
+		[SerializeField] int maxDurationSeconds = -1;
+		[SerializeField] [MinMaxSlider(1, 1000, true)] Vector2 samplesPerBatchRange = new Vector2(1, 50);
 		[SerializeField] [Range(1, 500)] int traceDepth = 35;
 		[SerializeField] DenoiseMode denoiseMode = DenoiseMode.None;
 		[SerializeField] NoiseColor noiseColor = NoiseColor.White;
 		[SerializeField] bool subPixelJitter = true;
 		[SerializeField] bool previewAfterBatch = true;
 		[SerializeField] bool stopWhenCompleted = true;
+		[SerializeField] bool saveWhenCompleted = true;
 #if PATH_DEBUGGING
 		[SerializeField] bool fadeDebugPaths = false;
 		[SerializeField] [Range(0, 25)] float debugPathDuration = 1;
@@ -100,17 +102,18 @@ namespace Unity
 		[SerializeField] [DisableInPlayMode] Shader viewRangeShader = null;
 		[SerializeField] [DisableInPlayMode] Shader blitShader = null;
 
-		[OdinReadOnly] public float AccumulatedSamples;
+		[OdinReadOnly] public float TotalSamplesPerPixel;
+		[UsedImplicitly] [OdinReadOnly] public int2 SamplesPerPixelRange;
 
 		[UsedImplicitly] [OdinReadOnly] public float MillionRaysPerSecond,
 			AvgMRaysPerSecond,
-			LastBatchDuration,
-			LastBatchRayCount,
-			LastTraceDuration;
+			LastBatchRayCountPerPixel;
 
-		[UsedImplicitly] [OdinReadOnly] public float BufferMinValue, BufferMaxValue;
+		[UsedImplicitly] [OdinReadOnly] public string LastBatchDuration, LastTraceDuration;
 
-		[UsedImplicitly] [ShowInInspector] public float AccumulateJobs => scheduledAccumulateJobs.Count;
+		[UsedImplicitly] [OdinReadOnly] public float2 BufferValueRange;
+
+		[UsedImplicitly] [ShowInInspector] public float AccumulateJobs => scheduledSampleJobs.Count;
 		[UsedImplicitly] [ShowInInspector] public float CombineJobs => scheduledCombineJobs.Count;
 		[UsedImplicitly] [ShowInInspector] public float DenoiseJobs => scheduledDenoiseJobs.Count;
 		[UsedImplicitly] [ShowInInspector] public float FinalizeJobs => scheduledFinalizeJobs.Count;
@@ -119,22 +122,27 @@ namespace Unity
 
 		Pool<NativeArray<float4>> float4Buffers;
 		Pool<NativeArray<float3>> float3Buffers;
+		Pool<NativeArray<float>> floatBuffers;
 		Pool<NativeArray<long>> longBuffers;
 
 		Pool<NativeReference<int>> intReferences;
 		Pool<NativeReference<bool>> boolReferences;
+		Pool<NativeReference<int2>> int2References;
+		Pool<NativeReference<float2>> float2References;
 
 		int interlacingOffsetIndex;
 		int[] interlacingOffsets;
 		uint frameSeed = 1;
+		float2 sampleCountWeightExtrema;
 
 		NativeArray<float4> colorAccumulationBuffer;
 		NativeArray<float3> normalAccumulationBuffer, albedoAccumulationBuffer;
+		NativeArray<float> sampleCountWeightAccumulationBuffer;
 
 		Texture2D frontBufferTexture, normalsTexture, albedoTexture, diagnosticsTexture;
-		NativeArray<RGBA32> frontBuffer, normalsBuffer, albedoBuffer;
-
 		UnityEngine.Material viewRangeMaterial, blitMaterial;
+
+		NativeArray<RGBA32> frontBuffer, normalsBuffer, albedoBuffer;
 		NativeArray<Diagnostics> diagnosticsBuffer;
 
 		// NativeArray<Sphere> sphereBuffer;
@@ -190,12 +198,15 @@ namespace Unity
 			}
 		}
 
-		struct AccumulateOutputData
+		struct SampleBatchOutputData
 		{
 			public NativeArray<float4> Color;
 			public NativeArray<float3> Normal, Albedo;
+			public NativeArray<float> SampleCountWeight;
 			public NativeReference<int> ReducedRayCount;
-			public JobHandle ReduceRayCountJobHandle;
+			public NativeReference<int> TotalSamples;
+			public NativeReference<float2> SampleCountWeightExtrema;
+			public NativeReference<int2> SampleCountExtrema;
 			public NativeArray<long> Timing;
 		}
 
@@ -204,7 +215,7 @@ namespace Unity
 			public NativeArray<float3> Color, Normal, Albedo;
 		}
 
-		readonly Queue<ScheduledJobData<AccumulateOutputData>> scheduledAccumulateJobs = new();
+		readonly Queue<ScheduledJobData<SampleBatchOutputData>> scheduledSampleJobs = new();
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledCombineJobs = new();
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledDenoiseJobs = new();
 		readonly Queue<ScheduledJobData<PassOutputData>> scheduledFinalizeJobs = new();
@@ -213,7 +224,7 @@ namespace Unity
 		float focusDistance = 1;
 		int lastTraceDepth;
 		uint lastSamplesPerPixel;
-		bool queuedAccumulate;
+		bool queuedSample;
 
 		readonly Stopwatch traceTimer = new();
 		readonly List<float> mraysPerSecResults = new();
@@ -222,7 +233,7 @@ namespace Unity
 
 		int BufferLength => (int) (bufferSize.x * bufferSize.y);
 
-		bool TraceActive => scheduledAccumulateJobs.Count > 0 || scheduledCombineJobs.Count > 0 || scheduledDenoiseJobs.Count > 0 || scheduledFinalizeJobs.Count > 0;
+		bool TraceActive => scheduledSampleJobs.Count > 0 || scheduledCombineJobs.Count > 0 || scheduledDenoiseJobs.Count > 0 || scheduledFinalizeJobs.Count > 0;
 
 		enum BufferView
 		{
@@ -231,6 +242,7 @@ namespace Unity
 #if FULL_DIAGNOSTICS && BVH
 			BvhHitCount,
 			CandidateCount,
+			SampleCountWeight,
 #endif
 			Normals,
 			Albedo
@@ -258,27 +270,38 @@ namespace Unity
 			channelPropertyId = Shader.PropertyToID("_Channel");
 			minimumRangePropertyId = Shader.PropertyToID("_Minimum_Range");
 
-			float3Buffers = new Pool<NativeArray<float3>>(() => new NativeArray<float3>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
-				itemNameOverride: "NativeArray<float3>") { Capacity = 64 };
+			unsafe
+			{
+				string GetArrayName<T>(NativeArray<T> e) where T : unmanaged => $"0x{(int)NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(e):x8}";
+				string GetReferenceName<T>(NativeReference<T> e) where T : unmanaged => $"0x{(int)e.GetUnsafePtrWithoutChecks():x8}";
 
-			float4Buffers = new Pool<NativeArray<float4>>(() => new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
-				itemNameOverride: "NativeArray<float4>") { Capacity = 16 };
+				float3Buffers = new Pool<NativeArray<float3>>(() => new NativeArray<float3>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetArrayName, equalityComparer: new NativeArrayEqualityComparer<float3>()) { Capacity = 32 };
 
-			longBuffers = new Pool<NativeArray<long>>(() => new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
-				itemNameOverride: "NativeArray<long>") { Capacity = 4 };
+				float4Buffers = new Pool<NativeArray<float4>>(() => new NativeArray<float4>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetArrayName, equalityComparer: new NativeArrayEqualityComparer<float4>()) { Capacity = 8 };
 
-			intReferences = new Pool<NativeReference<int>>(() => new NativeReference<int>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
-				itemNameOverride: "NativeReference<int>") { Capacity = 4 };
+				floatBuffers = new Pool<NativeArray<float>>(() => new NativeArray<float>(BufferLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetArrayName, equalityComparer: new NativeArrayEqualityComparer<float>()) { Capacity = 8 };
 
-			boolReferences = new Pool<NativeReference<bool>>(() => new NativeReference<bool>(AllocatorManager.Persistent),
-				itemNameOverride: "NativeReference<bool>", cleanupMethod: reference =>
-				{
-					unsafe
-					{
-						// Doing it the safe way caused the sentinels to complain for reasons unclear
-						*(bool*)reference.GetUnsafePtrWithoutChecks() = false;
-					}
-				}) { Capacity = 64 };
+				longBuffers = new Pool<NativeArray<long>>(() => new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetArrayName, equalityComparer: new NativeArrayEqualityComparer<long>()) { Capacity = 4 };
+
+				intReferences = new Pool<NativeReference<int>>(() => new NativeReference<int>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetReferenceName, equalityComparer: new NativeReferenceEqualityComparer<int>()) { Capacity = 4 };
+
+				boolReferences = new Pool<NativeReference<bool>>(() => new NativeReference<bool>(AllocatorManager.Persistent),
+					itemNameMethod: e => $"0x{(int)e.GetUnsafePtrWithoutChecks():x8}",
+					cleanupMethod: reference => { *(bool*)reference.GetUnsafePtrWithoutChecks() = false; },
+					equalityComparer: new NativeReferenceEqualityComparer<bool>()) { Capacity = 8 };
+
+				int2References = new Pool<NativeReference<int2>>(() => new NativeReference<int2>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetReferenceName, equalityComparer: new NativeReferenceEqualityComparer<int2>()) { Capacity = 4 };
+
+				float2References = new Pool<NativeReference<float2>>(() => new NativeReference<float2>(AllocatorManager.Persistent, NativeArrayOptions.UninitializedMemory),
+					itemNameMethod: GetReferenceName, equalityComparer: new NativeReferenceEqualityComparer<float2>()) { Capacity = 4 };
+
+			}
 
 			ignoreBatchTimings = true;
 
@@ -291,7 +314,7 @@ namespace Unity
 			InitDenoisers();
 			EnsureBuffersBuilt();
 			CleanCamera();
-			ScheduleAccumulate(true);
+			ScheduleSample(true);
 			TargetCamera.GetComponent<HDAdditionalCameraData>().customRender += OnCustomRender;
 		}
 
@@ -381,17 +404,12 @@ namespace Unity
 
 		void OnDestroy()
 		{
-			foreach (var jobData in scheduledAccumulateJobs) jobData.Cancel();
+			foreach (var jobData in scheduledSampleJobs) jobData.Cancel();
 			foreach (var jobData in scheduledCombineJobs) jobData.Cancel();
 			foreach (var jobData in scheduledDenoiseJobs) jobData.Cancel();
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Cancel();
 
-			foreach (var jobData in scheduledAccumulateJobs)
-			{
-				jobData.Handle.Complete();
-				jobData.OutputData.ReduceRayCountJobHandle.Complete();
-			}
-
+			foreach (var jobData in scheduledSampleJobs) jobData.Handle.Complete();
 			foreach (var jobData in scheduledCombineJobs) jobData.Handle.Complete();
 			foreach (var jobData in scheduledDenoiseJobs) jobData.Handle.Complete();
 			foreach (var jobData in scheduledFinalizeJobs) jobData.Handle.Complete();
@@ -406,9 +424,12 @@ namespace Unity
 			float3Buffers?.Dispose();
 			float4Buffers?.Dispose();
 			longBuffers?.Dispose();
+			floatBuffers?.Dispose();
 
 			intReferences?.Dispose();
 			boolReferences?.Dispose();
+			int2References?.Dispose();
+			float2References?.Dispose();
 
 			bvhNodeDataBuffer.SafeDispose();
 			bvhEntities.SafeDispose();
@@ -460,8 +481,7 @@ namespace Unity
 			bool buffersNeedRebuild = any(currentSize != bufferSize);
 			bool cameraDirty = TargetCamera.transform.hasChanged;
 			bool traceDepthChanged = traceDepth != lastTraceDepth;
-			bool samplesPerPixelDecreased =
-				lastSamplesPerPixel != samplesPerPixel && AccumulatedSamples > samplesPerPixel;
+			bool samplesPerPixelDecreased = lastSamplesPerPixel != samplesPerPixel && TotalSamplesPerPixel > samplesPerPixel;
 
 			bool traceNeedsReset = buffersNeedRebuild || worldNeedsRebuild || cameraDirty || traceDepthChanged || samplesPerPixelDecreased;
 
@@ -469,7 +489,7 @@ namespace Unity
 			{
 				int i = 0;
 				bool ShouldCancel() => i++ > 0 || traceAborted;
-				foreach (var jobData in scheduledAccumulateJobs)
+				foreach (var jobData in scheduledSampleJobs)
 					if (ShouldCancel())
 						jobData.Cancel();
 
@@ -488,37 +508,44 @@ namespace Unity
 					if (ShouldCancel())
 						jobData.Cancel();
 
-				foreach (var jobData in scheduledAccumulateJobs) jobData.Handle.Complete();
+				foreach (var jobData in scheduledSampleJobs) jobData.Handle.Complete();
 				foreach (var jobData in scheduledCombineJobs) jobData.Handle.Complete();
 				foreach (var jobData in scheduledDenoiseJobs) jobData.Handle.Complete();
 				foreach (var jobData in scheduledFinalizeJobs) jobData.Handle.Complete();
 			}
 
-			while (scheduledAccumulateJobs.Count > 0 && scheduledAccumulateJobs.Peek().Handle.IsCompleted)
+			while (scheduledSampleJobs.Count > 0 && scheduledSampleJobs.Peek().Handle.IsCompleted)
 			{
-				ScheduledJobData<AccumulateOutputData> completedJob = scheduledAccumulateJobs.Dequeue();
+				ScheduledJobData<SampleBatchOutputData> completedJob = scheduledSampleJobs.Dequeue();
 				completedJob.Complete();
 
 				TimeSpan elapsedTime = DateTime.FromFileTimeUtc(completedJob.OutputData.Timing[1]) -
 				                       DateTime.FromFileTimeUtc(completedJob.OutputData.Timing[0]);
 				longBuffers.Return(completedJob.OutputData.Timing);
 
-				completedJob.OutputData.ReduceRayCountJobHandle.Complete();
 				int totalRayCount = completedJob.OutputData.ReducedRayCount.Value;
+				int totalSamples = completedJob.OutputData.TotalSamples.Value;
+				sampleCountWeightExtrema = completedJob.OutputData.SampleCountWeightExtrema.Value;
+				int2 sampleCountExtrema = completedJob.OutputData.SampleCountExtrema.Value;
 				intReferences.Return(completedJob.OutputData.ReducedRayCount);
+				intReferences.Return(completedJob.OutputData.TotalSamples);
+				float2References.Return(completedJob.OutputData.SampleCountWeightExtrema);
+				int2References.Return(completedJob.OutputData.SampleCountExtrema);
 
-				LastBatchRayCount = totalRayCount;
-				AccumulatedSamples += (float) samplesPerBatch / interlacing;
-				LastBatchDuration = (float) elapsedTime.TotalMilliseconds;
+				var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
+				LastBatchRayCountPerPixel = (float) totalRayCount / totalBufferSize;
+				TotalSamplesPerPixel = (float) totalSamples / totalBufferSize;
+				LastBatchDuration = elapsedTime.ToString("g");
 				MillionRaysPerSecond = totalRayCount / (float) elapsedTime.TotalSeconds / 1000000;
 				if (!ignoreBatchTimings) mraysPerSecResults.Add(MillionRaysPerSecond);
 				AvgMRaysPerSecond = mraysPerSecResults.Count == 0 ? 0 : mraysPerSecResults.Average();
+				SamplesPerPixelRange = sampleCountExtrema;
 				ignoreBatchTimings = false;
 #if UNITY_EDITOR
 				ForceUpdateInspector();
 #endif
-
-				queuedAccumulate = !traceAborted && AccumulatedSamples < samplesPerPixel;
+				bool traceComplete = TotalSamplesPerPixel >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
+				queuedSample = !traceAborted && !traceComplete;
 			}
 
 			while (scheduledCombineJobs.Count > 0 && scheduledCombineJobs.Peek().Handle.IsCompleted)
@@ -533,13 +560,12 @@ namespace Unity
 				completedJob.Complete();
 			}
 
+			LastTraceDuration = traceTimer.Elapsed.ToString("g");
+
 			while (scheduledFinalizeJobs.Count > 0 && scheduledFinalizeJobs.Peek().Handle.IsCompleted)
 			{
 				ScheduledJobData<PassOutputData> completedJob = scheduledFinalizeJobs.Dequeue();
 				completedJob.Complete();
-
-				if (AccumulatedSamples >= samplesPerPixel)
-					LastTraceDuration = (float) traceTimer.Elapsed.TotalMilliseconds;
 
 				if (!traceAborted)
 					SwapBuffers();
@@ -557,25 +583,23 @@ namespace Unity
 			if (cameraDirty) CleanCamera();
 
 			// kick if needed (with double-buffering)
-			if ((queuedAccumulate && scheduledFinalizeJobs.Count <= 1) ||
+			if ((queuedSample && scheduledFinalizeJobs.Count <= 1) ||
 			    (traceNeedsReset && !traceAborted) ||
 			    (!TraceActive && !stopWhenCompleted && !traceAborted))
 			{
-				ScheduleAccumulate(traceNeedsReset || AccumulatedSamples >= samplesPerPixel,
-					scheduledAccumulateJobs.Count > 0
-						? JobHandle.CombineDependencies(
-							scheduledAccumulateJobs.Peek().Handle,
-							scheduledAccumulateJobs.Peek().OutputData.ReduceRayCountJobHandle)
-						: null);
+				ScheduleSample(
+					traceNeedsReset || TotalSamplesPerPixel >= samplesPerPixel,
+					scheduledSampleJobs.Count > 0 ? scheduledSampleJobs.Peek().Handle : null);
 
-				queuedAccumulate = false;
+				queuedSample = false;
 			}
+
+			if (!TraceActive)
+				traceTimer.Stop();
 		}
 
-		void ScheduleAccumulate(bool firstBatch, JobHandle? dependency = null)
+		void ScheduleSample(bool firstBatch, JobHandle? dependency = null)
 		{
-			// Debug.Log($"Scheduling accumulate (firstBatch = {firstBatch})");
-
 			Transform cameraTransform = TargetCamera.transform;
 			Vector3 origin = cameraTransform.position;
 			Vector3 lookAt = origin + cameraTransform.forward;
@@ -593,10 +617,12 @@ namespace Unity
 				if (!colorAccumulationBuffer.IsCreated) colorAccumulationBuffer = float4Buffers.Take();
 				if (!normalAccumulationBuffer.IsCreated) normalAccumulationBuffer = float3Buffers.Take();
 				if (!albedoAccumulationBuffer.IsCreated) albedoAccumulationBuffer = float3Buffers.Take();
+				if (!sampleCountWeightAccumulationBuffer.IsCreated) sampleCountWeightAccumulationBuffer = floatBuffers.Take();
 
 				colorAccumulationBuffer.ZeroMemory();
 				normalAccumulationBuffer.ZeroMemory();
 				albedoAccumulationBuffer.ZeroMemory();
+				sampleCountWeightAccumulationBuffer.ZeroMemory();
 
 				interlacingOffsetIndex = 0;
 
@@ -604,7 +630,7 @@ namespace Unity
 				debugPaths.EnsureCapacity(traceDepth);
 #endif
 				mraysPerSecResults.Clear();
-				AccumulatedSamples = 0;
+				TotalSamplesPerPixel = 0;
 				lastTraceDepth = traceDepth;
 				lastSamplesPerPixel = samplesPerPixel;
 				traceAborted = false;
@@ -616,6 +642,7 @@ namespace Unity
 			NativeArray<float4> colorOutputBuffer = float4Buffers.Take();
 			NativeArray<float3> normalOutputBuffer = float3Buffers.Take();
 			NativeArray<float3> albedoOutputBuffer = float3Buffers.Take();
+			NativeArray<float> sampleCountWeightOutputBuffer = floatBuffers.Take();
 
 			NativeReference<bool> cancellationToken = boolReferences.Take();
 
@@ -639,20 +666,22 @@ namespace Unity
 			// if (skyboxMaterial.TryGetProperty("_Color1", out Color bottomColor) && skyboxMaterial.TryGetProperty("_Color2", out Color topColor))
 			// 	environment = new Environment { SkyType = SkyType.GradientSky, SkyBottomColor = bottomColor.linear.ToFloat3(), SkyTopColor = topColor.linear.ToFloat3() };
 
-			AccumulateJob accumulateJob;
+			SampleBatchJob sampleBatchJob;
 			unsafe
 			{
-				accumulateJob = new AccumulateJob
+				sampleBatchJob = new SampleBatchJob
 				{
 					CancellationToken = cancellationToken,
 
 					InputColor = colorAccumulationBuffer,
 					InputNormal = normalAccumulationBuffer,
 					InputAlbedo = albedoAccumulationBuffer,
+					InputSampleCountWeight = sampleCountWeightAccumulationBuffer,
 
 					OutputColor = colorOutputBuffer,
 					OutputNormal = normalOutputBuffer,
 					OutputAlbedo = albedoOutputBuffer,
+					OutputSampleCountWeight = sampleCountWeightOutputBuffer,
 
 					SliceOffset = interlacingOffsets[interlacingOffsetIndex++],
 					SliceDivider = interlacing,
@@ -660,8 +689,10 @@ namespace Unity
 					Size = bufferSize,
 					View = raytracingCamera,
 					Environment = environment,
+
+
 					Seed = frameSeed,
-					SampleCount = min(samplesPerPixel, samplesPerBatch),
+					SampleCountRange = min(samplesPerPixel, (uint2) (float2) samplesPerBatchRange),
 					TraceDepth = traceDepth,
 					SubPixelJitter = subPixelJitter,
 					BvhRoot = BvhRoot,
@@ -669,6 +700,7 @@ namespace Unity
 					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
 					NoiseColor = noiseColor,
 					OutputDiagnostics = diagnosticsBuffer,
+					SampleCountWeightExtrema = this.sampleCountWeightExtrema,
 #if PATH_DEBUGGING
 					DebugPaths = (DebugPath*) debugPaths.GetUnsafePtr(),
 					DebugCoordinates = int2 (bufferSize / 2)
@@ -678,52 +710,74 @@ namespace Unity
 
 			NativeArray<long> timingBuffer = longBuffers.Take();
 
-			JobHandle accumulateJobHandle;
+			JobHandle sampleBatchJobHandle;
 			if (interlacing > 1)
 			{
-				using var handles = new NativeArray<JobHandle>(4, Allocator.Temp)
+				using var handles = new NativeArray<JobHandle>(6, Allocator.Temp)
 				{
 					[0] = new CopyFloat4BufferJob { CancellationToken = cancellationToken, Input = colorAccumulationBuffer, Output = colorOutputBuffer }.Schedule(dependency ?? default),
 					[1] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = normalAccumulationBuffer, Output = normalOutputBuffer }.Schedule(dependency ?? default),
 					[2] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = albedoAccumulationBuffer, Output = albedoOutputBuffer }.Schedule(dependency ?? default),
-					[3] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationToken, Buffer = diagnosticsBuffer }.Schedule(dependency ?? default)
+					[3] = new CopyFloatBufferJob { CancellationToken = cancellationToken, Input = sampleCountWeightAccumulationBuffer, Output = sampleCountWeightOutputBuffer }.Schedule(dependency ?? default),
+					[4] = new ClearBufferJob<Diagnostics> { CancellationToken = cancellationToken, Buffer = diagnosticsBuffer }.Schedule(dependency ?? default)
 				};
 
 				JobHandle combinedDependencies = JobHandle.CombineDependencies(handles);
 				JobHandle startTimerJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 0 }.Schedule(combinedDependencies);
-				accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
+				sampleBatchJobHandle = sampleBatchJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
 			}
 			else
 			{
 				JobHandle startTimerJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 0 }.Schedule(dependency ?? default);
-				accumulateJobHandle = accumulateJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
+				sampleBatchJobHandle = sampleBatchJob.Schedule(totalBufferSize, 1, startTimerJobHandle);
 			}
 
-			accumulateJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 1 }.Schedule(accumulateJobHandle);
+			sampleBatchJobHandle = new RecordTimeJob { Buffer = timingBuffer, Index = 1 }.Schedule(sampleBatchJobHandle);
 
 			NativeReference<int> reducedRayCountReference = intReferences.Take();
-			JobHandle reduceRayCountJobHandle = new ReduceRayCountJob { Diagnostics = diagnosticsBuffer, TotalRayCount = reducedRayCountReference }.Schedule(accumulateJobHandle);
+			NativeReference<int> totalSamplesReference = intReferences.Take();
+			NativeReference<float2> sampleCountWeightExtrema = float2References.Take();
+			NativeReference<int2> sampleCountExtremaReference = int2References.Take();
 
-			var outputData = new AccumulateOutputData
+			JobHandle reduceMetricsJobHandle = new ReduceMetricsJob
+			{
+				Diagnostics = diagnosticsBuffer,
+				AccumulatedColor = colorOutputBuffer,
+				TotalRayCount = reducedRayCountReference,
+				AccumulatedSampleCountWeight = sampleCountWeightOutputBuffer,
+				SampleCountWeightExtrema = sampleCountWeightExtrema,
+				SampleCountExtrema = sampleCountExtremaReference,
+				TotalSamples = totalSamplesReference
+			}.Schedule(sampleBatchJobHandle);
+
+			var outputData = new SampleBatchOutputData
 			{
 				Color = float4Buffers.Take(),
 				Normal = float3Buffers.Take(),
 				Albedo = float3Buffers.Take(),
-				ReduceRayCountJobHandle = reduceRayCountJobHandle,
+				SampleCountWeight = floatBuffers.Take(),
 				ReducedRayCount = reducedRayCountReference,
+				SampleCountWeightExtrema = sampleCountWeightExtrema,
+				SampleCountExtrema = sampleCountExtremaReference,
+				TotalSamples = totalSamplesReference,
 				Timing = timingBuffer
 			};
 
-			JobHandle combinedDependency = JobHandle.CombineDependencies(
-				new CopyFloat4BufferJob { CancellationToken = cancellationToken, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(accumulateJobHandle),
-				new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(accumulateJobHandle));
+			using var jobArray = new NativeArray<JobHandle>(5, Allocator.Temp)
+			{
+				[0] = new CopyFloat4BufferJob { CancellationToken = cancellationToken, Input = colorOutputBuffer, Output = outputData.Color }.Schedule(reduceMetricsJobHandle),
+				[1] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = normalOutputBuffer, Output = outputData.Normal }.Schedule(reduceMetricsJobHandle),
+				[2] = new CopyFloat3BufferJob { CancellationToken = cancellationToken, Input = albedoOutputBuffer, Output = outputData.Albedo }.Schedule(reduceMetricsJobHandle),
+				[3] = new CopyFloatBufferJob { CancellationToken = cancellationToken, Input = sampleCountWeightOutputBuffer, Output = outputData.SampleCountWeight }.Schedule(reduceMetricsJobHandle),
+			};
+			JobHandle combinedDependency = JobHandle.CombineDependencies(jobArray);
 
 			NativeArray<float4> colorInputBuffer = colorAccumulationBuffer;
 			NativeArray<float3> normalInputBuffer = normalAccumulationBuffer,
 				albedoInputBuffer = albedoAccumulationBuffer;
+			NativeArray<float> sampleCountWeightInputBuffer = sampleCountWeightAccumulationBuffer;
 
-			scheduledAccumulateJobs.Enqueue(new ScheduledJobData<AccumulateOutputData>
+			scheduledSampleJobs.Enqueue(new ScheduledJobData<SampleBatchOutputData>
 			{
 				CancellationToken = cancellationToken,
 				Handle = combinedDependency,
@@ -733,6 +787,7 @@ namespace Unity
 					float4Buffers.Return(colorInputBuffer);
 					float3Buffers.Return(normalInputBuffer);
 					float3Buffers.Return(albedoInputBuffer);
+					floatBuffers.Return(sampleCountWeightInputBuffer);
 					boolReferences.Return(cancellationToken);
 				}
 			});
@@ -741,20 +796,23 @@ namespace Unity
 			colorAccumulationBuffer = colorOutputBuffer;
 			normalAccumulationBuffer = normalOutputBuffer;
 			albedoAccumulationBuffer = albedoOutputBuffer;
+			sampleCountWeightAccumulationBuffer = sampleCountWeightOutputBuffer;
 
-			if (AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing >= samplesPerPixel || previewAfterBatch)
+			bool traceComplete = TotalSamplesPerPixel >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
+
+			if (traceComplete || previewAfterBatch)
 				ScheduleCombine(combinedDependency, outputData);
 
 			// schedule another accumulate (but no more than one)
-			if (!dependency.HasValue && AccumulatedSamples + accumulateJob.SampleCount / (float) interlacing < samplesPerPixel)
-				ScheduleAccumulate(false, JobHandle.CombineDependencies(combinedDependency, reduceRayCountJobHandle));
+			if (!dependency.HasValue && !traceComplete)
+				ScheduleSample(false, JobHandle.CombineDependencies(combinedDependency, reduceMetricsJobHandle));
 
 			JobHandle.ScheduleBatchedJobs();
 
 			if (firstBatch) traceTimer.Restart();
 		}
 
-		void ScheduleCombine(JobHandle dependency, AccumulateOutputData accumulateOutput)
+		void ScheduleCombine(JobHandle dependency, SampleBatchOutputData sampleBatchOutput)
 		{
 			NativeReference<bool> cancellationToken = boolReferences.Take();
 
@@ -769,20 +827,20 @@ namespace Unity
 				LdrAlbedo = false,
 #endif
 
-				InputColor = accumulateOutput.Color,
-				InputNormal = accumulateOutput.Normal,
-				InputAlbedo = accumulateOutput.Albedo,
+				InputColor = sampleBatchOutput.Color,
+				InputNormal = sampleBatchOutput.Normal,
+				InputAlbedo = sampleBatchOutput.Albedo,
 				Size = (int2) bufferSize,
 
 				OutputColor = float3Buffers.Take(),
 				OutputNormal = float3Buffers.Take(),
-				OutputAlbedo = float3Buffers.Take(),
+				OutputAlbedo = float3Buffers.Take()
 			};
 
 			var totalBufferSize = (int) (bufferSize.x * bufferSize.y);
 			JobHandle combineJobHandle = combineJob.Schedule(totalBufferSize, 128, dependency);
 
-			var copyOutputData = new PassOutputData
+			var combineOutputData = new PassOutputData
 			{
 				Color = combineJob.OutputColor,
 				Normal = combineJob.OutputNormal,
@@ -793,20 +851,21 @@ namespace Unity
 			{
 				CancellationToken = cancellationToken,
 				Handle = combineJobHandle,
-				OutputData = copyOutputData,
+				OutputData = combineOutputData,
 				OnComplete = () =>
 				{
-					float4Buffers.Return(accumulateOutput.Color);
-					float3Buffers.Return(accumulateOutput.Normal);
-					float3Buffers.Return(accumulateOutput.Albedo);
+					float4Buffers.Return(sampleBatchOutput.Color);
+					float3Buffers.Return(sampleBatchOutput.Normal);
+					float3Buffers.Return(sampleBatchOutput.Albedo);
+					floatBuffers.Return(sampleBatchOutput.SampleCountWeight);
 					boolReferences.Return(cancellationToken);
 				}
 			});
 
 			if (denoiseMode != DenoiseMode.None)
-				ScheduleDenoise(combineJobHandle, copyOutputData);
+				ScheduleDenoise(combineJobHandle, combineOutputData);
 			else
-				ScheduleFinalize(combineJobHandle, copyOutputData);
+				ScheduleFinalize(combineJobHandle, combineOutputData);
 		}
 
 		void ScheduleDenoise(JobHandle dependency, PassOutputData combineOutput)
@@ -967,6 +1026,15 @@ namespace Unity
 						bufferMax = max(bufferMax, value.CandidateCount);
 					}
 					break;
+
+				case BufferView.SampleCountWeight:
+					for (int i = 0; i < diagnosticsBuffer.Length; i++, ++diagnosticsPtr)
+					{
+						Diagnostics value = *diagnosticsPtr;
+						bufferMin = min(bufferMin, value.SampleCountWeight);
+						bufferMax = max(bufferMax, value.SampleCountWeight);
+					}
+					break;
 #endif
 			}
 
@@ -977,14 +1045,14 @@ namespace Unity
 				case BufferView.Albedo: albedoTexture.Apply(false); break;
 
 				default:
-					BufferMinValue = bufferMin;
-					BufferMaxValue = bufferMax;
+					BufferValueRange = float2(bufferMin, bufferMax);
 					diagnosticsTexture.Apply(false);
 					viewRangeMaterial.SetVector(minimumRangePropertyId, new Vector4(bufferMin, bufferMax - bufferMin));
 					break;
 			}
 
-			if (AccumulatedSamples >= samplesPerPixel && stopWhenCompleted)
+			bool traceComplete = TotalSamplesPerPixel >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
+			if (traceComplete && stopWhenCompleted && saveWhenCompleted)
 				SaveFrontBuffer();
 		}
 
@@ -1029,10 +1097,12 @@ namespace Unity
 
 			if ((int) lastBufferSize.x != width || (int) lastBufferSize.y != height)
 			{
+				floatBuffers.Reset();
 				float3Buffers.Reset();
 				float4Buffers.Reset();
 				colorAccumulationBuffer = default;
 				albedoAccumulationBuffer = normalAccumulationBuffer = default;
+				sampleCountWeightAccumulationBuffer = default;
 
 #if ENABLE_OPTIX
 				RebuildOptixBuffers((uint2) lastBufferSize);
@@ -1196,7 +1266,7 @@ namespace Unity
 					Material material;
 					if (unityMaterial.TryGetProperty("_Density", out float density))
 						material = new Material(MaterialType.ProbabilisticVolume, meshAlbedoTexture, density: density);
-					else if (unityMaterial.TryGetProperty("_RefractiveIndex", out float refractiveIndex))
+					else if (unityMaterial.TryGetProperty("_RefractionModel", out float refractionModel) && refractionModel > 0 && unityMaterial.TryGetProperty("_Ior", out float refractiveIndex))
 						material = new Material(MaterialType.Dielectric, meshAlbedoTexture, glossiness: meshGlossinessTexture, indexOfRefraction: refractiveIndex);
 					else
 						material = new Material(MaterialType.Standard, meshAlbedoTexture, meshEmissionTexture, meshGlossinessTexture, meshMetallicTexture);

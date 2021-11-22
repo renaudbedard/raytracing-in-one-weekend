@@ -233,4 +233,42 @@ namespace Util
 			return saturate((x*(a*x+b))/(x*(c*x+d)+e));
 		}
 	}
+
+	readonly struct NativeArrayEqualityComparer<T> : IEqualityComparer<NativeArray<T>> where T : unmanaged
+	{
+		public bool Equals(NativeArray<T> x, NativeArray<T> y)
+		{
+			unsafe
+			{
+				return NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(x) == NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(y);
+			}
+		}
+
+		public int GetHashCode(NativeArray<T> obj)
+		{
+			unsafe
+			{
+				return (int) NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(obj);
+			}
+		}
+	}
+
+	readonly struct NativeReferenceEqualityComparer<T> : IEqualityComparer<NativeReference<T>> where T : unmanaged
+	{
+		public bool Equals(NativeReference<T> x, NativeReference<T> y)
+		{
+			unsafe
+			{
+				return x.GetUnsafePtrWithoutChecks() == y.GetUnsafePtrWithoutChecks();
+			}
+		}
+
+		public int GetHashCode(NativeReference<T> obj)
+		{
+			unsafe
+			{
+				return (int) obj.GetUnsafePtrWithoutChecks();
+			}
+		}
+	}
 }

@@ -1,6 +1,11 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Object = UnityEngine.Object;
+
+#if ODIN_INSPECTOR
+using Sirenix.Utilities;
+#endif
 
 namespace Util
 {
@@ -8,17 +13,19 @@ namespace Util
 	{
 		readonly Action<T> cleanupMethod;
 		readonly Func<T> factoryMethod;
-		readonly string itemName;
-		int freeIndex;
+		readonly Func<T, string> itemNameMethod;
+		readonly Dictionary<T, int> takenItems;
 
+		int freeIndex;
 		T[] items = Array.Empty<T>();
 
-		public Pool(Func<T> factoryMethod = null, Action<T> cleanupMethod = null, string itemNameOverride = null)
+		public Pool(Func<T> factoryMethod = null, Action<T> cleanupMethod = null, Func<T, string> itemNameMethod = null, IEqualityComparer<T> equalityComparer = null)
 		{
-			itemName = itemNameOverride ?? typeof(T).Name;
+			takenItems = new Dictionary<T, int>(equalityComparer ?? EqualityComparer<T>.Default);
 
 			this.factoryMethod = factoryMethod;
 			this.cleanupMethod = cleanupMethod;
+			this.itemNameMethod = itemNameMethod ?? (x => x.ToString());
 		}
 
 		public void Reset()
@@ -38,8 +45,7 @@ namespace Util
 			set
 			{
 				if (freeIndex > value)
-					throw new InvalidOperationException(
-						$"Reducing capacity of {itemName} pool to {value} would make pool lose track of {freeIndex - value} taken items");
+					throw new InvalidOperationException($"Reducing capacity of {typeof(T).GetNiceName()} pool to {value} would make pool lose track of {freeIndex - value} taken items");
 
 				int oldCapacity = items.Length;
 
@@ -73,22 +79,37 @@ namespace Util
 			{
 				int oldCapacity = items.Length;
 				Capacity++;
-				Debug.Log($"Grew pool of {itemName} from {oldCapacity} to {items.Length}");
+				Debug.Log($"Grew pool of {typeof(T).GetNiceName()} from {oldCapacity} to {items.Length}");
 			}
 
-			return items[freeIndex++];
+			T item = items[freeIndex];
+			takenItems[item] = freeIndex;
+#if TRACE_LOGGING
+			Debug.Log($"Taking {typeof(T).GetNiceName()} {itemNameMethod(item)} at #{freeIndex}");
+#endif
+			++freeIndex;
+
+			return item;
 		}
 
 		public void Return(T item)
 		{
-			freeIndex--;
+			if (!takenItems.TryGetValue(item, out int sourceIndex))
+			{
+				Debug.LogError($"{typeof(T).GetNiceName()} {itemNameMethod(item)} count not be found in TakenIndices ({TakenCount} taken)");
+				return;
+			}
 
+			int destinationIndex = --freeIndex;
 			cleanupMethod?.Invoke(item);
+#if TRACE_LOGGING
+			Debug.Log($"Returned {typeof(T).GetNiceName()} {itemNameMethod(item)} at #{sourceIndex}, swapping with #{destinationIndex}");
+#endif
+			takenItems.Remove(item);
 
-			int destinationIndex = freeIndex;
-			int sourceIndex = Array.IndexOf(items, item, 0, freeIndex + 1);
-
-			(items[destinationIndex], items[sourceIndex]) = (items[sourceIndex], items[destinationIndex]);
+			T destinationItem = items[destinationIndex];
+			(items[destinationIndex], items[sourceIndex]) = (items[sourceIndex], destinationItem);
+			takenItems[destinationItem] = sourceIndex;
 		}
 
 		public void ReturnAll()
@@ -98,6 +119,14 @@ namespace Util
 					cleanupMethod(items[i]);
 
 			freeIndex = 0;
+			takenItems.Clear();
 		}
 	}
+
+#if !ODIN_INSPECTOR
+	static class TypeExtensions
+	{
+		public static string GetNiceName(this Type type) => type.Name;
+	}
+#endif
 }

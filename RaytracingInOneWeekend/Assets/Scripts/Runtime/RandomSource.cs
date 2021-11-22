@@ -17,12 +17,20 @@ namespace Runtime
 
 		Random whiteNoise;
 		PerPixelBlueNoise blueNoise;
+		float randomEvents;
 
 		public RandomSource(NoiseColor noiseColor, Random whiteNoise, PerPixelBlueNoise blueNoise)
 		{
 			this.noiseColor = noiseColor;
 			this.whiteNoise = whiteNoise;
 			this.blueNoise = blueNoise;
+			randomEvents = 0;
+		}
+
+		public float RandomEvents
+		{
+			get => randomEvents;
+			set => randomEvents = value;
 		}
 
 		// from : https://programming.guide/random-point-within-circle.html
