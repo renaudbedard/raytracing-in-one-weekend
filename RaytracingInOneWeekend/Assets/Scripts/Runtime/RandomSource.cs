@@ -8,7 +8,8 @@ namespace Runtime
 	enum NoiseColor
 	{
 		White,
-		Blue
+		Blue,
+		SpatioTemporalBlue
 	}
 
 	struct RandomSource
