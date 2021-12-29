@@ -545,7 +545,7 @@ namespace Unity
 #if UNITY_EDITOR
 				ForceUpdateInspector();
 #endif
-				bool traceComplete = TotalSamplesPerPixel >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
+				bool traceComplete = ceil(TotalSamplesPerPixel) >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
 				queuedSample = !traceAborted && !traceComplete;
 			}
 
@@ -801,7 +801,7 @@ namespace Unity
 			albedoAccumulationBuffer = albedoOutputBuffer;
 			sampleCountWeightAccumulationBuffer = sampleCountWeightOutputBuffer;
 
-			bool traceComplete = TotalSamplesPerPixel >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
+			bool traceComplete = samplesPerPixel == 1 || TotalSamplesPerPixel >= samplesPerPixel || (maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds);
 
 			if (traceComplete || previewAfterBatch)
 				ScheduleCombine(combinedDependency, outputData);
@@ -1054,7 +1054,7 @@ namespace Unity
 					break;
 			}
 
-			bool traceComplete = TotalSamplesPerPixel >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
+			bool traceComplete = ceil(TotalSamplesPerPixel) >= samplesPerPixel || maxDurationSeconds != -1 && traceTimer.Elapsed.TotalSeconds >= maxDurationSeconds;
 			if (traceComplete && stopWhenCompleted && saveWhenCompleted)
 				SaveFrontBuffer();
 		}
