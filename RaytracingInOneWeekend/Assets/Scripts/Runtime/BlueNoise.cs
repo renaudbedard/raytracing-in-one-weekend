@@ -1,70 +1,30 @@
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
-using static Unity.Mathematics.math;
 
 namespace Runtime
 {
-	readonly unsafe struct BlueNoise
+	unsafe struct BlueNoise
 	{
-		[field: NativeDisableUnsafePtrRestriction]
-		public half4* NoiseData { get; }
-		public uint RowStride { get; }
-
+		[NativeDisableUnsafePtrRestriction] readonly half4* noiseData;
+		readonly uint rowStride;
 		readonly uint seed;
+
+		PerPixelNoise<half4> perPixelNoise;
 
 		public BlueNoise(uint seed, half4* noiseData, uint rowStride) : this()
 		{
-			RowStride = rowStride;
-			NoiseData = noiseData;
 			this.seed = seed;
-		}
-
-		public PerPixelBlueNoise GetPerPixelData(uint2 coordinates) => new(seed, coordinates, NoiseData, RowStride);
-	}
-
-	unsafe struct PerPixelBlueNoise
-	{
-		[NativeDisableUnsafePtrRestriction] readonly half4* noiseData;
-		readonly uint2 coordinates;
-		uint2 offset;
-		readonly uint rowStride;
-		uint n;
-
-		public PerPixelBlueNoise(uint seed, uint2 coordinates, half4* noiseData, uint rowStride) : this()
-		{
-			this.coordinates = coordinates;
 			this.noiseData = noiseData;
 			this.rowStride = rowStride;
-
-			n = (byte) (seed % 255);
-			Advance();
 		}
 
-		public float NextFloat()
+		public uint2 Coordinates
 		{
-			uint2 wrappedCoords = (coordinates + offset) % rowStride;
-			half4* pPixel = noiseData + wrappedCoords.y * rowStride + wrappedCoords.x;
-			Advance();
-			return pPixel->x;
+			set => perPixelNoise = new PerPixelNoise<half4>(seed, value, noiseData, rowStride);
 		}
 
-		public float NextFloat(float min, float max) => NextFloat() * (max - min) + min;
+		public float NextFloat() => perPixelNoise.Next().x;
 
-		public float2 NextFloat2()
-		{
-			uint2 wrappedCoords = (coordinates + offset) % rowStride;
-			half4* pPixel = noiseData + wrappedCoords.y * rowStride + wrappedCoords.x;
-			Advance();
-			return float2(pPixel->xy);
-		}
-
-		public float2 NextFloat2(float2 min, float2 max) => NextFloat2() * (max - min) + min;
-
-		public int NextInt(int min, int max) => (int) math.min(NextFloat() * (max - min) + min, max - 1);
-
-		void Advance()
-		{
-			offset += (uint2) floor(R2.Next(n++) * rowStride);
-		}
+		public float2 NextFloat2() => perPixelNoise.Next().xy;
 	}
 }

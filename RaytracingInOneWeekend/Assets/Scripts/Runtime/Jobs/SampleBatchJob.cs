@@ -34,6 +34,7 @@ namespace Runtime.Jobs
 		[ReadOnly] [NativeDisableUnsafePtrRestriction] public BvhNode* BvhRoot;
 		[ReadOnly] public PerlinNoise PerlinNoise;
 		[ReadOnly] public BlueNoise BlueNoise;
+		[ReadOnly] public SpatioTemporalBlueNoise StbNoise;
 		[ReadOnly] public NoiseColor NoiseColor;
 		[ReadOnly] public float2 SampleCountWeightExtrema;
 
@@ -76,19 +77,21 @@ namespace Runtime.Jobs
 
 			int sampleCount = (int) lastColor.w;
 
-			PerPixelBlueNoise blueNoise = default;
 			Random whiteNoise = default;
 			switch (NoiseColor)
 			{
 				case NoiseColor.Blue:
-					blueNoise = BlueNoise.GetPerPixelData((uint2) coordinates);
+					BlueNoise.Coordinates = (uint2)coordinates;
+					break;
+				case NoiseColor.SpatioTemporalBlue:
+					StbNoise.Coordinates = (uint2)coordinates;
 					break;
 				case NoiseColor.White:
 					// Big primes stolen from Unity's random class
 					whiteNoise = new Random((Seed * 0x8C4CA03Fu) ^ (uint) (index * 0x7383ED49u));
 					break;
 			}
-			var rng = new RandomSource(NoiseColor, whiteNoise, blueNoise);
+			var rng = new RandomSource(NoiseColor, whiteNoise, BlueNoise, StbNoise);
 
 #if PATH_DEBUGGING
 			bool doDebugPaths = all(coordinates == DebugCoordinates);

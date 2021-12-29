@@ -77,6 +77,7 @@ namespace Unity
 
 		[Title("References")]
 		[SerializeField] BlueNoiseData blueNoise;
+		[SerializeField] SpatioTemporalBlueNoiseData stbNoise;
 
 		[Title("Settings")]
 		[SerializeField] [Range(1, 100)] int interlacing = 2;
@@ -655,6 +656,7 @@ namespace Unity
 			if (interlacingOffsetIndex == 0)
 			{
 				blueNoise.CycleTexture();
+				stbNoise.CycleTexture();
 				frameSeed = (uint) Time.frameCount + 1;
 			}
 
@@ -698,6 +700,7 @@ namespace Unity
 					BvhRoot = BvhRoot,
 					PerlinNoise = perlinNoise.GetRuntimeData(),
 					BlueNoise = blueNoise.GetRuntimeData(frameSeed),
+					StbNoise = stbNoise.GetRuntimeData(frameSeed),
 					NoiseColor = noiseColor,
 					OutputDiagnostics = diagnosticsBuffer,
 					SampleCountWeightExtrema = this.sampleCountWeightExtrema,

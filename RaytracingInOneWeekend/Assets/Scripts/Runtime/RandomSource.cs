@@ -17,14 +17,16 @@ namespace Runtime
 		readonly NoiseColor noiseColor;
 
 		Random whiteNoise;
-		PerPixelBlueNoise blueNoise;
+		BlueNoise blueNoise;
+		SpatioTemporalBlueNoise stbNoise;
 		float randomEvents;
 
-		public RandomSource(NoiseColor noiseColor, Random whiteNoise, PerPixelBlueNoise blueNoise)
+		public RandomSource(NoiseColor noiseColor, Random whiteNoise, BlueNoise blueNoise, SpatioTemporalBlueNoise stbNoise)
 		{
 			this.noiseColor = noiseColor;
 			this.whiteNoise = whiteNoise;
 			this.blueNoise = blueNoise;
+			this.stbNoise = stbNoise;
 			randomEvents = 0;
 		}
 
@@ -46,9 +48,12 @@ namespace Runtime
 					break;
 
 				case NoiseColor.Blue:
-					theta = blueNoise.NextFloat(0, 2 * PI);
+					theta = blueNoise.NextFloat() * 2 * PI;
 					radius = sqrt(blueNoise.NextFloat());
 					break;
+
+				case NoiseColor.SpatioTemporalBlue:
+					return stbNoise.NextUnitVector2();
 			}
 
 			sincos(theta, out float sinTheta, out float cosTheta);
@@ -58,10 +63,16 @@ namespace Runtime
 		public float3 OnCosineWeightedHemisphere(float3 normal)
 		{
 			float2 uv = default;
+			float3 tangentSpaceDirection;
+
 			switch (noiseColor)
 			{
 				case NoiseColor.White: uv = whiteNoise.NextFloat2(); break;
 				case NoiseColor.Blue: uv = blueNoise.NextFloat2();	break;
+
+				case NoiseColor.SpatioTemporalBlue:
+					tangentSpaceDirection = stbNoise.NextCosineUnitVector3();
+					return Tools.TangentToWorldSpace(tangentSpaceDirection, normal);
 			}
 
 			// uniform sampling of a cosine-weighted hemisphere
@@ -72,7 +83,7 @@ namespace Runtime
 			float theta = uv.y * 2 * PI;
 			sincos(theta, out float sinTheta, out float cosTheta);
 			float2 xz = radius * float2(cosTheta, sinTheta);
-			float3 tangentSpaceDirection = float3(xz.x, sqrt(1 - u), xz.y);
+			tangentSpaceDirection = float3(xz.x, sqrt(1 - u), xz.y);
 
 			return Tools.TangentToWorldSpace(tangentSpaceDirection, normal);
 		}
@@ -84,6 +95,7 @@ namespace Runtime
 			{
 				case NoiseColor.White: uv = whiteNoise.NextFloat2(); break;
 				case NoiseColor.Blue: uv = blueNoise.NextFloat2();	break;
+				case NoiseColor.SpatioTemporalBlue: uv = stbNoise.NextFloat2();	break;
 			}
 
 			// uniform sampling of a hemisphere
@@ -105,6 +117,7 @@ namespace Runtime
 			{
 				case NoiseColor.White: rnd = whiteNoise.NextFloat2(); break;
 				case NoiseColor.Blue: rnd = blueNoise.NextFloat2();	break;
+				case NoiseColor.SpatioTemporalBlue: return stbNoise.NextUnitVector3();
 			}
 
 			float z = rnd.x * 2.0f - 1.0f;
@@ -120,6 +133,7 @@ namespace Runtime
 			{
 				case NoiseColor.White: return whiteNoise.NextFloat();
 				case NoiseColor.Blue: return blueNoise.NextFloat();
+				case NoiseColor.SpatioTemporalBlue: return stbNoise.NextFloat();
 			}
 			return default;
 		}
@@ -130,26 +144,7 @@ namespace Runtime
 			{
 				case NoiseColor.White: return whiteNoise.NextFloat2();
 				case NoiseColor.Blue: return blueNoise.NextFloat2();
-			}
-			return default;
-		}
-
-		public float2 NextFloat2(float2 from, float2 to)
-		{
-			switch (noiseColor)
-			{
-				case NoiseColor.White: return whiteNoise.NextFloat2(from, to);
-				case NoiseColor.Blue: return blueNoise.NextFloat2(from, to);
-			}
-			return default;
-		}
-
-		public int NextInt(int from, int to)
-		{
-			switch (noiseColor)
-			{
-				case NoiseColor.White: return whiteNoise.NextInt(from, to);
-				case NoiseColor.Blue: return blueNoise.NextInt(from, to);
+				case NoiseColor.SpatioTemporalBlue: return stbNoise.NextFloat2();
 			}
 			return default;
 		}

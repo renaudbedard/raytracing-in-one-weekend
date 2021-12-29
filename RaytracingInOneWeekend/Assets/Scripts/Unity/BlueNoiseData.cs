@@ -1,13 +1,12 @@
 using System;
 using Runtime;
-using Sirenix.OdinInspector;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
 
 #if ODIN_INSPECTOR
-
+using Sirenix.OdinInspector;
 #else
 using OdinMock;
 #endif

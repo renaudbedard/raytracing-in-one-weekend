@@ -6,7 +6,7 @@ namespace Util
 	enum ChannelType
 	{
 		UnsignedByte,
-		SignedHalf,
+		SignedHalf
 	}
 
 	[StructLayout(LayoutKind.Explicit)]

@@ -29,7 +29,7 @@ namespace Runtime.EntityTypes
 
 		public float3 RandomPoint(ref RandomSource rng)
 		{
-			float2 u = rng.NextFloat2(0, 1);
+			float2 u = rng.NextFloat2();
 			if (u.x + u.y > 1)
 				u = 1 - u;
 			return u.x * Data[0] + u.y * Data[1] + Data[3];
