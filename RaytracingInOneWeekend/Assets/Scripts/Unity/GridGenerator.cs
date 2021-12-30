@@ -16,15 +16,17 @@ namespace Unity
 		[SerializeField] int2 gridSize;
 		[SerializeField] Transform minimumTransform, maximumTransform;
 
-		[Header("Horizontal")]
-		[SerializeField] Material horizontalMinimumMaterial;
-		[SerializeField] Material horizontalMaximumMaterial;
-		[SerializeField] [ValueDropdown(nameof(MaterialPropertiesNames))] int horizontalBlendParameter;
+		[Header("Bottom")]
+		[SerializeField] Material bottomLeftMaterial;
+		[SerializeField] Material bottomRightMaterial;
 
-		[Header("Vertical")]
-		[SerializeField] Material verticalMinimumMaterial;
-		[SerializeField] Material verticalMaximumMaterial;
+		[Header("Top")]
+		[SerializeField] Material topLeftMaterial;
+		[SerializeField] Material topRightMaterial;
+
+		[Header("Blend Parameters")]
 		[SerializeField] [ValueDropdown(nameof(MaterialPropertiesNames))] int verticalBlendParameter;
+		[SerializeField] [ValueDropdown(nameof(MaterialPropertiesNames))] int horizontalBlendParameter;
 
 		readonly List<GameObject> instances = new();
 
@@ -32,8 +34,8 @@ namespace Unity
 		{
 			get
 			{
-				for (int i = 0; i < horizontalMinimumMaterial.shader.GetPropertyCount(); i++)
-					yield return new ValueDropdownItem(horizontalMinimumMaterial.shader.GetPropertyName(i), i);
+				for (int i = 0; i < bottomLeftMaterial.shader.GetPropertyCount(); i++)
+					yield return new ValueDropdownItem(bottomLeftMaterial.shader.GetPropertyName(i), i);
 			}
 		}
 
@@ -76,8 +78,8 @@ namespace Unity
 			for (int j = 0; j < gridSize.y; j++)
 			for (int i = 0; i < gridSize.x; i++)
 			{
-				var hs = (float)i / (gridSize.x - 1);
-				var vs = (float)j / (gridSize.y - 1);
+				var hs = gridSize.x == 1 ? 0 : (float)i / (gridSize.x - 1);
+				var vs = gridSize.y == 1 ? 0 : (float)j / (gridSize.y - 1);
 
 				MeshRenderer instance = Instantiate(template, transform);
 				instance.transform.localPosition = dot(delta, horizontalAxis) * hs * horizontalAxis * sign(delta) +
@@ -85,24 +87,72 @@ namespace Unity
 				                                   minPosition;
 				instance.name = GeneratedName;
 
-				var materialInstance = new Material(horizontalMinimumMaterial) { name = "Generated Material" };
+				var materialInstance = new Material(bottomLeftMaterial) { name = "Generated Material" };
 
-				switch (materialInstance.shader.GetPropertyType(horizontalBlendParameter))
+				if (horizontalBlendParameter == verticalBlendParameter)
 				{
-					case ShaderPropertyType.Float:
-					case ShaderPropertyType.Range:
-						int nameId = materialInstance.shader.GetPropertyNameId(horizontalBlendParameter);
-						materialInstance.SetFloat(nameId, lerp(horizontalMinimumMaterial.GetFloat(nameId), horizontalMaximumMaterial.GetFloat(nameId), hs));
-						break;
+					var blendParameter = verticalBlendParameter; // interchangeable with the bottom one
+					int nameId = materialInstance.shader.GetPropertyNameId(blendParameter);
+
+					switch (materialInstance.shader.GetPropertyType(blendParameter))
+					{
+						case ShaderPropertyType.Float:
+						case ShaderPropertyType.Range:
+						{
+							float bottomFloatValue = lerp(bottomLeftMaterial.GetFloat(nameId), bottomRightMaterial.GetFloat(nameId), hs);
+							float topFloatValue = lerp(topLeftMaterial.GetFloat(nameId), topRightMaterial.GetFloat(nameId), hs);
+							materialInstance.SetFloat(nameId, lerp(bottomFloatValue, topFloatValue, vs));
+							break;
+						}
+
+						case ShaderPropertyType.Color:
+						{
+							Color bottomColorValue = Color.Lerp(bottomLeftMaterial.GetColor(nameId), bottomRightMaterial.GetColor(nameId), hs);
+							Color topColorValue = Color.Lerp(topLeftMaterial.GetColor(nameId), topRightMaterial.GetColor(nameId), hs);
+							materialInstance.SetColor(nameId, Color.Lerp(bottomColorValue, topColorValue, vs));
+							break;
+						}
+					}
 				}
-
-				switch (materialInstance.shader.GetPropertyType(verticalBlendParameter))
+				else
 				{
-					case ShaderPropertyType.Float:
-					case ShaderPropertyType.Range:
-						int nameId = materialInstance.shader.GetPropertyNameId(verticalBlendParameter);
-						materialInstance.SetFloat(nameId, lerp(verticalMinimumMaterial.GetFloat(nameId), verticalMaximumMaterial.GetFloat(nameId), vs));
-						break;
+					int nameId = materialInstance.shader.GetPropertyNameId(horizontalBlendParameter);
+					switch (materialInstance.shader.GetPropertyType(horizontalBlendParameter))
+					{
+						case ShaderPropertyType.Float:
+						case ShaderPropertyType.Range:
+						{
+							float horizontalValue = lerp(bottomLeftMaterial.GetFloat(nameId), bottomRightMaterial.GetFloat(nameId), hs);
+							materialInstance.SetFloat(nameId, horizontalValue);
+							break;
+						}
+
+						case ShaderPropertyType.Color:
+						{
+							Color horizontalValue = Color.Lerp(bottomLeftMaterial.GetColor(nameId), bottomRightMaterial.GetColor(nameId), hs);
+							materialInstance.SetColor(nameId, horizontalValue);
+							break;
+						}
+					}
+
+					nameId = materialInstance.shader.GetPropertyNameId(verticalBlendParameter);
+					switch (materialInstance.shader.GetPropertyType(verticalBlendParameter))
+					{
+						case ShaderPropertyType.Float:
+						case ShaderPropertyType.Range:
+						{
+							float verticalValue = lerp(bottomLeftMaterial.GetFloat(nameId), topLeftMaterial.GetFloat(nameId), hs);
+							materialInstance.SetFloat(nameId, verticalValue);
+							break;
+						}
+
+						case ShaderPropertyType.Color:
+						{
+							Color verticalValue = Color.Lerp(bottomLeftMaterial.GetColor(nameId), topLeftMaterial.GetColor(nameId), hs);
+							materialInstance.SetColor(nameId, verticalValue);
+							break;
+						}
+					}
 				}
 
 				instance.material = materialInstance;

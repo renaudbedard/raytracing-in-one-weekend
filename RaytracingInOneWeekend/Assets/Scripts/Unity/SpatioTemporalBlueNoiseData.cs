@@ -21,7 +21,7 @@ namespace Unity
 		[AssetsOnly] public Texture2D[] UnitVector2Textures = null;
 		[AssetsOnly] public Texture2D[] UnitVector3Textures = null;
 
-		int textureIndex;
+		int textureIndex = -1;
 
 		public unsafe SpatioTemporalBlueNoise GetRuntimeData(uint seed)
 		{

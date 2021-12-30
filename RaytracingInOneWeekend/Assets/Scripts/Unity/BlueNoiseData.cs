@@ -18,7 +18,7 @@ namespace Unity
 	{
 		[LabelText("Textures")] [AssetsOnly] public Texture2D[] NoiseTextures = null;
 
-		int textureIndex;
+		int textureIndex = -1;
 
 		public unsafe void Linearize()
 		{

@@ -1,6 +1,6 @@
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Mathematics;
 using static Unity.Mathematics.math;
+using uint2 = Unity.Mathematics.uint2;
 
 namespace Runtime
 {
