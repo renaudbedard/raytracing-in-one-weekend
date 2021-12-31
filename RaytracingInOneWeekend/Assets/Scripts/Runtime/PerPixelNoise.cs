@@ -8,8 +8,9 @@ namespace Runtime
 	{
 		[NativeDisableUnsafePtrRestriction] readonly T* noiseData;
 		readonly uint2 coordinates;
-		uint2 offset;
 		readonly uint rowStride;
+
+		uint2 offset;
 		uint n;
 
 		public PerPixelNoise(uint seed, uint2 coordinates, T* noiseData, uint rowStride) : this()
@@ -18,7 +19,7 @@ namespace Runtime
 			this.noiseData = noiseData;
 			this.rowStride = rowStride;
 
-			n = (byte) (seed % 255);
+			n = seed;
 			Advance();
 		}
 
@@ -32,7 +33,7 @@ namespace Runtime
 
 		void Advance()
 		{
-			offset += (uint2) floor(R2.Next(n++) * rowStride);
+			offset = (uint2) floor(R2.Next(n++) * rowStride);
 		}
 	}
 }
